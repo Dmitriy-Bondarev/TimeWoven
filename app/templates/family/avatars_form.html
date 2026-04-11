@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Аватары семьи</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      padding: 24px;
+    }
+    h1 { font-size: 24px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.3); }
+    th { text-align: left; color: #9ca3af; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+    tr:hover { background: rgba(15,23,42,0.8); }
+    img {
+      width: 48px;
+      height: 48px;
+      border-radius: 999px;
+      object-fit: cover;
+      border: 1px solid rgba(148,163,184,0.5);
+    }
+    form { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+    select, input[type="file"] { font: inherit; font-size: 14px; }
+    button {
+      background: #f97316;
+      color: #020617;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Загрузка аватаров</h1>
+
+  <form action="/admin/avatars" method="post" enctype="multipart/form-data">
+    <label>
+      Человек:
+      <select name="person_id">
+        {% for person in people %}
+          <option value="{{ person.id }}">{{ person.id }} — {{ person.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Фото:
+      <input type="file" name="file" accept="image/*" required>
+    </label>
+    <button type="submit">Загрузить</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Имя</th>
+        <th>Текущий аватар</th>
+        <th>Путь в базе</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for person in people %}
+      <tr>
+        <td>{{ person.id }}</td>
+        <td>{{ person.name }}</td>
+        <td>
+          {% if person.avatar_url %}
+            <img src="{{ person.avatar_url }}" alt="{{ person.name }}">
+          {% else %}
+            нет
+          {% endif %}
+        </td>
+        <td>{{ person.avatar_url or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

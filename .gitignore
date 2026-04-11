@@ -1,0 +1,27 @@
+# База данных (не в git - только SQL дампы)
+data/db/family.db
+data/db/family.db.backup*
+data/db/*.textClipping
+
+# Аудио файлы
+data/processed/
+data/raw/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# IDE
+.vscode/
+.cursor/
+*.swp
+app/static/processed/
+app/static/avatars/
