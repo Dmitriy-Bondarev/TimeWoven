@@ -77,3 +77,15 @@ class Quote(Base):
 
     author = relationship("Person", back_populates="quotes")
     memory = relationship("Memory", back_populates="quotes")
+
+
+class AvatarHistory(Base):
+    __tablename__ = "AvatarHistory"
+
+    avatar_id = Column(Integer, primary_key=True, index=True)
+    person_id = Column(Integer, ForeignKey("People.person_id"), nullable=False)
+    storage_path = Column(String, nullable=False)
+    target_year = Column(Integer)
+    is_current = Column(Integer, default=0)
+    source_type = Column(String, nullable=False)
+    created_at = Column(String)

@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .db import get_db
-from .models import Quote, PersonI18n, Person, Memory
+from .models import Quote, PersonI18n, Person, Memory, AvatarHistory
 
 # Admin credentials (в продакшене вынести в .env)
 ADMIN_USERS = {
@@ -576,3 +576,82 @@ async def person_card(person_id: int, request: Request, db: Session = Depends(ge
             "quotes": quotes_data,
         },
     )
+
+
+@app.get("/profile", response_class=HTMLResponse)
+async def profile(request: Request, db: Session = Depends(get_db)):
+    current_person_id = request.cookies.get("current_person_id")
+    if not current_person_id:
+        return RedirectResponse(url="/who-am-i?next=/profile", status_code=303)
+
+    person = db.query(Person).filter(Person.person_id == int(current_person_id)).first()
+    if not person:
+        return RedirectResponse(url="/who-am-i?next=/profile", status_code=303)
+
+    i18n = db.query(PersonI18n).filter(
+        PersonI18n.person_id == person.person_id,
+        PersonI18n.lang_code == "ru"
+    ).first()
+
+    name = build_person_name(i18n)
+    memories_count = db.query(Memory).filter(Memory.author_id == person.person_id).count()
+    quotes_count = db.query(Quote).filter(Quote.author_id == person.person_id).count()
+
+    return templates.TemplateResponse(
+        "family/profile.html",
+        {
+            "request": request,
+            "person": person,
+            "name": name,
+            "memories_count": memories_count,
+            "quotes_count": quotes_count,
+            "message": request.query_params.get("message"),
+        },
+    )
+
+
+@app.post("/profile/avatar")
+async def profile_avatar_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    current_person_id = request.cookies.get("current_person_id")
+    if not current_person_id:
+        return RedirectResponse(url="/who-am-i?next=/profile", status_code=303)
+
+    person_id = int(current_person_id)
+    avatars_dir = Path("app/static/avatars")
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+
+    suffix = Path(file.filename).suffix.lower() or ".jpg"
+    filename = f"person_{person_id}{suffix}"
+    filepath = avatars_dir / filename
+
+    contents = await file.read()
+    filepath.write_bytes(contents)
+
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if person:
+        # Снимаем флаг is_current у предыдущих аватаров
+        db.query(AvatarHistory).filter(
+            AvatarHistory.person_id == person_id,
+            AvatarHistory.is_current == 1
+        ).update({"is_current": 0})
+
+        # Пишем новый аватар в историю
+        new_avatar = AvatarHistory(
+            person_id=person_id,
+            storage_path=f"/static/avatars/{filename}",
+            is_current=1,
+            source_type="upload",
+            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        db.add(new_avatar)
+
+        # Обновляем основную запись
+        person.avatar_url = f"/static/avatars/{filename}"
+        db.add(person)
+        db.commit()
+
+    return RedirectResponse(url="/profile?message=Фото обновлено", status_code=303)
