@@ -25,3 +25,4 @@ venv/
 *.swp
 app/static/processed/
 app/static/avatars/
+family.db
