@@ -165,7 +165,7 @@
                 {% endif %}
 
                 <div>
-                  <div class="response-author">{{ item.author_name }}</div>
+                  <div class="response-author"><a href="/family/person/{{ item.author_id }}" style="color: inherit; text-decoration: none;">{{ item.author_name }}</a></div>
                   <div class="response-date">{{ item.created_at or "Без даты" }}</div>
                 </div>
               </div>

@@ -50,7 +50,7 @@
           {% endif %}
         </td>
         <td>
-          {{ r.name }}
+          <a href="/family/person/{{ r.person_id }}" style="color: inherit; text-decoration: none;">{{ r.name }}</a>
           {% if not r.avatar_url %}
             <br><a href="/admin/avatars" class="upload-link">↑ загрузить фото</a>
           {% endif %}

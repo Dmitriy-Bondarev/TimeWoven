@@ -21,6 +21,7 @@ class Person(Base):
     phone = Column(String)
     preferred_ch = Column(String)
     avatar_url = Column(String)
+    pin = Column(String)
 
     translations = relationship("PersonI18n", back_populates="person")
     quotes = relationship("Quote", back_populates="author")

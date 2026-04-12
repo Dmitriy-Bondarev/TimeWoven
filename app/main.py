@@ -100,6 +100,7 @@ def collect_replies(db: Session, source_memory_id: int):
                 "id": reply.id,
                 "text": pick_memory_text(reply),
                 "author_name": build_person_name(reply_author_i18n),
+                "author_id": reply.author_id,
                 "avatar_url": reply_author.avatar_url if reply_author and reply_author.avatar_url else None,
                 "created_at": format_created_at(reply.created_at),
             }
@@ -234,6 +235,52 @@ async def who_am_i_submit(
     person_id: int = Form(...),
     next: str = Form("/"),
 ):
+    return RedirectResponse(url=f"/who-am-i/pin?person_id={person_id}&next={next}", status_code=303)
+
+
+@app.get("/who-am-i/pin", response_class=HTMLResponse)
+async def pin_form(request: Request, person_id: int, next: str = "/", db: Session = Depends(get_db)):
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    i18n = db.query(PersonI18n).filter(PersonI18n.person_id == person_id, PersonI18n.lang_code == "ru").first()
+    name = build_person_name(i18n)
+    return templates.TemplateResponse(
+        "family/pin_form.html",
+        {
+            "request": request,
+            "person_id": person_id,
+            "name": name,
+            "avatar_url": person.avatar_url if person else None,
+            "next": next,
+            "error": None,
+        },
+    )
+
+
+@app.post("/who-am-i/pin", response_class=HTMLResponse)
+async def pin_submit(
+    request: Request,
+    person_id: int = Form(...),
+    pin: str = Form(...),
+    next: str = Form("/"),
+    db: Session = Depends(get_db),
+):
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    i18n = db.query(PersonI18n).filter(PersonI18n.person_id == person_id, PersonI18n.lang_code == "ru").first()
+    name = build_person_name(i18n)
+
+    if not person or person.pin != pin.strip():
+        return templates.TemplateResponse(
+            "family/pin_form.html",
+            {
+                "request": request,
+                "person_id": person_id,
+                "name": name,
+                "avatar_url": person.avatar_url if person else None,
+                "next": next,
+                "error": "Неверный PIN. Попробуйте ещё раз.",
+            },
+        )
+
     response = RedirectResponse(url=next, status_code=303)
     response.set_cookie("current_person_id", str(person_id), max_age=60 * 60 * 24 * 365)
     return response
@@ -395,4 +442,80 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         "family/admin_people.html",
         {"request": request, "rows": rows},
+    )
+
+
+@app.get("/family/person/{person_id}", response_class=HTMLResponse)
+async def person_card(person_id: int, request: Request, db: Session = Depends(get_db)):
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        return HTMLResponse("Человек не найден", status_code=404)
+
+    i18n = (
+        db.query(PersonI18n)
+        .filter(PersonI18n.person_id == person_id, PersonI18n.lang_code == "ru")
+        .first()
+    )
+
+    name = " ".join(filter(None, [
+        getattr(i18n, "first_name", None),
+        getattr(i18n, "last_name", None),
+        getattr(i18n, "patronymic", None),
+    ])) or "Неизвестный"
+
+    memories = (
+        db.query(Memory)
+        .filter(Memory.author_id == person_id, Memory.audio_url != None)
+        .order_by(Memory.id.desc())
+        .all()
+    )
+
+    quotes = (
+        db.query(Quote)
+        .filter(Quote.author_id == person_id)
+        .order_by(Quote.id.desc())
+        .all()
+    )
+
+    memories_data = []
+    for m in memories:
+        raw_audio = m.audio_url or ""
+        filename = raw_audio.split("/")[-1].strip()
+        audio_url = f"/static/processed/{filename}" if filename else None
+        memories_data.append({
+            "id": m.id,
+            "text": pick_memory_text(m),
+            "audio_url": audio_url,
+            "created_at": format_created_at(m.created_at),
+        })
+
+    quotes_data = [
+        {
+            "id": q.id,
+            "text": q.content_text,
+            "created_at": format_created_at(q.created_at),
+        }
+        for q in quotes
+    ]
+
+    def fmt_date(val):
+        if not val:
+            return None
+        parts = val.split("-")
+        if len(parts) == 3:
+            return f"{parts[2]}.{parts[1]}.{parts[0]}"
+        return val
+
+    return templates.TemplateResponse(
+        "family/person_card.html",
+        {
+            "request": request,
+            "person": person,
+            "name": name,
+            "biography": getattr(i18n, "biography", None),
+            "birth_date": fmt_date(person.birth_date),
+            "death_date": fmt_date(person.death_date),
+            "memories": memories_data,
+            "quotes": quotes_data,
+        },
     )
