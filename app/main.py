@@ -1,4 +1,5 @@
 import random
+import hashlib
 from pathlib import Path
 from datetime import datetime
 
@@ -10,6 +11,20 @@ from sqlalchemy.orm import Session
 
 from .db import get_db
 from .models import Quote, PersonI18n, Person, Memory
+
+# Admin credentials (в продакшене вынести в .env)
+ADMIN_USERS = {
+    "admin": hashlib.sha256("timewoven2026".encode()).hexdigest(),
+}
+
+def is_admin(request: Request) -> bool:
+    return request.cookies.get("is_admin") == "1"
+
+def require_admin(request: Request):
+    if not is_admin(request):
+        return RedirectResponse(url=f"/admin/login?next={request.url.path}", status_code=303)
+    return None
+
 
 app = FastAPI(title="TimeWoven")
 
@@ -155,8 +170,47 @@ async def home_presence(request: Request, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login(request: Request, next: str = "/admin/people"):
+    if is_admin(request):
+        return RedirectResponse(url=next, status_code=303)
+    return templates.TemplateResponse(
+        "family/admin_login.html",
+        {"request": request, "next": next, "error": None},
+    )
+
+
+@app.post("/admin/login", response_class=HTMLResponse)
+async def admin_login_submit(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    next: str = Form("/admin/people"),
+):
+    import hashlib
+    hashed = hashlib.sha256(password.encode()).hexdigest()
+    if ADMIN_USERS.get(username) == hashed:
+        response = RedirectResponse(url=next, status_code=303)
+        response.set_cookie("is_admin", "1", max_age=60 * 60 * 8)  # 8 часов
+        return response
+    return templates.TemplateResponse(
+        "family/admin_login.html",
+        {"request": request, "next": next, "error": "Неверный логин или пароль."},
+    )
+
+
+@app.get("/admin/logout")
+async def admin_logout():
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie("is_admin")
+    return response
+
+
 @app.get("/admin/avatars", response_class=HTMLResponse)
 async def avatars_form(request: Request, db: Session = Depends(get_db)):
+    guard = require_admin(request)
+    if guard:
+        return guard
     people = (
         db.query(Person, PersonI18n)
         .join(PersonI18n, Person.person_id == PersonI18n.person_id)
@@ -409,6 +463,9 @@ async def reply_sent(memory_id: int, request: Request, author: str = "", db: Ses
 
 @app.get("/admin/people", response_class=HTMLResponse)
 async def admin_people(request: Request, db: Session = Depends(get_db)):
+    guard = require_admin(request)
+    if guard:
+        return guard
     people = db.query(Person).order_by(Person.person_id).all()
 
     rows = []
