@@ -89,3 +89,18 @@ class AvatarHistory(Base):
     is_current = Column(Integer, default=0)
     source_type = Column(String, nullable=False)
     created_at = Column(String)
+
+
+class Event(Base):
+    __tablename__ = "Events"
+
+    event_id = Column(Integer, primary_key=True, index=True)
+    author_id = Column(Integer, ForeignKey("People.person_id"))
+    location_id = Column(Integer)
+    event_type = Column(String, nullable=False)
+    date_start = Column(String)
+    date_start_prec = Column(String)
+    date_end = Column(String)
+    date_end_prec = Column(String)
+    is_private = Column(Integer, default=0)
+    cover_asset_id = Column(Integer)

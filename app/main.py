@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .db import get_db
-from .models import Quote, PersonI18n, Person, Memory, AvatarHistory
+from .models import Quote, PersonI18n, Person, Memory, AvatarHistory, Event
 
 # Admin credentials (в продакшене вынести в .env)
 ADMIN_USERS = {
@@ -655,3 +655,123 @@ async def profile_avatar_upload(
         db.commit()
 
     return RedirectResponse(url="/profile?message=Фото обновлено", status_code=303)
+
+
+@app.get("/family/timeline", response_class=HTMLResponse)
+async def timeline(request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import text
+
+    # Три источника объединяем в один список
+    items = []
+
+    # 1. Рождения и смерти из People
+    people = db.query(Person).all()
+    for p in people:
+        i18n = db.query(PersonI18n).filter(
+            PersonI18n.person_id == p.person_id,
+            PersonI18n.lang_code == "ru"
+        ).first()
+        name = build_person_name(i18n)
+
+        is_female = p.gender == "F"
+        born_word = "Родилась" if is_female else "Родился"
+        died_word = "Ушла из жизни" if is_female else "Ушёл из жизни"
+
+        if p.birth_date:
+            items.append({
+                "date": p.birth_date,
+                "date_prec": p.birth_date_prec or "EXACT",
+                "type": "birth",
+                "title": f"{born_word} {name}",
+                "person_id": p.person_id,
+                "avatar_url": p.avatar_url,
+                "source": "people",
+            })
+        if p.death_date:
+            items.append({
+                "date": p.death_date,
+                "date_prec": p.death_date_prec or "EXACT",
+                "type": "death",
+                "title": f"{died_word} {name}",
+                "person_id": p.person_id,
+                "avatar_url": p.avatar_url,
+                "source": "people",
+            })
+
+    # 2. События из Events
+    type_labels = {
+        "wedding": "Свадьба",
+        "birth": "Рождение",
+        "death": "Смерть",
+        "memory_recording": "Запись посланий",
+        "anniversary": "Юбилей",
+        "graduation": "Окончание учёбы",
+        "move": "Переезд",
+    }
+    events = db.query(Event).filter(Event.is_private == 0).all()
+    for e in events:
+        label = type_labels.get(e.event_type, e.event_type)
+        items.append({
+            "date": e.date_start,
+            "date_prec": e.date_start_prec or "EXACT",
+            "type": e.event_type,
+            "title": label,
+            "person_id": e.author_id,
+            "avatar_url": None,
+            "source": "events",
+        })
+
+    # 3. Воспоминания с аудио
+    memories = db.query(Memory).filter(
+        Memory.audio_url != None,
+        Memory.event_id == None,
+    ).all()
+    for m in memories:
+        if not m.created_at:
+            continue
+        i18n = db.query(PersonI18n).filter(
+            PersonI18n.person_id == m.author_id,
+            PersonI18n.lang_code == "ru"
+        ).first()
+        author = db.query(Person).filter(Person.person_id == m.author_id).first()
+        name = build_person_name(i18n)
+        items.append({
+            "date": m.created_at[:10] if m.created_at else None,
+            "date_prec": "EXACT",
+            "type": "memory",
+            "title": f"Послание от {name}",
+            "text": pick_memory_text(m),
+            "person_id": m.author_id,
+            "avatar_url": author.avatar_url if author else None,
+            "memory_id": m.id,
+            "source": "memories",
+        })
+
+    # Сортируем по дате
+    def sort_key(x):
+        d = x.get("date") or "0000"
+        return d[:10] if d else "0000"
+
+    items.sort(key=sort_key)
+
+    # Форматируем даты для отображения
+    for item in items:
+        raw = item.get("date", "")
+        prec = item.get("date_prec", "EXACT")
+        if raw:
+            parts = raw[:10].split("-")
+            if prec == "DECADE":
+                item["date_display"] = f"{parts[0][:3]}0-е"
+            elif prec in ("YEARONLY", "ABOUT"):
+                item["date_display"] = f"ок. {parts[0]}"
+            elif len(parts) == 3:
+                item["date_display"] = f"{parts[2]}.{parts[1]}.{parts[0]}"
+            else:
+                item["date_display"] = raw[:10]
+        else:
+            item["date_display"] = "Дата неизвестна"
+
+    return templates.TemplateResponse(
+        "family/timeline.html",
+        {"request": request, "items": items},
+    )
