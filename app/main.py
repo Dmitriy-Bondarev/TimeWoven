@@ -128,8 +128,9 @@ async def home_presence(request: Request, db: Session = Depends(get_db)):
 
     if not all_quotes:
         return templates.TemplateResponse(
+            request,
             "family/home.html",
-            {"request": request, "quote": None, "lang": "ru"}
+            {"quote": None, "lang": "ru"}
         )
 
     selected_quote = random.choice(all_quotes)
@@ -165,8 +166,9 @@ async def home_presence(request: Request, db: Session = Depends(get_db)):
     }
 
     return templates.TemplateResponse(
+        request,
         "family/home.html",
-        {"request": request, "quote": quote_data, "lang": "ru"}
+        {"quote": quote_data, "lang": "ru"}
     )
 
 
@@ -175,8 +177,9 @@ async def admin_login(request: Request, next: str = "/admin/people"):
     if is_admin(request):
         return RedirectResponse(url=next, status_code=303)
     return templates.TemplateResponse(
+        request,
         "family/admin_login.html",
-        {"request": request, "next": next, "error": None},
+        {"next": next, "error": None},
     )
 
 
@@ -194,8 +197,9 @@ async def admin_login_submit(
         response.set_cookie("is_admin", "1", max_age=60 * 60 * 8)  # 8 часов
         return response
     return templates.TemplateResponse(
+        request,
         "family/admin_login.html",
-        {"request": request, "next": next, "error": "Неверный логин или пароль."},
+        {"next": next, "error": "Неверный логин или пароль."},
     )
 
 
@@ -232,8 +236,9 @@ async def avatars_form(request: Request, db: Session = Depends(get_db)):
         )
 
     return templates.TemplateResponse(
+        request,
         "family/avatars_form.html",
-        {"request": request, "people": data}
+        {"people": data}
     )
 
 
@@ -279,8 +284,9 @@ async def who_am_i(request: Request, db: Session = Depends(get_db), next: str = 
         people.append({"id": person.person_id, "name": name})
 
     return templates.TemplateResponse(
+        request,
         "family/who_am_i.html",
-        {"request": request, "people": people, "next": next},
+        {"people": people, "next": next},
     )
 
 
@@ -298,9 +304,9 @@ async def pin_form(request: Request, person_id: int, next: str = "/", db: Sessio
     i18n = db.query(PersonI18n).filter(PersonI18n.person_id == person_id, PersonI18n.lang_code == "ru").first()
     name = build_person_name(i18n)
     return templates.TemplateResponse(
+        request,
         "family/pin_form.html",
         {
-            "request": request,
             "person_id": person_id,
             "name": name,
             "avatar_url": person.avatar_url if person else None,
@@ -324,9 +330,9 @@ async def pin_submit(
 
     if not person or person.pin != pin.strip():
         return templates.TemplateResponse(
+            request,
             "family/pin_form.html",
             {
-                "request": request,
                 "person_id": person_id,
                 "name": name,
                 "avatar_url": person.avatar_url if person else None,
@@ -335,7 +341,7 @@ async def pin_submit(
             },
         )
 
-    response = RedirectResponse(url=next, status_code=303)
+    response = RedirectResponse(url="/profile" if next == "/" else next, status_code=303)
     response.set_cookie("current_person_id", str(person_id), max_age=60 * 60 * 24 * 365)
     return response
 
@@ -346,9 +352,9 @@ async def reply_form(memory_id: int, request: Request, db: Session = Depends(get
 
     if not memory:
         return templates.TemplateResponse(
+            request,
             "family/reply.html",
             {
-                "request": request,
                 "memory": None,
                 "author_name": "Предок",
                 "memory_text": None,
@@ -375,9 +381,9 @@ async def reply_form(memory_id: int, request: Request, db: Session = Depends(get
     responses = collect_replies(db, memory_id)
 
     return templates.TemplateResponse(
+        request,
         "family/reply.html",
         {
-            "request": request,
             "memory": memory,
             "memory_text": pick_memory_text(memory),
             "author_name": author_name,
@@ -404,9 +410,9 @@ async def reply_submit(
 
     if not memory:
         return templates.TemplateResponse(
+            request,
             "family/reply.html",
             {
-                "request": request,
                 "memory": None,
                 "author_name": "Предок",
                 "memory_text": None,
@@ -452,9 +458,9 @@ async def reply_submit(
 @app.get("/family/reply/{memory_id}/sent", response_class=HTMLResponse)
 async def reply_sent(memory_id: int, request: Request, author: str = "", db: Session = Depends(get_db)):
     return templates.TemplateResponse(
+        request,
         "family/reply_sent.html",
         {
-            "request": request,
             "memory_id": memory_id,
             "author_name": author,
         },
@@ -497,8 +503,9 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
         })
 
     return templates.TemplateResponse(
+        request,
         "family/admin_people.html",
-        {"request": request, "rows": rows},
+        {"rows": rows},
     )
 
 
@@ -564,9 +571,9 @@ async def person_card(person_id: int, request: Request, db: Session = Depends(ge
         return val
 
     return templates.TemplateResponse(
+        request,
         "family/person_card.html",
         {
-            "request": request,
             "person": person,
             "name": name,
             "biography": getattr(i18n, "biography", None),
@@ -598,9 +605,9 @@ async def profile(request: Request, db: Session = Depends(get_db)):
     quotes_count = db.query(Quote).filter(Quote.author_id == person.person_id).count()
 
     return templates.TemplateResponse(
+        request,
         "family/profile.html",
         {
-            "request": request,
             "person": person,
             "name": name,
             "memories_count": memories_count,
@@ -708,7 +715,10 @@ async def timeline(request: Request, db: Session = Depends(get_db)):
         "graduation": "Окончание учёбы",
         "move": "Переезд",
     }
-    events = db.query(Event).filter(Event.is_private == 0).all()
+    # Birth events are excluded from Event table: they're already represented as personalized cards
+    # from Person.birth_date (e.g. "Родился Иван"). Including them separately would duplicate timeline
+    # entries since Event.author_id doesn't reflect the actual birth subject.
+    events = db.query(Event).filter(Event.is_private == 0, Event.event_type != "birth", Event.event_type != "death").all()
     for e in events:
         label = type_labels.get(e.event_type, e.event_type)
         items.append({
@@ -747,6 +757,8 @@ async def timeline(request: Request, db: Session = Depends(get_db)):
             "source": "memories",
         })
 
+
+
     # Сортируем по дате
     def sort_key(x):
         d = x.get("date") or "0000"
@@ -772,6 +784,10 @@ async def timeline(request: Request, db: Session = Depends(get_db)):
             item["date_display"] = "Дата неизвестна"
 
     return templates.TemplateResponse(
+        request,
         "family/timeline.html",
-        {"request": request, "items": items},
+        {"items": items},
     )
+
+from app.routes.family_tree import router as family_router
+app.include_router(family_router)
