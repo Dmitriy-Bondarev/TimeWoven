@@ -1,168 +1,236 @@
-# TimeWoven — Database Changelog
+# 🗄 DB Changelog — TimeWoven
 
-
-## 2026-04-15
-
-### Контекст
-Начата нормализация структуры базы данных.
-Работа ведётся локально (MacBook). Сервер не используется.
-
-### Цель
-Привести структуру к архитектуре:
-- Person (человек)
-- Union (союз)
-- Memory (воспоминание)
-- Event (событие)
-- Relationship (связи)
+> Журнал всех изменений схемы и данных базы данных.  
+> Каждая запись документирует **что** изменилось, **зачем** и **как откатить**.
 
 ---
 
-### Снимок до изменений
-- Схема сохранена в: db_schema_before.sql
-- Таблицы: db_tables_before.txt
+## Формат записи
 
-### Добавлено
-- Таблица Unions
-  - partner1_id
-  - partner2_id
-  - start_date
-  - end_date
+```markdown
+### [{VERSION}] — {YYYY-MM-DD} — {Краткое название}
 
-Причина:
-Добавлен уровень "союза" для корректной генеалогии.
-PersonRelationship остаётся как слой связей.
+**Тип:** {Schema | Data | Migration | Index | Seed}  
+**Автор:** {имя}  
+**ADR:** {ссылка на ADR или "—"}  
+**Обратимость:** {Reversible | Irreversible | Partially reversible}
 
-### Построение Union
-Автоматически созданы союзы на основе RelationshipType:
-- spouselegal
-- spousecommon
+#### Описание
+{Что было сделано и зачем, 2–4 предложения}
 
-Логика:
-- каждая пара → один Union
-- дубликаты исключены
+#### Изменения
 
-### Добавлено
-- Таблица UnionChildren
-  - union_id
-  - child_id
+| Действие   | Объект               | Детали                              |
+|------------|----------------------|-------------------------------------|
+| {ADD/ALTER/DROP/UPDATE} | `{table.column}` | {описание изменения}           |
 
-Назначение:
-Связывает детей с союзами родителей
+#### SQL
 
-### Построение структуры семьи
-Автоматически определены дети для каждого Union
+```sql
+-- Forward (применение)
+{SQL-команды для применения изменений}
 
-Логика:
-- берём детей каждого родителя
-- находим пересечение
-- считаем это детьми союза
+-- Rollback (откат)
+{SQL-команды для отката}
+```
 
-### Исправление логики UnionChildren
-Удалены некорректные связи детей с союзами.
-Причина:
-предыдущая логика (intersection) приводила к ошибкам — внуки попадали как дети.
+#### Валидация
 
-### Ручная корректировка данных
-Исправлены родительские связи:
+```sql
+-- Проверка после применения
+{SQL-запросы для проверки корректности}
+```
 
-Удалено:
-- Александр → Иван, Кирилл, Марина
-- Наталия → Иван, Кирилл, Марина
-
-Причина:
-внуки были ошибочно записаны как дети (bioparent).
+#### Затронутый код
+- `{file_path}` — {что изменено в коде}
+```
 
 ---
 
-## 2026-04-17 — Temporal normalization v1 (PersonRelationship)
+## Записи
 
-### Контекст
-Проект переведён на PostgreSQL как основную БД. Начата нормализация временной модели связей в таблице `PersonRelationship` (valid_from / valid_to) на продовом сервере.
-
-### Цель
-- Убрать `NULL` из `valid_to` для ключевых связей.
-- Согласовать `valid_from` для родительско‑детских связей с `People.birth_date`.
-- Ограничить браки датой смерти участников (если есть данные о смерти).
+<!-- Новые записи добавляются СВЕРХУ -->
 
 ---
 
-### 1. Открытый конец интервала (valid_to)
+### [1.1] — 2026-04-17 — Temporal normalization v1 (PersonRelationship)
 
-Сделано:
-- Для всех записей в `"PersonRelationship"` с `valid_to IS NULL` проставлено `valid_to = '9999-12-31'` как стандартное обозначение открытого valid‑time интервала.
+**Тип:** Data  
+**Автор:** Дмитрий Бондарев  
+**ADR:** —  
+**Обратимость:** Partially reversible
 
-Результат:
-- В таблице нет связей с `valid_to = NULL`.
-- Все актуальные связи имеют явный верхний предел `9999-12-31`, что упрощает запросы вида `[valid_from, valid_to)`.
+#### Описание
+
+Нормализация временной модели связей в таблице `person_relationships` на продовом PostgreSQL: устранены `NULL` в `valid_to`, `valid_from` для родительско‑детских связей согласован с датой рождения ребёнка, браки обрезаны по дате смерти участников, если она известна. Цель — сделать модель связей временно консистентной и пригодной для запросов вида «состояние семьи на дату» через интервал `[valid_from, valid_to)`.
+
+#### Изменения
+
+| Действие | Объект                                  | Детали                                                                 |
+|----------|-----------------------------------------|------------------------------------------------------------------------|
+| UPDATE   | `person_relationships.valid_to`         | Заменить `NULL` на `'9999-12-31'` для всех связей                      |
+| UPDATE   | `person_relationships.valid_from`       | Заполнить из `people.birth_date` для типов `bioparent` и `child`       |
+| UPDATE   | `person_relationships.valid_to`         | Для `spouselegal` обрезать по дате смерти одного из супругов           |
+
+#### SQL
+
+> Ниже — концептуальные SQL-скрипты; в реальности операции выполнялись в несколько шагов с dry‑run‑проверками.
+
+```sql
+-- 1. Проставить открытый конец интервала для всех NULL
+UPDATE person_relationships
+SET valid_to = '9999-12-31'
+WHERE valid_to IS NULL;
+
+-- 2. Синхронизировать valid_from для bioparent (type 1)
+UPDATE person_relationships pr
+SET valid_from = p.birth_date
+FROM people p
+WHERE pr.relationship_type_id = 1          -- bioparent
+  AND pr.person_to_id = p.id               -- ребёнок = person_to_id
+  AND pr.valid_from IS NULL
+  AND p.birth_date IS NOT NULL;
+
+-- 3. Синхронизировать valid_from для child (type 2)
+UPDATE person_relationships pr
+SET valid_from = p.birth_date
+FROM people p
+WHERE pr.relationship_type_id = 2          -- child
+  AND pr.person_from_id = p.id             -- ребёнок = person_from_id
+  AND pr.valid_from IS NULL
+  AND p.birth_date IS NOT NULL;
+
+-- 4. Зафиксировать биологическое родство как "вечное" (9999-12-31)
+UPDATE person_relationships
+SET valid_to = '9999-12-31'
+WHERE relationship_type_id IN (1, 2);      -- bioparent, child
+
+-- 5. Нормализация браков по дате смерти (spouselegal)
+-- valid_to хранится как текст, поэтому работаем через ::date
+UPDATE person_relationships pr
+SET valid_to = new_new_valid_to::text
+FROM (
+    SELECT
+        pr.id,
+        LEAST(
+            COALESCE(NULLIF(pr.valid_to, '')::date, DATE '9999-12-31'),
+            COALESCE(pf.death_date, DATE '9999-12-31'),
+            COALESCE(pt.death_date, DATE '9999-12-31')
+        ) AS new_new_valid_to
+    FROM person_relationships pr
+    JOIN people pf ON pf.id = pr.person_from_id
+    JOIN people pt ON pt.id = pr.person_to_id
+    WHERE pr.relationship_type_id = 3      -- spouselegal
+) AS t
+WHERE pr.id = t.id;
+```
+
+```sql
+-- Rollback (идейный, частично возможен только из бэкапа)
+-- 1. Восстановление valid_to/valid_from требует заранее сохранённого снимка:
+--    до применения изменений нужно было сделать:
+--    CREATE TABLE pr_snapshot_2026_04_17 AS
+--      SELECT id, valid_from, valid_to FROM person_relationships;
+--
+-- 2. Откат к снимку:
+-- UPDATE person_relationships pr
+-- SET valid_from = s.valid_from,
+--     valid_to   = s.valid_to
+-- FROM pr_snapshot_2026_04_17 s
+-- WHERE pr.id = s.id;
+--
+-- При отсутствии снимка откат считается практически невозможным (Irreversible).
+```
+
+#### Валидация
+
+```sql
+-- 1) Проверка: больше нет NULL в valid_to
+SELECT COUNT(*) AS null_valid_to_count
+FROM person_relationships
+WHERE valid_to IS NULL;
+
+-- 2) Проверка: bioparent/child согласованы с датой рождения ребёнка
+SELECT pr.id, pr.relationship_type_id, pr.valid_from, p.birth_date
+FROM person_relationships pr
+JOIN people p
+  ON (pr.relationship_type_id = 1 AND pr.person_to_id   = p.id)
+  OR (pr.relationship_type_id = 2 AND pr.person_from_id = p.id)
+WHERE p.birth_date IS NOT NULL
+  AND pr.valid_from <> p.birth_date;
+
+-- 3) Проверка: spouselegal не выходят за рамки даты смерти
+SELECT pr.id, pr.valid_to, pf.death_date AS from_death, pt.death_date AS to_death
+FROM person_relationships pr
+JOIN people pf ON pf.id = pr.person_from_id
+JOIN people pt ON pt.id = pr.person_to_id
+WHERE pr.relationship_type_id = 3
+  AND (
+        (pf.death_date IS NOT NULL AND pr.valid_to::date > pf.death_date)
+     OR (pt.death_date IS NOT NULL AND pr.valid_to::date > pt.death_date)
+  );
+```
+
+#### Затронутый код
+
+- `app/models/relationship.py` — использование полей `valid_from` / `valid_to` как датовых строк.
+- (план) сервисы/репозитории, использующие фильтрацию по интервалу `[valid_from, valid_to)`.
 
 ---
 
-### 2. Нормализация родительско‑детских связей (bioparent / child)
+### [1.0] — 2026-04-15 — Введение Union / UnionChildren и нормализация семьи
 
-Типы:
-- `relationship_type_id = 1` — `bioparent` (родитель → ребёнок).
-- `relationship_type_id = 2` — `child` (ребёнок → родитель).
+**Тип:** Schema + Data  
+**Автор:** Дмитрий Бондарев  
+**ADR:** —  
+**Обратимость:** Reversible (через сохранённые схемный/табличный снимки)
 
-Сделано:
-- Для всех записей `relationship_type_id = 1` (`bioparent`), где `valid_from IS NULL`, выполнено заполнение:
-  - `valid_from = People.birth_date` ребёнка (`person_to_id`).
-- Для всех записей `relationship_type_id = 2` (`child`), где `valid_from IS NULL`, выполнено заполнение:
-  - `valid_from = People.birth_date` ребёнка (`person_from_id`).
+#### Описание
 
-Решения по `valid_to`:
-- Для `bioparent` и `child` статус «родитель ↔ ребёнок» не обрезается по смерти:
-  - `valid_to` для этих типов фиксируется как `'9999-12-31'`.
-  - Смерть учитывается только на уровне `People.death_date`, но не как окончание родительско‑детской связи.
+Начата нормализация структуры базы данных: выделены сущности `Union` (союз/брак) и `UnionChildren` (дети союза), а также приведены данные к новой модели. Цель — перейти от «голых» связей между людьми к архитектуре Person / Union / Memory / Event / Relationship и корректно моделировать семью через союзы родителей и их детей.
 
-Результат:
-- Для каждой пары родитель–ребёнок обе стороны связи (1 и 2) имеют согласованный `valid_from`, равный дате рождения ребёнка.
-- Модель родства по оси «родитель ↔ ребёнок» стала временно консистентной.
+#### Изменения
 
----
+| Действие | Объект          | Детали                                                      |
+|----------|-----------------|-------------------------------------------------------------|
+| SNAPSHOT | `db_schema`     | Схема сохранена в `db_schema_before.sql`                    |
+| SNAPSHOT | `db_tables`     | Список таблиц в `db_tables_before.txt`                      |
+| CREATE   | `unions`        | `partner1_id`, `partner2_id`, `start_date`, `end_date`      |
+| CREATE   | `union_children`| `union_id`, `child_id`                                      |
+| DATA     | `unions`        | Автоматическое построение союзов по связям `spouse*`        |
+| DATA     | `union_children`| Автоматическое заполнение детей союзов + ручная чистка      |
+| DATA     | `person_relationships` | Удаление ошибочных связей (внуки как дети)     |
 
-### 3. Нормализация браков по дате смерти (spouselegal)
+#### SQL
 
-Типы:
-- `relationship_type_id = 3` — `spouselegal` (официальный брак).
-- `relationship_type_id = 4` — `spousecommon` (фактический союз; на этом шаге нормализован только `spouselegal`).
+> Структура и данные строились скриптом; ниже — логика в SQL-псевдокоде.
 
-Особенности схемы:
-- Поле `"PersonRelationship".valid_to` хранится как `varchar`, поэтому все операции с датами выполняются с явным приведением типов (`::date`).
+```sql
+-- Снимки состояния до изменений (выполнено вручную, MacBook)
+-- Схема:
+--   .output db_schema_before.sql
+--   .schema
+-- Таблицы:
+--   .output db_tables_before.txt
+--   .tables
 
-Сделано (через dry‑run + UPDATE):
-1. Выполнен SELECT‑dry‑run для связей `relationship_type_id IN (3, 4)` с умершими участниками:
-   - показаны:
-     - `old_valid_to` (строка),
-     - `death_date` обоих партнёров,
-     - расчётный `new_valid_to` как `LEAST(valid_to, death_dates...)` в типе `date`.
-   - проверено, что вместо `'9999-12-31'` подставляется реальная дата смерти, если она есть.
+-- 1. Таблица unions (структура)
+CREATE TABLE unions (
+    id          SERIAL PRIMARY KEY,
+    partner1_id INTEGER NOT NULL REFERENCES people(id),
+    partner2_id INTEGER NOT NULL REFERENCES people(id),
+    start_date  DATE,
+    end_date    DATE
+);
 
-2. Выполнен UPDATE для `spouselegal` (`relationship_type_id = 3`):
-   - `valid_to` приводится к `date`,
-   - пересчитывается как минимум из:
-     - текущего значения `valid_to` (при `NULL` используется `'9999-12-31'`),
-     - `pf.death_date` (`person_from_id`),
-     - `pt.death_date` (`person_to_id`),
-   - затем результат сохраняется обратно в `valid_to` как текст в формате `YYYY-MM-DD`.
+-- 2. Таблица union_children (структура)
+CREATE TABLE union_children (
+    id       SERIAL PRIMARY KEY,
+    union_id INTEGER NOT NULL REFERENCES unions(id),
+    child_id INTEGER NOT NULL REFERENCES people(id)
+);
 
-Результат:
-- Для всех браков, где хотя бы один из супругов умер, `valid_to` больше не выходит за пределы даты смерти.
-- Браки без данных о смерти остаются с открытым концом `'9999-12-31'`.
+-- 3. Построение Union по связям spouselegal / spousecommon
+-- (псевдокод: каждая уникальная пара супругов -> один Union)
 
----
-
-### 4. Задел на интеграцию с Unions
-
-Сделано:
-- Таблица `"Unions"` принята как источник truth для:
-  - `start_date` (начало брака/союза),
-  - `end_date` (развод/окончание союза).
-
-Пока:
-- В рамках `Temporal normalization v1` браки синхронизированы только по дате смерти (через `People.death_date`).
-- Сами поля `start_date` / `end_date` в `Unions` будут заполнены и учтены в отдельном шаге.
-
-План:
-- В `Temporal normalization v2` связать `Unions` со `spouselegal`:
-  - `valid_from` ← `Unions.start_date`,
-  - `valid_to` ← минимум из (`Unions.end_date`, даты смерти супругов, `'9999-12-31'`).
+-- 

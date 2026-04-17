@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 
 from fastapi import FastAPI, Request, Depends, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -34,6 +34,11 @@ try:
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
 except RuntimeError:
     pass
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("app/static/logo.png")
 
 
 def build_person_name(person_i18n):
@@ -791,3 +796,9 @@ async def timeline(request: Request, db: Session = Depends(get_db)):
 
 from app.routes.family_tree import router as family_router
 app.include_router(family_router)
+# TODO: создать новый endpoint FastAPI /users,
+# который:
+# - использует асинхронный роутер
+# - достаёт список пользователей из PostgreSQL через SQLAlchemy
+# - возвращает список в формате JSON со статусом 200
+# - обрабатывает ситуацию, когда пользователей нет (пустой список)

@@ -1,87 +1,188 @@
 # TimeWoven
 
-Семейное веб-приложение для хранения и передачи воспоминаний через поколения.
+> Семейное веб‑приложение для хранения и передачи воспоминаний через поколения: голос, истории и фото, связанные с людьми, событиями и эпохами.
 
-## Стек
+[![Python](https://img.shields.io/badge/Python-3.11+-blue)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688)]()
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791)]()
+[![License](https://img.shields.io/badge/License-Private-green)]()
 
-- Python 3.9+
-- FastAPI + Uvicorn
-- SQLAlchemy
-- PostgreSQL 14 (основная БД)
-- SQLite (архив / локальная разработка)
-- Jinja2
-- python-multipart
+---
 
-## Структура проекта
+## 📖 О проекте
 
-- `app/` — FastAPI-приложение
-- `app/main.py` — точка входа (ASGI)
-- `app/db.py` — конфигурация подключения к БД
-- `app/templates/` — Jinja2-шаблоны
-- `app/static/` — статика (CSS, JS, изображения)
-- `data/db/` — дампы и архивы БД (SQLite / PostgreSQL)
-- `backups/` — резервные копии продовой БД
-- `TECH_PASSPORT.md` — технический паспорт проекта
-- `DB_CHANGELOG.md` — история изменений структуры и данных
+TimeWoven помогает семье собирать и осмыслять свои воспоминания: каждое воспоминание — это не просто факт, а субъективный фрагмент истории, привязанный к людям, событиям и местам.  
+Проект строит живое семейное древо, где аудио, текст и фотографии становятся частью единого смыслового полотна.
 
-## Установка и запуск (локально, SQLite)
+### Ключевые возможности
+
+- **Семейное древо** — визуальная структура семьи на основе персон, союзов и детей.
+- **Воспоминания и таймлайн** — лента воспоминаний, событий и цитат, связанных с людьми.
+- **История аватаров** — управление визуальной идентичностью персон во времени.
+- **Подготовка к Telegram / ASR** — задел под «Импульс дня» и транскрибацию аудио (Whisper).
+
+---
+
+## ⚡ Быстрый старт
+
+### Требования
+
+- Python 3.11+
+- PostgreSQL 14+
+- Git
+
+### Установка (локально, SQLite как архив)
 
 ```bash
-# Клонировать репозиторий
+# 1. Клонирование репозитория
 git clone git@github.com:Dmitriy-Bondarev/TimeWoven.git
 cd TimeWoven
 
-# Создать виртуальное окружение
+# 2. Создание виртуального окружения
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Установить зависимости
+# 3. Установка зависимостей
 pip install -r requirements.txt
-
-# Восстановить БД из дампа (локальная SQLite)
-sqlite3 data/db/family.db < data/db/family.sql
-
-# Запустить сервер (локально, dev-режим)
-python -m uvicorn app.main:app --reload
 ```
 
-Приложение будет доступно по адресу: http://127.0.0.1:8000
+### Запуск c SQLite (локальное ознакомление)
 
-## Подключение к PostgreSQL (prod / staging)
+```bash
+# Восстановление локальной SQLite (если есть дамп)
+sqlite3 data/db/family.db < data/db/family.sql  # при наличии дампа
 
-Продовая БД работает на PostgreSQL 14 и описана в `TECH_PASSPORT.md` и `DB_CHANGELOG.md`.
+# Запуск dev-сервера
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-Базовые параметры (см. TECH_PASSPORT для актуальных значений):
+Приложение будет доступно по адресу: `http://localhost:8000`.
 
-- Host: `localhost:5432` (при работе на сервере)
+### Подключение к PostgreSQL
+
+Продовая БД описана в [TECH_PASSPORT.md](TECH_PASSPORT.md#6-инфраструктура-и-деплой) и [DB_CHANGELOG.md](DB_CHANGELOG.md).  
+Базовые параметры:
+
+- Host: `localhost:5432` (на сервере)
 - Database: `timewoven`
 - User: `timewoven_user`
 - DSN: `postgresql+psycopg2://timewoven_user:***@localhost:5432/timewoven`
 
-Переключение приложения на PostgreSQL выполняется через конфигурацию в `app/db.py` и переменные окружения (см. комментарии внутри файла).
+`DATABASE_URL` задаётся через `.env`, чтение реализовано в `app/config.py`.
 
-## Основные экраны
+---
 
-| URL                   | Описание                             |
-|-----------------------|--------------------------------------|
-| `/`                   | Импульс дня — случайная цитата с аудио |
-| `/family/reply/{id}`  | Ответ на послание                    |
-| `/family/person/{id}` | Карточка человека                    |
-| `/who-am-i`           | Выбор участника                      |
-| `/admin/people`       | Контроль качества данных             |
-| `/admin/avatars`      | Загрузка аватаров                    |
-| `/family/tree`        | Дерево семьи (визуальный просмотр)   |
+## 🏗 Архитектура
 
-## Участники
+```text
+TimeWoven/
+├── app/
+│   ├── main.py          # Точка входа FastAPI (ASGI)
+│   ├── config.py        # Конфигурация и .env
+│   ├── models/          # SQLAlchemy модели (Person, Union, Memory, Relationship)
+│   ├── routes/          # Эндпоинты: family, timeline, auth, admin
+│   ├── services/        # Бизнес-логика
+│   ├── repositories/    # Доступ к данным
+│   ├── schemas/         # Pydantic-схемы
+│   └── templates/       # Jinja2-шаблоны
+├── static/
+│   └── images/
+│       ├── avatars/     # Аватары персон
+│       └── uploads/     # Загруженные медиа
+├── data/
+│   └── db/              # Архивы SQLite / дампы
+├── backups/             # Резервные копии БД
+├── docs/
+│   └── adr/             # Architecture Decision Records
+├── temp/                # Временные файлы, дампы, экспорты
+├── TECH_PASSPORT.md     # Технический паспорт
+├── DB_CHANGELOG.md      # Журнал изменений БД
+├── CHANGELOG.md         # Релизный changelog продукта
+└── README.md            # ← вы здесь
+```
 
-9 человек семьи Бондаревых — 3 поколения.
+Подробная архитектура и temporal‑модель связей описаны в [TECH_PASSPORT.md](TECH_PASSPORT.md).
 
-## Roadmap
+---
 
-- [ ] Переключение FastAPI на PostgreSQL (db.py)
-- [ ] PIN-авторизация
-- [ ] Timeline событий
-- [ ] Дерево семьи (улучшенный UI)
-- [ ] Уведомления в Telegram
-- [ ] Whisper pipeline для транскрипции аудио
-- [ ] Мобильная версия (PWA)
+## 🗄 База данных
+
+Основная БД — PostgreSQL 14. Важные таблицы:
+
+| Таблица               | Назначение                                        |
+|-----------------------|---------------------------------------------------|
+| `people`              | Персоны (люди в семейном графе)                   |
+| `person_relationships`| Связи между людьми (родство, браки и др.)         |
+| `unions`              | Союзы/браки (двое партнёров, даты начала/окончания) |
+| `union_children`      | Привязка детей к союзам                           |
+| `memories`            | Воспоминания (аудио, текст, фото)                 |
+| `memory_people`       | Связи воспоминаний с персонами                    |
+| `quotes`              | Цитаты / ключевые фразы                           |
+| `avatar_history`      | История аватаров персон                           |
+
+История изменений схемы и данных: [DB_CHANGELOG.md](DB_CHANGELOG.md).
+
+---
+
+## 🔧 Конфигурация
+
+Параметры задаются через `.env`:
+
+| Переменная      | Описание                               | Значение по умолчанию        |
+|-----------------|----------------------------------------|------------------------------|
+| `DATABASE_URL`  | Подключение к БД (PostgreSQL/SQLite)   | `sqlite:///data/db/family.db`|
+| `SECRET_KEY`    | Секрет для сессий/подписей             | —                            |
+| `DEBUG`         | Режим отладки FastAPI                  | `false`                      |
+
+---
+
+## 🧪 Тестирование
+
+```bash
+# Запуск всех тестов
+pytest
+
+# С покрытием
+pytest --cov=app --cov-report=html
+
+# Конкретный модуль
+pytest tests/test_family.py -v
+```
+
+(Структура tests/ будет развиваться по мере роста проекта.)
+
+---
+
+## 🚀 Деплой
+
+Продакшен-деплой подробно описан в [TECH_PASSPORT.md](TECH_PASSPORT.md#6-инфраструктура-и-деплой).
+
+Кратко:
+
+```bash
+ssh root@193.187.95.221
+cd /root/projects/TimeWoven
+git pull origin main
+source .venv/bin/activate
+pip install -r requirements.txt
+systemctl restart timewoven
+```
+
+---
+
+## 📚 Документация
+
+| Документ                               | Описание                                 |
+|----------------------------------------|------------------------------------------|
+| [TECH_PASSPORT.md](TECH_PASSPORT.md)   | Полный технический паспорт проекта       |
+| [DB_CHANGELOG.md](DB_CHANGELOG.md)     | Журнал изменений базы данных             |
+| `docs/adr/`                            | Архитектурные решения (ADR)              |
+| `temp/project_docs/`                   | Пакет документации и шаблонов (на сервере)|
+
+---
+
+## 👤 Автор
+
+**Дмитрий Бондарев** — архитектор и владелец продукта TimeWoven.  
+- GitHub: [Dmitriy-Bondarev](https://github.com/Dmitriy-Bondarev)  
+- Email: dmitriy.bondarev@gmail.com
