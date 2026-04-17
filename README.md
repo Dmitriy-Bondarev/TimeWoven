@@ -72,33 +72,39 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
-## 🏗 Архитектура
+## 🏗 Архитектура и структура проекта
 
 ```text
-TimeWoven/
-├── app/
-│   ├── main.py          # Точка входа FastAPI (ASGI)
-│   ├── config.py        # Конфигурация и .env
-│   ├── models/          # SQLAlchemy модели (Person, Union, Memory, Relationship)
-│   ├── routes/          # Эндпоинты: family, timeline, auth, admin
-│   ├── services/        # Бизнес-логика
-│   ├── repositories/    # Доступ к данным
-│   ├── schemas/         # Pydantic-схемы
-│   └── templates/       # Jinja2-шаблоны
+/root/projects/TimeWoven/
+├── app/                          # Исходный код FastAPI-приложения
+│   ├── main.py                   # Точка входа (ASGI-приложение)
+│   ├── config.py                 # Конфигурация и работа с .env / DATABASE_URL
+│   ├── models/                   # SQLAlchemy модели (Person, Union, Memory, Relationship и др.)
+│   ├── routes/                   # Эндпоинты: family, timeline, auth, admin
+│   ├── services/                 # Бизнес-логика
+│   ├── repositories/             # Доступ к данным (PostgreSQL через SQLAlchemy)
+│   ├── schemas/                  # Pydantic-схемы запросов/ответов
+│   └── templates/                # Jinja2-шаблоны интерфейса
 ├── static/
-│   └── images/
-│       ├── avatars/     # Аватары персон
-│       └── uploads/     # Загруженные медиа
+│   ├── css/                      # Стили
+│   ├── js/                       # Скрипты
+│   └── images/                   # Изображения
+│       ├── avatars/              # Аватары персон
+│       └── uploads/              # Загруженные медиа
 ├── data/
-│   └── db/              # Архивы SQLite / дампы
-├── backups/             # Резервные копии БД
-├── docs/
-│   └── adr/             # Architecture Decision Records
-├── temp/                # Временные файлы, дампы, экспорты
-├── TECH_PASSPORT.md     # Технический паспорт
-├── DB_CHANGELOG.md      # Журнал изменений БД
-├── CHANGELOG.md         # Релизный changelog продукта
-└── README.md            # ← вы здесь
+│   └── db/                       # Архивы SQLite / вспомогательные дампы
+├── backups/                      # Резервные копии БД и важных файлов
+├── temp/                         # Временные файлы (дампы, экспорты, черновики SQL)
+│   └── project_docs/             # Пакет документации, выгруженный с Mac
+├── tech-docs/                    # Живущая рядом документация проекта
+│   ├── adr/                      # Architecture Decision Records (ADR-001, ADR-002, ...)
+│   └── README.md                 # Описание набора шаблонов и структуры docs
+├── TECH_PASSPORT.md              # Технический паспорт (high-level техническая карта)
+├── DB_CHANGELOG.md               # Журнал изменений схемы и данных БД
+├── CHANGELOG.md                  # Релизный changelog продукта
+├── requirements.txt              # Осмысленный список зависимостей
+├── requirements.lock.txt         # Полный снимок зависимостей (pip freeze)
+└── README.md                     # ← вы здесь
 ```
 
 Подробная архитектура и temporal‑модель связей описаны в [TECH_PASSPORT.md](TECH_PASSPORT.md).
@@ -176,8 +182,40 @@ systemctl restart timewoven
 |----------------------------------------|------------------------------------------|
 | [TECH_PASSPORT.md](TECH_PASSPORT.md)   | Полный технический паспорт проекта       |
 | [DB_CHANGELOG.md](DB_CHANGELOG.md)     | Журнал изменений базы данных             |
-| `docs/adr/`                            | Архитектурные решения (ADR)              |
+| `tech-docs/`                           | Шаблоны и расширенная документация       |
 | `temp/project_docs/`                   | Пакет документации и шаблонов (на сервере)|
+
+---
+
+## 🧱 ADR и архитектурные решения
+
+Architecture Decision Records живут в каталоге `tech-docs/adr`:
+
+```text
+tech-docs/
+└── adr/
+    ├── README.md       # Индекс всех ADR
+    ├── ADR-001.md      # Миграция с SQLite на PostgreSQL
+    ├── ADR-002.md      # Temporal Normalization для PersonRelationship
+    └── ADR.template.md # Шаблон для новых ADR (план)
+```
+
+### Как прочитать решения
+
+- Начать с [`tech-docs/adr/README.md`](tech-docs/adr/README.md) — там индекс всех решений.  
+- Затем открыть нужный `ADR-XXX.md` (номер из таблицы).
+
+### Как добавить новый ADR
+
+1. Скопировать шаблон `ADR.template.md` в `tech-docs/adr/ADR-{NNN}.md`.  
+2. Заполнить секции (Контекст, Варианты, Решение, Последствия, План).  
+3. Добавить строку в таблицу в `tech-docs/adr/README.md`.  
+4. Закоммитить:
+
+   ```bash
+   git add tech-docs/adr
+   git commit -m "docs: add ADR-{NNN} — {краткое описание}"
+   ```
 
 ---
 
@@ -185,4 +223,4 @@ systemctl restart timewoven
 
 **Дмитрий Бондарев** — архитектор и владелец продукта TimeWoven.  
 - GitHub: [Dmitriy-Bondarev](https://github.com/Dmitriy-Bondarev)  
-- Email: dmitriy.bondarev@gmail.com
+- Email: [dmitriy.bondarev@gmail.com](mailto:dmitriy.bondarev@gmail.com)
