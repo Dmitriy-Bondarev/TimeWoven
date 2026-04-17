@@ -28,3 +28,9 @@ app/static/avatars/
 family.db
 *.db
 backups/
+
+# Временные файлы (папка temp/)
+# Сохраняем только .gitkeep и README.md
+temp/*
+!temp/.gitkeep
+!temp/README.md
