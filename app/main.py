@@ -1,4 +1,7 @@
 import random
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import hashlib
 from pathlib import Path
 from datetime import datetime
@@ -12,13 +15,26 @@ from sqlalchemy.orm import Session
 from .db import get_db
 from .models import Quote, PersonI18n, Person, Memory, AvatarHistory, Event
 
-# Admin credentials (в продакшене вынести в .env)
+# Admin credentials из .env
+_admin_username = os.getenv("ADMIN_USERNAME", "admin")
+_admin_password = os.getenv("ADMIN_PASSWORD", "")
 ADMIN_USERS = {
-    "admin": hashlib.sha256("timewoven2026".encode()).hexdigest(),
+    _admin_username: hashlib.sha256(_admin_password.encode()).hexdigest(),
 }
 
+SESSION_SECRET = os.getenv("SESSION_SECRET", "changeme")
+
 def is_admin(request: Request) -> bool:
-    return request.cookies.get("is_admin") == "1"
+    from itsdangerous import URLSafeSerializer, BadSignature
+    s = URLSafeSerializer(SESSION_SECRET)
+    token = request.cookies.get("admin_token")
+    if not token:
+        return False
+    try:
+        s.loads(token)
+        return True
+    except BadSignature:
+        return False
 
 def require_admin(request: Request):
     if not is_admin(request):
@@ -199,7 +215,10 @@ async def admin_login_submit(
     hashed = hashlib.sha256(password.encode()).hexdigest()
     if ADMIN_USERS.get(username) == hashed:
         response = RedirectResponse(url=next, status_code=303)
-        response.set_cookie("is_admin", "1", max_age=60 * 60 * 8)  # 8 часов
+        from itsdangerous import URLSafeSerializer
+        s = URLSafeSerializer(SESSION_SECRET)
+        token = s.dumps({"user": username})
+        response.set_cookie("admin_token", token, max_age=60 * 60 * 8, httponly=True, samesite="lax")
         return response
     return templates.TemplateResponse(
         request,
@@ -211,7 +230,7 @@ async def admin_login_submit(
 @app.get("/admin/logout")
 async def admin_logout():
     response = RedirectResponse(url="/", status_code=303)
-    response.delete_cookie("is_admin")
+    response.delete_cookie("admin_token")
     return response
 
 
