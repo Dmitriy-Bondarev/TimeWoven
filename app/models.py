@@ -60,6 +60,7 @@ class Memory(Base):
     created_at = Column(String)
     created_by = Column(Integer, ForeignKey("People.person_id"))
     source_type = Column(String)
+    transcription_status = Column(String, default="pending")
 
     author = relationship("Person", foreign_keys=[author_id], back_populates="memories_authored")
     creator = relationship("Person", foreign_keys=[created_by], back_populates="memories_created")
