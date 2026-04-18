@@ -159,7 +159,7 @@ async def home_presence(request: Request, db: Session = Depends(get_db)):
     audio_url = None
     if raw_audio:
         filename = raw_audio.split("/")[-1].strip()
-        audio_url = f"/static/processed/{filename}"
+        audio_url = f"/static/audio/processed/{filename}"
 
     quote_data = {
         "text": selected_quote.content_text,
@@ -253,7 +253,7 @@ async def upload_avatar(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    avatars_dir = Path("app/static/avatars")
+    avatars_dir = Path("app/static/images/avatars")
     avatars_dir.mkdir(parents=True, exist_ok=True)
 
     suffix = Path(file.filename).suffix.lower() or ".jpg"
@@ -265,7 +265,7 @@ async def upload_avatar(
 
     person = db.query(Person).filter(Person.person_id == person_id).first()
     if person:
-        person.avatar_url = f"/static/avatars/{filename}"
+        person.avatar_url = f"/static/images/avatars/{filename}"
         db.add(person)
         db.commit()
 
@@ -550,7 +550,7 @@ async def person_card(person_id: int, request: Request, db: Session = Depends(ge
     for m in memories:
         raw_audio = m.audio_url or ""
         filename = raw_audio.split("/")[-1].strip()
-        audio_url = f"/static/processed/{filename}" if filename else None
+        audio_url = f"/static/audio/processed/{filename}" if filename else None
         memories_data.append({
             "id": m.id,
             "text": pick_memory_text(m),
@@ -633,7 +633,7 @@ async def profile_avatar_upload(
         return RedirectResponse(url="/who-am-i?next=/profile", status_code=303)
 
     person_id = int(current_person_id)
-    avatars_dir = Path("app/static/avatars")
+    avatars_dir = Path("app/static/images/avatars")
     avatars_dir.mkdir(parents=True, exist_ok=True)
 
     suffix = Path(file.filename).suffix.lower() or ".jpg"
@@ -654,7 +654,7 @@ async def profile_avatar_upload(
         # Пишем новый аватар в историю
         new_avatar = AvatarHistory(
             person_id=person_id,
-            storage_path=f"/static/avatars/{filename}",
+            storage_path=f"/static/images/avatars/{filename}",
             is_current=1,
             source_type="upload",
             created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -662,7 +662,7 @@ async def profile_avatar_upload(
         db.add(new_avatar)
 
         # Обновляем основную запись
-        person.avatar_url = f"/static/avatars/{filename}"
+        person.avatar_url = f"/static/images/avatars/{filename}"
         db.add(person)
         db.commit()
 

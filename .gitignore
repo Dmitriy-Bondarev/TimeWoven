@@ -34,3 +34,4 @@ backups/
 temp/*
 !temp/.gitkeep
 !temp/README.md
+.env
