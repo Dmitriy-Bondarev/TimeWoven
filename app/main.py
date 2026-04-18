@@ -2,9 +2,10 @@ import random
 import os
 from dotenv import load_dotenv
 load_dotenv()
-import hashlib
 from pathlib import Path
 from datetime import datetime
+from app.security import ADMIN_USERS, SESSION_SECRET, is_admin, require_admin
+from app.routes.admin import router as admin_router
 
 from fastapi import FastAPI, Request, Depends, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
@@ -14,32 +15,6 @@ from sqlalchemy.orm import Session
 
 from .db import get_db
 from .models import Quote, PersonI18n, Person, Memory, AvatarHistory, Event
-
-# Admin credentials из .env
-_admin_username = os.getenv("ADMIN_USERNAME", "admin")
-_admin_password = os.getenv("ADMIN_PASSWORD", "")
-ADMIN_USERS = {
-    _admin_username: hashlib.sha256(_admin_password.encode()).hexdigest(),
-}
-
-SESSION_SECRET = os.getenv("SESSION_SECRET", "changeme")
-
-def is_admin(request: Request) -> bool:
-    from itsdangerous import URLSafeSerializer, BadSignature
-    s = URLSafeSerializer(SESSION_SECRET)
-    token = request.cookies.get("admin_token")
-    if not token:
-        return False
-    try:
-        s.loads(token)
-        return True
-    except BadSignature:
-        return False
-
-def require_admin(request: Request):
-    if not is_admin(request):
-        return RedirectResponse(url=f"/admin/login?next={request.url.path}", status_code=303)
-    return None
 
 
 app = FastAPI(title="TimeWoven")
@@ -199,7 +174,7 @@ async def admin_login(request: Request, next: str = "/admin/people"):
         return RedirectResponse(url=next, status_code=303)
     return templates.TemplateResponse(
         request,
-        "family/admin_login.html",
+        "admin/admin_login.html",
         {"next": next, "error": None},
     )
 
@@ -222,7 +197,7 @@ async def admin_login_submit(
         return response
     return templates.TemplateResponse(
         request,
-        "family/admin_login.html",
+        "admin/admin_login.html",
         {"next": next, "error": "Неверный логин или пароль."},
     )
 
@@ -261,7 +236,7 @@ async def avatars_form(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse(
         request,
-        "family/avatars_form.html",
+        "admin/avatars_form.html",
         {"people": data}
     )
 
@@ -528,7 +503,7 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse(
         request,
-        "family/admin_people.html",
+        "admin/admin_people.html",
         {"rows": rows},
     )
 
@@ -815,61 +790,11 @@ async def timeline(request: Request, db: Session = Depends(get_db)):
 
 
 
-@app.get("/admin/transcriptions", response_class=HTMLResponse)
-async def admin_transcriptions(request: Request, db: Session = Depends(get_db)):
-    redirect = require_admin(request)
-    if redirect:
-        return redirect
-    from .models import Memory, PersonI18n
-    memories = db.query(Memory).filter(
-        Memory.transcription_status.in_(["review", "pending"]),
-        Memory.audio_url.isnot(None)
-    ).order_by(Memory.id.desc()).all()
-    result = []
-    for m in memories:
-        author_name = None
-        if m.author_id:
-            i18n = db.query(PersonI18n).filter(
-                PersonI18n.person_id == m.author_id,
-                PersonI18n.lang_code == "ru"
-            ).first()
-            if i18n:
-                parts = [i18n.first_name, i18n.last_name]
-                author_name = " ".join([p for p in parts if p])
-        result.append({
-            "id": m.id,
-            "author_name": author_name,
-            "audio_url": m.audio_url,
-            "transcript_verbatim": m.transcript_verbatim,
-            "transcript_readable": m.transcript_readable,
-            "transcription_status": m.transcription_status,
-            "created_at": m.created_at,
-        })
-    return templates.TemplateResponse(request, "family/admin_transcriptions.html", {"memories": result})
 
-
-@app.post("/admin/transcriptions/{memory_id}/publish")
-async def publish_transcription(
-    memory_id: int,
-    request: Request,
-    transcript_verbatim: str = Form(""),
-    transcript_readable: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    redirect = require_admin(request)
-    if redirect:
-        return redirect
-    from .models import Memory
-    memory = db.query(Memory).filter(Memory.id == memory_id).first()
-    if memory:
-        memory.transcript_verbatim = transcript_verbatim
-        memory.transcript_readable = transcript_readable
-        memory.transcription_status = "published"
-        db.commit()
-    return RedirectResponse(url="/admin/transcriptions", status_code=303)
 
 # --- Whisper Transcription API ---
 WHISPER_API_TOKEN = os.getenv("WHISPER_API_TOKEN", "")
+
 
 @app.post("/api/transcription/result")
 async def transcription_result(
@@ -904,13 +829,45 @@ async def transcription_result(
     from fastapi.responses import JSONResponse
     return JSONResponse(status_code=200, content={"status": "ok", "memory_id": memory_id})
 
+
 from app.routes.family_tree import router as family_router
 app.include_router(family_router)
-# TODO: создать новый endpoint FastAPI /users,
-# который:
+app.include_router(admin_router)
+
+@app.get("/users")
+async def users_list(db: Session = Depends(get_db)):
+    users = (
+        db.query(Person)
+        .filter(Person.is_user == 1)
+        .order_by(Person.person_id)
+        .all()
+    )
+
+    user_list = []
+    for user in users:
+        i18n = (
+            db.query(PersonI18n)
+            .filter(PersonI18n.person_id == user.person_id, PersonI18n.lang_code == "ru")
+            .first()
+        )
+        full_name = " ".join(
+            [part for part in [getattr(i18n, "first_name", None), getattr(i18n, "last_name", None)] if part]
+        ).strip() if i18n else None
+
+        user_list.append({
+            "person_id": user.person_id,
+            "name": full_name or None,
+            "role": user.role,
+            "phone": user.phone,
+            "is_alive": bool(user.is_alive) if user.is_alive is not None else None,
+        })
+
+    return {"users": user_list}
+
 
 # --- Audio Upload API ---
 AUDIO_UPLOAD_DIR = Path("app/static/audio/uploads")
+
 
 @app.post("/api/audio/upload")
 async def audio_upload(
@@ -939,7 +896,14 @@ async def audio_upload(
     db.add(memory)
     db.commit()
     db.refresh(memory)
-    return JSONResponse(status_code=200, content={"status": "queued", "memory_id": memory.id, "filename": safe_name})
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "queued",
+            "memory_id": memory.id,
+            "filename": safe_name,
+        },
+    )
 # - использует асинхронный роутер
 # - достаёт список пользователей из PostgreSQL через SQLAlchemy
 # - возвращает список в формате JSON со статусом 200
