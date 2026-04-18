@@ -8,25 +8,27 @@ watcher.py — TimeWoven Audio Watcher (Mac)
 import os
 import time
 import hashlib
-import requests
 import json
 from pathlib import Path
 from datetime import datetime
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
+from urllib.error import URLError, HTTPError
+import mimetypes
+import uuid
 
 # ── Настройки ────────────────────────────────────────────────────────────────
-WATCH_DIR = Path.home() / "Desktop" / "timewoven_audio"   # папка на Маке
-SERVER_URL = "https://app.timewoven.ru"                    # продакшн сервер
+WATCH_DIR = Path.home() / "Desktop" / "timewoven_audio"
+SERVER_URL = "https://app.timewoven.ru"
 UPLOAD_ENDPOINT = f"{SERVER_URL}/api/audio/upload"
-STATUS_ENDPOINT = f"{SERVER_URL}/api/transcription/result"
-ADMIN_TOKEN = os.environ.get("TW_ADMIN_TOKEN", "")         # из env
-POLL_INTERVAL = 10                                          # секунды
+ADMIN_TOKEN = os.environ.get("TW_ADMIN_TOKEN", "")
+POLL_INTERVAL = 10
 PROCESSED_LOG = Path.home() / ".timewoven_watcher_log.json"
 SUPPORTED_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".mp4"}
 
 
 # ── Утилиты ───────────────────────────────────────────────────────────────────
 def file_hash(path: Path) -> str:
-    """SHA256 первых 64KB для быстрой идентификации."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
         h.update(f.read(65536))
@@ -47,36 +49,49 @@ def save_log(log_data: dict):
 
 def log(msg: str):
     ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] {msg}")
+    print(f"[{ts}] {msg}", flush=True)
 
 
-# ── Основная логика ───────────────────────────────────────────────────────────
+def build_multipart(path: Path, boundary: str) -> bytes:
+    """Build multipart/form-data body using only stdlib."""
+    filename = path.name.encode('utf-8')
+    with open(path, 'rb') as f:
+        file_data = f.read()
+    body = (
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'
+        f'Content-Type: audio/mpeg\r\n'
+        f'\r\n'
+    ).encode('utf-8') + file_data + f'\r\n--{boundary}--\r\n'.encode('utf-8')
+    return body
+
+
 def upload_file(path: Path) -> dict | None:
-    """Загружает файл на сервер, возвращает JSON-ответ или None."""
-    headers = {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+    boundary = uuid.uuid4().hex
+    body = build_multipart(path, boundary)
+    token_ascii = ADMIN_TOKEN.encode('ascii', errors='ignore').decode('ascii')
+    headers = {
+        'Authorization': f'Bearer {token_ascii}',
+        'Content-Type': f'multipart/form-data; boundary={boundary}',
+        'Content-Length': str(len(body)),
+    }
     try:
-        with open(path, "rb") as f:
-            resp = requests.post(
-                UPLOAD_ENDPOINT,
-                headers=headers,
-                files={"file": (path.name, f, "audio/mpeg")},
-                timeout=60
-            )
-        if resp.status_code == 200:
-            return resp.json()
-        else:
-            log(f"  Ошибка загрузки {path.name}: HTTP {resp.status_code} — {resp.text[:200]}")
-            return None
-    except requests.exceptions.ConnectionError:
-        log(f"  Нет соединения с сервером. Повтор через {POLL_INTERVAL}с.")
+        req = Request(UPLOAD_ENDPOINT, data=body, headers=headers, method='POST')
+        with urlopen(req, timeout=60) as resp:
+            resp_body = resp.read().decode('utf-8')
+            return json.loads(resp_body)
+    except HTTPError as e:
+        log(f"  Ошибка HTTP {e.code}: {e.read().decode('utf-8', errors='replace')[:200]}")
+        return None
+    except URLError as e:
+        log(f"  Нет соединения: {e.reason}")
         return None
     except Exception as e:
-        log(f"  Исключение при загрузке: {e}")
+        log(f"  Исключение: {e}")
         return None
 
 
 def check_new_files(watch_dir: Path, processed: dict) -> list:
-    """Возвращает список новых (ещё не обработанных) аудиофайлов."""
     new_files = []
     for path in sorted(watch_dir.iterdir()):
         if path.suffix.lower() not in SUPPORTED_EXT:
@@ -88,7 +103,6 @@ def check_new_files(watch_dir: Path, processed: dict) -> list:
 
 
 def run():
-    # Создаём папку если не существует
     WATCH_DIR.mkdir(parents=True, exist_ok=True)
     log(f"Watcher запущен. Слежу за: {WATCH_DIR}")
     log(f"Сервер: {SERVER_URL}")
@@ -120,10 +134,10 @@ def run():
             time.sleep(POLL_INTERVAL)
 
         except KeyboardInterrupt:
-            log("Watcher остановлен пользователем.")
+            log("Стоп.")
             break
         except Exception as e:
-            log(f"Критическая ошибка: {e}")
+            log(f"Ошибка: {e}")
             time.sleep(POLL_INTERVAL)
 
 
