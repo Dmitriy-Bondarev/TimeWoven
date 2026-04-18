@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Транскрипции — проверка</title>
+  <style>
+    :root { --bg: #020617; --card: #0f172a; --text: #e5e7eb; --muted: #94a3b8; --accent: #f59e0b; --ok: #22c55e; --warn: #ef4444; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; padding: 32px 24px; }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 24px; color: var(--accent); }
+    .back { color: var(--muted); font-size: 13px; text-decoration: none; display: inline-block; margin-bottom: 20px; }
+    .back:hover { color: var(--text); }
+    .card { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #1e293b; }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .person { font-weight: 600; font-size: 15px; }
+    .date { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .status { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+    .status-review { background: #78350f; color: #fde68a; }
+    .status-published { background: #14532d; color: #86efac; }
+    .status-pending { background: #1e293b; color: var(--muted); }
+    .status-error { background: #450a0a; color: #fca5a5; }
+    audio { width: 100%; margin-bottom: 16px; border-radius: 8px; }
+    .transcript-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .transcript-block { margin-bottom: 12px; }
+    textarea { width: 100%; background: #020617; color: var(--text); border: 1px solid #1e293b; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.6; resize: vertical; min-height: 80px; font-family: inherit; }
+    textarea:focus { outline: none; border-color: var(--accent); }
+    .actions { display: flex; gap: 10px; margin-top: 16px; }
+    .btn { padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-publish { background: var(--ok); color: #000; }
+    .btn-publish:hover { background: #16a34a; }
+    .empty { text-align: center; color: var(--muted); padding: 60px 0; font-size: 16px; }
+    .count-info { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <a href="/admin/people" class="back">&larr; Назад к панели</a>
+  <h1>&#127897; Транскрипции &mdash; проверка</h1>
+
+  {% if memories %}
+  <p class="count-info">Ожидают проверки: {{ memories|length }}</p>
+  {% for m in memories %}
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="person">{{ m.author_name or 'Неизвестный автор' }}</div>
+        <div class="date">{{ m.created_at or '' }} &middot; ID: {{ m.id }}</div>
+      </div>
+      <span class="status status-{{ m.transcription_status or 'pending' }}">{{ m.transcription_status or 'pending' }}</span>
+    </div>
+    {% if m.audio_url %}
+    <audio controls src="{{ m.audio_url }}"></audio>
+    {% endif %}
+    <form method="post" action="/admin/transcriptions/{{ m.id }}/publish">
+      <div class="transcript-block">
+        <div class="transcript-label">Дословно (verbatim)</div>
+        <textarea name="transcript_verbatim" rows="3">{{ m.transcript_verbatim or '' }}</textarea>
+      </div>
+      <div class="transcript-block">
+        <div class="transcript-label">Читаемый текст (readable)</div>
+        <textarea name="transcript_readable" rows="4">{{ m.transcript_readable or '' }}</textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn btn-publish">&#10003; Опубликовать</button>
+      </div>
+    </form>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty">Нет транскрипций на проверке</div>
+  {% endif %}
+</body>
+</html>
