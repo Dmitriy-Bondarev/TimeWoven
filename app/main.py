@@ -908,6 +908,38 @@ from app.routes.family_tree import router as family_router
 app.include_router(family_router)
 # TODO: создать новый endpoint FastAPI /users,
 # который:
+
+# --- Audio Upload API ---
+AUDIO_UPLOAD_DIR = Path("app/static/audio/uploads")
+
+@app.post("/api/audio/upload")
+async def audio_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import JSONResponse
+    # Verify token
+    auth = request.headers.get("Authorization", "")
+    expected = f"Bearer {os.getenv('WHISPER_API_TOKEN', '')}"
+    if not auth or auth != expected:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+    # Save file
+    AUDIO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    safe_name = Path(file.filename).name
+    dest = AUDIO_UPLOAD_DIR / safe_name
+    contents = await file.read()
+    dest.write_bytes(contents)
+    # Create Memory record with status pending
+    memory = Memory(
+        audio_url=f"/static/audio/uploads/{safe_name}",
+        transcription_status="pending",
+        created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
+    db.add(memory)
+    db.commit()
+    db.refresh(memory)
+    return JSONResponse(status_code=200, content={"status": "queued", "memory_id": memory.id, "filename": safe_name})
 # - использует асинхронный роутер
 # - достаёт список пользователей из PostgreSQL через SQLAlchemy
 # - возвращает список в формате JSON со статусом 200
