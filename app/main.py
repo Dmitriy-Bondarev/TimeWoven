@@ -813,6 +813,43 @@ async def timeline(request: Request, db: Session = Depends(get_db)):
         {"items": items},
     )
 
+
+# --- Whisper Transcription API ---
+WHISPER_API_TOKEN = os.getenv("WHISPER_API_TOKEN", "")
+
+@app.post("/api/transcription/result")
+async def transcription_result(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    token = request.headers.get("X-Whisper-Token", "")
+    if not token or token != WHISPER_API_TOKEN:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    data = await request.json()
+    memory_id = data.get("memory_id")
+    transcript_verbatim = data.get("transcript_verbatim", "")
+    transcript_readable = data.get("transcript_readable", "")
+
+    if not memory_id:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=400, content={"error": "memory_id required"})
+
+    from .models import Memory
+    memory = db.query(Memory).filter(Memory.id == memory_id).first()
+    if not memory:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=404, content={"error": "Memory not found"})
+
+    memory.transcript_verbatim = transcript_verbatim
+    memory.transcript_readable = transcript_readable
+    memory.transcription_status = "review"
+    db.commit()
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=200, content={"status": "ok", "memory_id": memory_id})
+
 from app.routes.family_tree import router as family_router
 app.include_router(family_router)
 # TODO: создать новый endpoint FastAPI /users,
