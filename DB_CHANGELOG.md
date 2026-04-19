@@ -53,6 +53,81 @@
 
 ---
 
+### [1.2] — 2026-04-19 — Перенос на PostgreSQL v1.3 и фикс Quote.id
+
+**Тип:** Schema + Data  
+**Автор:** Дмитрий Бондарев  
+**ADR:** —  
+**Обратимость:** Reversible (через бэкап схемы и данных)
+
+#### Описание
+
+Фиксация состояния БД после перехода на PostgreSQL: устранена ошибка `IntegrityError` при сохранении ответов семьи из-за отсутствия автоинкремента на первичном ключе `Quote.id`, проверены связи `Memory.author_id → Person.person_id → PersonI18n`, зафиксированы фактические counts по ключевым таблицам. Цель — стабилизировать базу под продовый контур и гарантировать корректную работу семейных ответов. [cite:29]
+
+#### Изменения
+
+| Действие | Объект            | Детали                                                                 |
+|----------|-------------------|------------------------------------------------------------------------|
+| ALTER    | `Quotes.id`       | Установка `PRIMARY KEY` c автоинкрементом (sequence / IDENTITY)       |
+| CHECK    | `Person`/`Memory` | Проверка связей `Memory.author_id → Person.person_id → PersonI18n`    |
+| CHECK    | Counts            | Проверка текущих counts: `Person = 9`, `Memory = 9`                    |
+
+#### SQL
+
+> Ниже — концептуальная SQL-модель для PostgreSQL; фактическая реализация зависит от текущего определения `Quotes.id`.
+
+```sql
+-- 1. Создать sequence для Quotes.id, если её ещё нет
+CREATE SEQUENCE IF NOT EXISTS quotes_id_seq OWNED BY "Quotes".id;
+
+-- 2. Привязать sequence как DEFAULT для id
+ALTER TABLE "Quotes"
+    ALTER COLUMN id SET DEFAULT nextval('quotes_id_seq');
+
+-- 3. Выставить sequence на максимальное существующее значение
+SELECT setval('quotes_id_seq', COALESCE(MAX(id), 1)) FROM "Quotes";
+```
+
+```sql
+-- Rollback (идейный)
+-- Вариант отката только DEFAULT и sequence, без удаления данных:
+
+-- 1. Убрать DEFAULT:
+-- ALTER TABLE "Quotes" ALTER COLUMN id DROP DEFAULT;
+
+-- 2. По необходимости удалить sequence:
+-- DROP SEQUENCE IF EXISTS quotes_id_seq;
+
+-- Первичный ключ на id обычно не откатывается, так как он логически необходим.
+```
+
+#### Валидация
+
+```sql
+-- 1) Проверка: новые INSERT в Quotes не падают по PK и DEFAULT срабатывает
+BEGIN;
+INSERT INTO "Quotes" (content, author_id, memory_id, created_at)
+VALUES ('_db_changelog_test_', 1, 1, now());
+ROLLBACK;
+
+-- 2) Проверка counts по основным таблицам
+SELECT COUNT(*) AS persons_count  FROM "Person";
+SELECT COUNT(*) AS memories_count FROM "Memory";
+
+-- 3) Проверка: все Memory.author_id указывают на существующий Person
+SELECT COUNT(*) AS broken_author_refs
+FROM "Memory" m
+LEFT JOIN "Person" p ON m.author_id = p.person_id
+WHERE m.author_id IS NOT NULL AND p.person_id IS NULL;
+```
+
+#### Затронутый код
+
+- `app/models/__init__.py` — модель `Quote`: поле `id` с `primary_key=True, autoincrement=True`.  
+- `app/api/routes/tree.py` — сохранение ответов семьи в таблицу `Quotes`. [cite:29]
+
+---
+
 ### [1.1] — 2026-04-17 — Temporal normalization v1 (PersonRelationship)
 
 **Тип:** Data  
@@ -62,7 +137,7 @@
 
 #### Описание
 
-Нормализация временной модели связей в таблице `person_relationships` на продовом PostgreSQL: устранены `NULL` в `valid_to`, `valid_from` для родительско‑детских связей согласован с датой рождения ребёнка, браки обрезаны по дате смерти участников, если она известна. Цель — сделать модель связей временно консистентной и пригодной для запросов вида «состояние семьи на дату» через интервал `[valid_from, valid_to)`.
+Нормализация временной модели связей в таблице `person_relationships` на продовом PostgreSQL: устранены `NULL` в `valid_to`, `valid_from` для родительско‑детских связей согласован с датой рождения ребёнка, браки обрезаны по дате смерти участников, если она известна. Цель — сделать модель связей временно консистентной и пригодной для запросов вида «состояние семьи на дату» через интервал `[valid_from, valid_to)`. [cite:31]
 
 #### Изменения
 
@@ -74,7 +149,7 @@
 
 #### SQL
 
-> Ниже — концептуальные SQL-скрипты; в реальности операции выполнялись в несколько шагов с dry‑run‑проверками.
+> Ниже — концептуальные SQL-скрипты; в реальности операции выполнялись в несколько шагов с dry‑run‑проверками. [cite:31]
 
 ```sql
 -- 1. Проставить открытый конец интервала для всех NULL
@@ -106,7 +181,6 @@ SET valid_to = '9999-12-31'
 WHERE relationship_type_id IN (1, 2);      -- bioparent, child
 
 -- 5. Нормализация браков по дате смерти (spouselegal)
--- valid_to хранится как текст, поэтому работаем через ::date
 UPDATE person_relationships pr
 SET valid_to = new_new_valid_to::text
 FROM (
@@ -128,7 +202,6 @@ WHERE pr.id = t.id;
 ```sql
 -- Rollback (идейный, частично возможен только из бэкапа)
 -- 1. Восстановление valid_to/valid_from требует заранее сохранённого снимка:
---    до применения изменений нужно было сделать:
 --    CREATE TABLE pr_snapshot_2026_04_17 AS
 --      SELECT id, valid_from, valid_to FROM person_relationships;
 --
@@ -173,8 +246,7 @@ WHERE pr.relationship_type_id = 3
 
 #### Затронутый код
 
-- `app/models/relationship.py` — использование полей `valid_from` / `valid_to` как датовых строк.
-- (план) сервисы/репозитории, использующие фильтрацию по интервалу `[valid_from, valid_to)`.
+- Логика чтения/запросов PersonRelationship в сервисах и будущих репозиториях (интервалы `[valid_from, valid_to)`). [cite:31]
 
 ---
 
@@ -187,23 +259,23 @@ WHERE pr.relationship_type_id = 3
 
 #### Описание
 
-Начата нормализация структуры базы данных: выделены сущности `Union` (союз/брак) и `UnionChildren` (дети союза), а также приведены данные к новой модели. Цель — перейти от «голых» связей между людьми к архитектуре Person / Union / Memory / Event / Relationship и корректно моделировать семью через союзы родителей и их детей.
+Начата нормализация структуры базы данных: выделены сущности `Union` (союз/брак) и `UnionChildren` (дети союза), а также приведены данные к новой модели. Цель — перейти от «голых» связей между людьми к архитектуре Person / Union / Memory / Event / Relationship и корректно моделировать семью через союзы родителей и их детей. [cite:31]
 
 #### Изменения
 
-| Действие | Объект          | Детали                                                      |
-|----------|-----------------|-------------------------------------------------------------|
-| SNAPSHOT | `db_schema`     | Схема сохранена в `db_schema_before.sql`                    |
-| SNAPSHOT | `db_tables`     | Список таблиц в `db_tables_before.txt`                      |
-| CREATE   | `unions`        | `partner1_id`, `partner2_id`, `start_date`, `end_date`      |
-| CREATE   | `union_children`| `union_id`, `child_id`                                      |
-| DATA     | `unions`        | Автоматическое построение союзов по связям `spouse*`        |
-| DATA     | `union_children`| Автоматическое заполнение детей союзов + ручная чистка      |
+| Действие | Объект           | Детали                                                      |
+|----------|------------------|-------------------------------------------------------------|
+| SNAPSHOT | `db_schema`      | Схема сохранена в `db_schema_before.sql`                    |
+| SNAPSHOT | `db_tables`      | Список таблиц в `db_tables_before.txt`                      |
+| CREATE   | `unions`         | `partner1_id`, `partner2_id`, `start_date`, `end_date`      |
+| CREATE   | `union_children` | `union_id`, `child_id`                                      |
+| DATA     | `unions`         | Построение союзов по связям `spouse*`                       |
+| DATA     | `union_children` | Построение детей союзов + ручная чистка                     |
 | DATA     | `person_relationships` | Удаление ошибочных связей (внуки как дети)     |
 
 #### SQL
 
-> Структура и данные строились скриптом; ниже — логика в SQL-псевдокоде.
+> Структура и данные строились скриптом; ниже — логика в SQL-псевдокоде. [cite:31]
 
 ```sql
 -- Снимки состояния до изменений (выполнено вручную, MacBook)
@@ -230,7 +302,62 @@ CREATE TABLE union_children (
     child_id INTEGER NOT NULL REFERENCES people(id)
 );
 
--- 3. Построение Union по связям spouselegal / spousecommon
--- (псевдокод: каждая уникальная пара супругов -> один Union)
+-- 3. Построение Union по связям spouselegal / spousecommon (псевдокод)
+--   INSERT INTO unions (partner1_id, partner2_id, start_date, end_date)
+--   SELECT DISTINCT
+--       LEAST(pr.person_from_id, pr.person_to_id) AS partner1_id,
+--       GREATEST(pr.person_from_id, pr.person_to_id) AS partner2_id,
+--       NULL::date AS start_date,
+--       NULL::date AS end_date
+--   FROM person_relationships pr
+--   WHERE pr.relationship_type_id IN (3,4); -- spouselegal/spousecommon
 
--- 
+-- 4. Построение UnionChildren по связям parent/child (псевдокод)
+--   INSERT INTO union_children (union_id, child_id)
+--   SELECT
+--       u.id AS union_id,
+--       c.id AS child_id
+--   FROM unions u
+--   JOIN person_relationships pr ON
+--       pr.relationship_type_id IN (1,2) -- bioparent/child
+--       AND (pr.person_from_id = u.partner1_id OR pr.person_from_id = u.partner2_id
+--            OR pr.person_to_id = u.partner1_id OR pr.person_to_id = u.partner2_id)
+--   JOIN people c ON
+--       (pr.relationship_type_id = 1 AND pr.person_to_id   = c.id) OR
+--       (pr.relationship_type_id = 2 AND pr.person_from_id = c.id);
+```
+
+```sql
+-- Rollback (идейный)
+-- 1. Удалить union_children:
+-- DROP TABLE IF EXISTS union_children;
+--
+-- 2. Удалить unions:
+-- DROP TABLE IF EXISTS unions;
+--
+-- 3. По необходимости восстановить схему/данные из db_schema_before.sql и db_tables_before.txt.
+```
+
+#### Валидация
+
+```sql
+-- 1) unions созданы и содержат пары партнёров
+SELECT COUNT(*) AS unions_count FROM unions;
+
+-- 2) union_children содержит ожидаемое число записей
+SELECT COUNT(*) AS union_children_count FROM union_children;
+
+-- 3) Проверка отсутствия "детей без союза"
+SELECT COUNT(*) AS children_without_union
+FROM person_relationships pr
+WHERE pr.relationship_type_id IN (1,2)
+  AND NOT EXISTS (
+      SELECT 1
+      FROM union_children uc
+      WHERE uc.child_id IN (pr.person_from_id, pr.person_to_id)
+  );
+```
+
+#### Затронутый код
+
+- Модели и сервисы, работающие с Union / UnionChildren (семейный граф, таймлайн).

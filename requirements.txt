@@ -1,7 +1,7 @@
 # ============================================================
 # TimeWoven — Python Dependencies
 # ============================================================
-# Дата обновления: 2026-04-18
+# Дата обновления: 2026-04-19
 # Python: 3.11+
 # Окружение: Production + Development
 #
@@ -9,8 +9,8 @@
 #   pip install -r requirements.txt
 #
 # Обновление после добавления пакета:
-#   pip freeze > requirements.lock.txt  (полный снимок)
-#   Вручную добавить в этот файл с комментарием
+#   pip freeze > requirements.lock.txt   # полный снимок
+#   Вручную синхронизировать этот файл
 #
 # Конвенция версионирования:
 #   package==X.Y.Z   — точная версия (для стабильности прода)
@@ -20,7 +20,6 @@
 
 # --- Веб-фреймворк и ASGI ---
 fastapi==0.128.8             # REST API фреймворк, маршрутизация, валидация
-starlette==0.49.3            # ASGI-ядро, на котором основан FastAPI
 uvicorn==0.39.0              # ASGI-сервер для запуска FastAPI
 
 
@@ -35,7 +34,7 @@ MarkupSafe==3.0.3            # Экранирование в шаблонах Ji
 python-multipart==0.0.20     # Обработка form-data (загрузка файлов)
 
 
-# --- Безопасность и Auth ---
+# --- Конфигурация и сессии ---
 python-dotenv==1.2.2         # Загрузка переменных окружения из .env
 itsdangerous==2.2.0          # Подпись и верификация cookies/токенов
 starlette-session==0.4.3     # Сессии для Starlette/FastAPI
@@ -47,7 +46,7 @@ pydantic_core==2.41.5        # Ядро pydantic v2
 annotated-types==0.7.0       # Дополнительные типовые аннотации для pydantic
 
 
-# --- Async и низкоуровневые зависимости FastAPI ---
+# --- Async и низкоуровневые зависимости ---
 anyio==4.12.1                # Абстракция над asyncio/Trio
 h11==0.16.0                  # HTTP/1.1 протокол для uvicorn
 idna==3.11                   # Поддержка IDN-доменов
@@ -58,20 +57,20 @@ exceptiongroup==1.3.1        # Группировка исключений (дл
 # --- Утилиты типов ---
 typing_extensions==4.15.0    # Дополнительные typing-фичи
 typing-inspection==0.4.2     # Инспекция типов (вспомогательные утилиты)
-annotated-doc==0.0.4         # Работа с аннотированной документацией (вспомогательный пакет)
+annotated-doc==0.0.4         # Работа с аннотированной документацией
 
 
 # --- Тестирование (dev only, TODO) ---
-# pytest==8.1.1               # Тестовый фреймворк
-# pytest-cov==5.0.0           # Покрытие кода тестами
-# httpx==0.27.0               # Async HTTP клиент для тестов FastAPI
+# pytest==8.1.1              # Тестовый фреймворк
+# pytest-cov==5.0.0          # Покрытие кода тестами
+# httpx==0.27.0              # Async HTTP-клиент для тестов FastAPI
 
 
 # --- Линтинг и форматирование (dev only, TODO) ---
-# ruff==0.3.5                 # Линтер и форматтер (замена flake8 + black + isort)
+# ruff==0.3.5                # Линтер и форматтер
 
 
 # --- AI / ML и интеграции (опционально, TODO) ---
-# openai-whisper==20231117    # Транскрибация аудио (Whisper pipeline)
-# torch>=2.0,<3.0             # PyTorch — зависимость Whisper
-# python-telegram-bot==21.1   # Telegram Bot (Импульс дня)
+# openai-whisper==20231117   # Транскрибация аудио (Whisper pipeline)
+# torch>=2.0,<3.0            # PyTorch — зависимость Whisper
+# python-telegram-bot==21.1  # Telegram Bot (Импульс дня)
