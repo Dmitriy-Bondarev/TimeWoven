@@ -1,7 +1,267 @@
 # CHANGELOG — TimeWoven
 
-## [v1.13-final-stabilization] — 2026-04-21
+## [v1.22.14-product-backlog-bootstrap] — 2026-04-22
 
+### Process | Documentation
+
+- **Docs artifact**: в корень проекта добавлен постоянный реестр `PRODUCT_BACKLOG.md` для ведения продуктовых задач, статусов и решений.
+- **Process update**: зафиксировано правило синхронизации backlog-изменений с `docs/PROJECT_LOG.md` и `CHANGELOG.md` для прозрачной трассировки продуктовых решений.
+
+## [v1.22.13-admin-person-create-form-p1] — 2026-04-22
+
+### Feature | Admin | People
+
+- **Feature (Task P1, New person in one step)**: добавлены `GET/POST /admin/people/new` в `app/api/routes/admin.py` с серверной валидацией формы и созданием персоны через единый сервисный вызов.
+- **Feature (Transactional create service)**: создан `app/services/people_service.py` с `create_person_with_i18n(...)`, который в одной транзакции создаёт `People` + обязательную RU-локализацию + опциональную EN-локализацию.
+- **Feature (Max contact mapping)**: поле формы `max_user_id` маппится в `People.messenger_max_id`; поддержан `preferred_ch='Max'` и fallback `'None'`.
+- **Feature (Admin UI)**: добавлен шаблон `app/web/templates/admin/admin_person_new.html` и кнопка `+ Новая персона` в `app/web/templates/admin/admin_people.html`.
+- **Schema sync**: добавлена миграция `migrations/003_expand_preferred_channel_for_max.sql` и обновлены `create_postgres_schema.sql`, `docs/DATABASE_SCHEMA.md` для канала `Max`.
+
+## [v1.22.12-local-stub-http-client-m3-local] — 2026-04-22
+
+### Feature | AI | Local Stub
+
+- **Feature (Task M3-local)**: `app/services/ai_analyzer.py` — `AI_PROVIDER=local_stub` теперь вызывает внешний локальный HTTP-endpoint через `AI_LOCAL_STUB_URL`, маппит `summary/people/dates` в стандартный `AnalysisResult` и игнорирует лишние поля ответа.
+- **Safety (Local provider fallback)**: при отсутствии URL, недоступности сервиса, таймауте, не-200 ответе или невалидном JSON анализатор возвращает `status=error` и не поднимает исключение в webhook/pipeline.
+- **Ops (Local defaults)**: `.env` — сохранён безопасный `AI_PROVIDER=disabled`, дефолт `AI_LOCAL_STUB_URL` обновлён на `http://localhost:9000/analyze`.
+
+## [v1.22.11-max-memory-ai-provider-agnostic-m2] — 2026-04-22
+
+### Feature | Bot | AI Abstraction
+
+- **Feature (Task M2, Provider-agnostic analyzer)**: `app/services/ai_analyzer.py` — добавлен единый интерфейс `analyze_memory_text(text)` со стандартизированным результатом: `summary`, `persons`, `dates`, `locations`, `raw_provider`, `status`.
+- **Feature (Config-driven providers)**: поддержаны `AI_PROVIDER=disabled|mock|anthropic|local_stub`; режим `disabled` безопасно возвращает `status=disabled`, `mock` выдаёт тестовую структуру без внешнего API, `local_stub` возвращает `not_implemented`.
+- **Feature (Anthropic safety)**: существующая Claude-логика перенесена в отдельный провайдер с primary/fallback моделью и безопасной обработкой ошибок (без падения webhook).
+- **Feature (Webhook integration)**: `app/api/routes/bot_webhooks.py` — после успешного `create_memory_from_max(...)` выполняется не-блокирующий вызов анализа; при ошибке AI transport+persistence не ломаются.
+- **Feature (Metadata persistence, no schema changes)**: `app/services/memory_store.py` — добавлена `attach_analysis_to_memory(...)`, сохраняющая результат анализа в `Memories.transcript_verbatim` metadata.
+- **Compatibility**: `MemoryAnalyzer.extract_entities(...)` оставлен как backward-compatible адаптер для старых вызовов в `app/bot/max_messenger.py`.
+
+## [v1.22.10-max-memory-min-loop-m1] — 2026-04-22
+
+### Feature | Bot | Transport/Persistence
+
+- **Feature (Task M1, Min loop Max -> Memory)**: `app/api/routes/bot_webhooks.py` — входящий webhook `/webhooks/maxbot/incoming` теперь гарантированно сохраняет текстовые сообщения в `Memories` через минимальный persistence-контур.
+- **Feature (Persistence helper)**: `app/services/memory_store.py` — добавлена `create_memory_from_max(user_id, text, raw_payload)` с базовым person mapping по `messenger_max_id`/`messenger_tg_id` и fallback в общий inbox (`author_id=NULL`).
+- **Feature (Outbound reply)**: после успешного сохранения webhook вызывает `MaxMessengerBot.send_message(...)` с подтверждением: "Спасибо, я сохранил эту историю в семейный архив.".
+- **Fix (Webhook validation)**: при отсутствии текста и отсутствии медиа webhook возвращает `400` (валидационная ошибка), вместо потенциальных `500`.
+- **Fix (MAX send target)**: `app/bot/max_messenger.py` — `send_message` больше не использует хардкод chat_id; используется `MAX_API_SEND_URL` и входящий `user_id`.
+- **Ops (Logging noise)**: удалены лишние отладочные записи в `webhook_test.log` из базового happy-path, оставлено компактное структурированное логирование через `logger`.
+
+## [v1.22.9-family-graph-keyframe-mode-stale-fetch-guard-6c3_1] — 2026-04-22
+
+### Feature | Frontend | UI/Graph Stabilization
+
+- **Feature (Task 6C.3.1, Keyframe Mode toggle)**: `app/web/templates/family_tree.html` + `app/web/static/js/family_graph.js` — добавлен явный переключатель `Слои времени: ON/OFF` для управления wheel-поведением в temporal keyframes.
+- **Behavior (Wheel scope + predictability)**: keyframe wheel navigation работает только в явном режиме `ON` и только в зоне графа/таймлайна; при `OFF` wheel возвращается к обычному D3 zoom.
+- **Behavior (Zoom conflict safety)**: при `ON` D3 wheel zoom блокируется zoom-filter'ом, чтобы wheel однозначно листал keyframes без конфликта жестов.
+- **Stability (Stale fetch protection)**: в `loadAndRender` добавлен request sequence guard; устаревшие fetch-ответы игнорируются и не могут откатить сцену на старый год.
+- **UX (Minimal feedback)**: добавлена лёгкая подсветка текущего `Кадр: <год>` при быстрой keyframe-навигации.
+- **Validation**: `family_graph.js` синтаксически валиден (`esprima.parseScript`).
+
+## [v1.22.8-family-graph-keyframe-navigation-prototype-6c3] — 2026-04-22
+
+### Feature | Frontend | UI/Graph
+
+- **Feature (Task 6C.3, Keyframe timeline prototype)**: `app/web/static/js/family_graph.js` — добавлены keyframes на основе текущих graph snapshot-данных (birth/death/start/end years), состояние `currentKeyframeIndex` и переходы `goToPrevKeyframe()` / `goToNextKeyframe()`.
+- **Feature (Normalization)**: keyframe years валидируются, дедуплицируются и сортируются по возрастанию; при отсутствии keyframes включается fallback на обычный year workflow.
+- **Feature (UI)**: `app/web/templates/family_tree.html` — добавлены минимальные кнопки навигации `‹ предыдущий слой` / `следующий слой ›` и индикатор текущего кадра.
+- **Feature (Wheel prototype)**: в режиме `По году` добавлена wheel-навигация по keyframes (throttled), использующая stable update path из 6C.2 без backend-изменений.
+- **Validation**: `family_graph.js` успешно проходит `esprima.parseScript`.
+
+## [v1.22.7-family-graph-stable-year-update-prototype-6c2] — 2026-04-22
+
+### Feature | Frontend | Family Graph
+
+- **Prototype (Task 6C.2)**: `app/web/static/js/family_graph.js` — добавлен feature flag `USE_STABLE_UPDATE` и прототип in-place обновления снапшота в режиме «По году» без полного teardown SVG.
+- **Stable update path**: для year-переходов (`applyYearAndReloadGraph`) данные графа обновляются через keyed joins (nodes/edges), с сохранением координат существующих узлов и reuse текущей D3 simulation.
+- **Temporal transitions**: добавлены мягкие fade-in/fade-out для появляющихся/исчезающих узлов и рёбер, чтобы уменьшить визуальный jump при смене года.
+- **Safety**: режим «Сейчас» и обычный полный `render()` оставлены без изменения; прототип можно отключить через флаг.
+- **Docs**: обновлён `tech-docs/family-graph-snapshot-timeline-notes.md` секцией "Prototype 6C.2 — Stable Update Notes".
+
+## [v1.22.6-family-graph-snapshot-timeline-prep-6c1] — 2026-04-22
+
+### Docs | Architecture | Frontend Research
+
+- **Docs (Task 6C.1)**: добавлен инженерный разведочный документ `tech-docs/family-graph-snapshot-timeline-notes.md` по подготовке Snapshot Timeline для family graph.
+- **Research (Current frontend)**: зафиксированы текущие entry points year-mode (`window.GRAPH_YEAR`, `state.temporalMode/selectedYear`), точка загрузки графа (`loadAndRender`) и факт полного пересоздания D3-сцены при смене года.
+- **Roadmap (Phase 1)**: описан минимальный путь без backend-изменений: snapshot-controller на фронте, переходы по индексам снимков, reuse текущего `applyYearAndReloadGraph(year)`.
+- **Risks**: отдельно зафиксированы источники layout jumping и границы работ, требующие отдельной задачи (keyed joins, reuse simulation, continuity policy, gestures).
+
+## [v1.22.5-adr-006-temporal-layers-snapshot-navigation] — 2026-04-22
+
+### Docs | Architecture
+
+- **Architecture (ADR)**: добавлен `tech-docs/adr/ADR-006.md` со статусом `Proposed`: переход family graph от year-input модели к навигации по temporal snapshots/layers.
+- **Scope (Frontend UX roadmap)**: зафиксированы этапы внедрения (flat keyframe timeline -> stable transitions -> optional layer-stack visualization) без обязательного 3D.
+- **Compatibility**: runtime-код и схема БД не менялись; текущий режим `Сейчас/По году` остаётся baseline.
+- **Docs (ADR Index)**: обновлён реестр `tech-docs/README.md` с новой записью ADR-006.
+
+## [v1.22.4-family-graph-year-timeline-slider-6a] — 2026-04-22
+
+### Feature | Frontend | UI/Graph
+
+- **Feature (Task 6A, Timeline slider)**: `app/web/templates/family_tree.html` — добавлена UI-шкала времени (`input[type=range]`) рядом с year-input и краткий label для режима «По году».
+- **Feature (Year sync)**: `app/web/static/js/family_graph.js` — добавлены функции `getCurrentYearFromUI()`, `setYearInUI(year)`, `applyYearAndReloadGraph(year)`; реализована синхронизация input ↔ slider.
+- **Feature (Debounce)**: `app/web/static/js/family_graph.js` — добавлен `debounce(fn, delay)` и debounced перезагрузка графа (250мс) при перетаскивании слайдера в режиме «По году».
+- **UX (Temporal modes)**: в режиме «Сейчас» year-input и слайдер остаются видимыми, но отключены; в режиме «По году» активируются и используют выбранный год.
+- **Range policy (v1)**: диапазон лет установлен как `1900..(текущий год + 5)`, шаг `1`.
+
+## [v1.22.3-adr-005-union-v2-proposal] — 2026-04-22
+
+### Docs | Architecture
+
+- **Architecture (ADR)**: добавлен `tech-docs/adr/ADR-005.md` с предложенным направлением Union v2: `union_type`, single-parent союзы, моделирование adoption/guardianship и будущий strict temporal mode.
+- **Docs (ADR Index)**: обновлён реестр `tech-docs/README.md` — добавлены записи ADR-003, ADR-004, ADR-005 для актуального индекса.
+- **Scope**: изменений схемы БД и runtime-кода нет; решение имеет статус `Proposed`.
+
+## [v1.22.2-family-graph-filter-temporal-fixes-5c] — 2026-04-22
+
+### Fix | Frontend | Backend
+
+- **Fix (Deceased filter)**: `family_graph.js` — при отключении фильтра "Умершие" теперь скрываются и рёбра к скрытым узлам (раньше стрелки зависали в воздухе).
+- **Fix (Children filter)**: `family_graph.js` — при отключении "Дети" осиротевшие узлы-дети без видимых рёбер полностью скрываются.
+- **Fix (Partners filter)**: `family_graph.js` — union-узлы без видимых рёбер после отключения "Партнёры" скрываются автоматически.
+- **Fix (Temporal year mode)**: `family_graph.py` — при передаче `year` узлы персон с `birth_year > year` не включаются в граф; `union_to_node` теперь вычисляет `is_active` относительно выбранного года, а не текущего.
+- **Fix (now-mode year leak)**: `family_graph.js` — `getRequestedYear()` в режиме "Сейчас" возвращает `null`, не отправляя `year` в backend.
+- **Fix (Focus collision)**: `family_graph.js` — `forceCollide` и `linkDistance` увеличены для root-узла (+6px и +28px), подписи не перекрываются.
+- **Validation**: Python `ast.parse` OK, JS `esprima.parseScript` OK; `timewoven.service` перезапущен; `curl /health` 200.
+
+## [v1.22.1-temporal-family-graph-visual-polish-5b] — 2026-04-22
+
+### UX | Frontend
+
+- **UX (Temporal graph polish)**: `app/web/templates/family_tree.html` — улучшен визуальный стиль контролов и нижней панели без изменения layout: toggle-группа `Сейчас / По году`, приглушённое disabled-состояние поля года, более явные состояния кнопок истории (`←/→`).
+- **UX (Node/edge styling)**: `app/web/static/js/family_graph.js` — усилена визуальная дифференциация рёбер (`active`/`inactive`/`neutral`) по цвету, толщине и dash-стилю; сохранено полное скрытие рёбер при отключении фильтров `Партнёры/Дети`.
+- **UX (Focus & hover)**: `app/web/static/js/family_graph.js` — добавлен мягкий hover-акцент узлов/подписей, refined focus-ring, компактные узлы и более заметные `union`-узлы; подпись фокуса расширена годами жизни.
+- **UX (Bottom panel)**: `app/web/static/js/family_graph.js` + `app/web/templates/family_tree.html` — улучшена типографика и структура person/union summary; CTA-кнопки приведены к primary/secondary: `Перейти в профиль`, `Сделать корнем`, `Timeline человека/союза`.
+- **Validation**: JS parse OK (`esprima.parseScript`), `timewoven.service` перезапущен.
+
+## [v1.22-temporal-family-graph-v2] — 2026-04-22
+
+### Feature | Backend | Frontend
+
+- **Feature (Temporal payload)**: `app/schemas/family_graph.py` и `app/services/family_graph.py` расширены для temporal-графа.
+  - `person` node: добавлены `death_year`.
+  - `union` node: добавлены `start_date`, `end_date`, `is_active`.
+  - `edge`: добавлено `is_active_for_year` + заполнение `valid_from`/`valid_to` по данным союза/рождения.
+- **Feature (Year mode API)**: `app/api/routes/tree.py` — endpoint `/family/tree/json` теперь поддерживает query-параметр `year` (пример: `/family/tree/json?root_person_id=1&depth=2&year=2015`) и передаёт его в граф-сервис.
+- **Feature (Temporal UI controls)**: `app/web/templates/family_tree.html` + `app/web/static/js/family_graph.js` — добавлены режимы `Сейчас` / `По году`, input года и перезагрузка графа с параметром `year`.
+- **Feature (Temporal styling)**: на фронте рёбра визуально разделены по состоянию на год: `active` (обычный стиль), `inactive` (faded/серый), `neutral` (промежуточный стиль при отсутствии данных).
+- **Feature (Bottom panel + timeline linkage)**: нижняя панель расширена для person/union (годы жизни, периоды союзов, дети, temporal summary) и добавлены кнопки перехода в timeline: `/family/timeline?person_id=...`, `/family/timeline?union_id=...`.
+- **Feature (Timeline filters)**: `app/api/routes/tree.py` — `/family/timeline` принимает `person_id` и `union_id` для контекстного отображения связанных событий.
+- **Validation**:
+  - Python compile OK (`py_compile` для изменённых backend-файлов).
+  - JS parse OK (`esprima.parseScript` для `family_graph.js`).
+  - `timewoven.service` перезапущен и активен.
+  - Проверки: `/health`, `/family/tree/json?root_person_id=1&depth=2`, `/family/tree/json?root_person_id=1&depth=2&year=2015` возвращают `200`.
+
+## [v1.21.1-family-graph-syntax-hotfix] — 2026-04-22
+
+### Bugfix | Frontend
+
+- **Bugfix (JS Parse Error)**: `app/web/static/js/family_graph.js` — исправлен синтаксический дефект около `family_graph.js:460` (`Uncaught SyntaxError: missing ) in parenthetical`): восстановлен корректный блок `updateDepthButtons()` и баланс скобок.
+- **Validation**: клиентский JS успешно парсится (`esprima.parseScript`) после деплоя, endpoint `/family/tree/json` возвращает валидные `nodes/edges`.
+- **Infrastructure**: перезапущен `timewoven.service`, статус `active (running)`.
+
+## [v1.21-family-graph-4b-ux] — 2026-04-22
+
+### UX | Frontend
+
+- **UX (Remove floating action-card)**: `app/web/templates/family_tree.html` — удалён тёмный action-card tooltip над узлами графа (HTML `#graph-tooltip`, CSS `.tt-actions`, `.tt-btn`, `.tt-meta`). Tooltip переработан в лёгкий hover-label (имя персоны, без кнопок, `pointer-events: none`).
+- **UX (Bottom contextual panel)**: добавлен `#graph-info-panel` под панелью управления. При загрузке показывает root-персону. При клике на персону — обновляется: имя, год рождения, пол, кнопки «Перейти в профиль» и «Сделать корнем». Палитра панели соответствует TimeWoven (`--bg`, `--surface`, `--accent`).
+- **UX (Union selection)**: клик по union-узлу — обновляет нижнюю панель (союз, имена участников из текущего графа). Действий для union нет (нет стабильного route). Union-узел при выборе получает amber-stroke `#f59e0b`.
+- **UX (History nav)**: back/forward теперь также обновляют нижнюю панель по текущему focused person.
+- **UX (Hint text)**: обновлён заголовочный подзаголовок (убрана ссылка на карточку).
+- **No DB changes**: API `/family/tree/json` не изменён, схема БД не затронута.
+- **Changed files**: `app/web/static/js/family_graph.js`, `app/web/templates/family_tree.html`.
+
+## [v1.20.1-family-graph-acceptance-hotfix] — 2026-04-22
+
+### Bugfix | QA
+
+- **Bugfix (Template Render)**: `app/web/templates/family_tree.html` — удалены дублирующиеся `{% extends %}` / `{% block content %}`, которые вызывали `500` (`TemplateSyntaxError: Unexpected end of template`) на `/family/tree` после авторизации.
+- **Bugfix (Frontend Asset Integrity)**: `app/web/static/js/family_graph.js` — устранено повреждение файла (смешение v1/v2 кода, `Unexpected end of input` в браузере). Файл принудительно переписан в единый валидный Graph v2 скрипт.
+- **QA (Smoke Test)**: Выполнен browser-level smoke-test (Playwright, headless Chromium) с cookie-авторизацией: render=true, click_focus=true, tooltip=true, union_click_no_focus_change=true, filters=true, depth=true, history=true, page_errors=[].
+- **Known non-blocking**: В console фиксируется внешний SRI warning для Font Awesome CSS (из базового шаблона), не влияет на рендер/работу семейного графа.
+
+## [v1.20-family-graph-v2-mvp] — 2026-04-22
+
+### Feature | UX | Visualization
+
+- **Feature (Graph UX)**: Полная замена `app/web/static/js/family_graph.js` — Graph v2 (~290 строк). Старый v1 код удалён (два конфликтующих `mouseover`, click→navigate).
+- **Feature (Focus Mode)**: Клик по персоне → фокус (dim остальных) + показ tooltip. Навигация в профиль — только через кнопку "Профиль →" в tooltip. Правая кнопка мыши → сменить корень графа (reroot + reload).
+- **Feature (Focus History)**: Кнопки ← / → в панели управления — навигация по истории фокусировки. Amber-кольцо вокруг текущего фокуса.
+- **Feature (Depth Controls)**: Кнопки − / + меняют глубину графа (1–5) и перезагружают данные через `/family/tree/json`.
+- **Feature (Semantic Edges)**: Партнёрские рёбра — синие сплошные (#4a90e2); дочерние — зелёные пунктирные (#22c55e). Раздельные arrowhead-маркеры per edge type.
+- **Feature (Dim)**: Не-соседние узлы и рёбра приглушаются до opacity 0.12 / 0.07. Союзные (union) узлы — 0.12 если не связаны с фокусом.
+- **Feature (Filters)**: Три toggle-кнопки: Партнёры / Дети / Умершие — скрывают соответствующие рёбра или узлы в реальном времени.
+- **Feature (Tooltip)**: Тёмный tooltip (#1a1a2e) с именем, мета (год рождения, †, пол) и тремя action-кнопками. Tooltip закрывается кликом по фону.
+- **Template (family_tree.html)**: Полная замена — добавлена `.graph-controls` панель под канвасом, `#graph-tooltip` абсолютно позиционированный в `#graph-wrapper`, новые CSS-переменные. `window.GRAPH_DATA_URL` заменён на `window.GRAPH_ROOT_PERSON_ID` + `window.GRAPH_DEPTH`.
+- **No DB changes**: API `/family/tree/json` не изменён, схема БД не затронута.
+
+## [v1.19-nav-auth-security-fixes] — 2026-04-22
+
+### Bugfix | Security | Infrastructure
+
+- **Infrastructure (Deploy)**: Перезапущен `timewoven.service` после накопленных фиксов v1.14–v1.16; `GET /health` теперь возвращает `200 {"status":"ok"}` на production.
+- **Bugfix (Navigation)**: `_require_family_session` в `tree.py` теперь сохраняет реальный URL запроса в параметр `next=` (включая query-строку). Ранее жёстко писал `/family/welcome`, из-за чего после логина пользователь всегда попадал на главную вместо запрошенной страницы. Проверено: `/family/timeline` → `next=/family/timeline`, `/family/tree?root_person_id=1` → `next=/family/tree%3F...`.
+- **Security (Admin Auth)**: `app/security.py` — восстановлена реальная проверка `require_admin`: сравнивает cookie `tw_admin_session` с `sha256(ADMIN_USERNAME:ADMIN_PASSWORD)`. Переменные берутся из `.env`. Ранее функция всегда возвращала `None` (пропускала всех). Добавлена функция `make_admin_token()` для установки cookie при логине.
+- **Security (Admin Auth)**: `GET /admin/avatars` — добавлена пропущенная проверка `require_admin`. Был единственный admin-маршрут без auth-guard.
+- **Security (Open Redirect)**: `POST /admin/login` — добавлена валидация параметра `next`: принимаются только пути, начинающиеся с `/` без `//` и без схемы (`://`). При невалидном `next` — редирект на `/admin`. Аналогично уже реализованной защите в `who-am-i/pin`.
+- **Security (Admin Login)**: `POST /admin/login` теперь реально сверяет `username`/`password` с `.env`-переменными `ADMIN_USERNAME`/`ADMIN_PASSWORD` и устанавливает сессионную cookie `tw_admin_session` (httponly, samesite=lax, 8 часов).
+- **Bugfix (UX)**: `POST /family/reply/{memory_id}` — исправлен redirect при отсутствии `person_id`: больше не попадает строка `"None"` в query-параметр, которая вызывала `422 Unprocessable Entity` на GET-обработчике. Если `person_id` не передан — redirect на `?saved=1` без `person_id`.
+
+## [v1.18-backup-manager-hotfix] — 2026-04-22
+
+### Infrastructure | Backup Reliability
+
+- **Infrastructure (Backup Script)**: `scripts/backup_manager.sh` усилен проверкой бинарника `pg_dump` через `command -v` с fail-fast ошибкой при отсутствии, чтобы исключить silent-fail в cron окружении.
+- **Infrastructure (Operations)**: Создана директория `/root/projects/TimeWoven/backups/daily/archive` и выполнен ручной тестовый запуск бэкапа с подтверждением генерации артефактов в `backups/daily/`.
+- **Infrastructure (Scheduler)**: Обновлена crontab-запись на запуск через полный путь и рабочую директорию: `cd /root/projects/TimeWoven && /bin/bash /root/projects/TimeWoven/scripts/backup_manager.sh >> /root/projects/TimeWoven/backups/daily/backup_manager.log 2>&1`.
+
+## [v1.17-total-traceability-protocol] — 2026-04-22
+
+### Infrastructure | Process Control
+
+- **Infrastructure (Governance)**: Введен обязательный протокол логирования всех изменений проекта (Total Traceability) в фазе «Стабилизация и Контроль».
+- **Process Rule (CHANGELOG)**: После выполнения любой задачи необходимо добавить запись в `CHANGELOG.md` с датой, типом изменения (`Feature|Bugfix|Security|Infrastructure`) и кратким описанием «что и зачем».
+- **Process Rule (Structure)**: При структурных изменениях каталогов/файлов проекта требуется запись в `docs/PROJECT_LOG.md` с причиной изменения.
+- **Process Rule (Schema Sync)**: При любом изменении SQLAlchemy-моделей или схемы PostgreSQL требуется немедленная синхронизация `docs/DATABASE_SCHEMA.md` и запись в `DB_CHANGELOG.md`.
+- **Process Rule (Infra Control)**: Изменения в backup-скриптах (включая `scripts/backup_manager.sh`) и Nginx-конфигурации подлежат обязательной фиксации в журналах изменений.
+- **Session Gate**: Сессия изменений считается завершенной только после подтверждения, что обновлены все релевантные журналы (`CHANGELOG.md`, `docs/PROJECT_LOG.md`, `docs/DATABASE_SCHEMA.md`, `DB_CHANGELOG.md` при schema-изменениях).
+
+## [v1.16-max-audio-ingestion-minimal] — 2026-04-22
+
+### Feature | Audio Ingestion
+
+- **Feature (Ingestion)**: `bot_webhooks.py` теперь при входящем MAX audio attachment пытается скачать файл локально в `app/web/static/audio/raw/` с предсказуемым именем `max_{attachment_id}_{timestamp}.{ext}`.
+- **Backwards compatible storage**: внешний `audio_url` по-прежнему сохраняется в поле `Memories.audio_url`; локальный путь сохраняется в `Memories.transcript_verbatim` как JSON-ключ `local_audio_path`.
+- **Fallback safety**: при ошибке скачивания webhook не падает, память всё равно создаётся в статусе `pending_manual_text`, а в metadata проставляется `audio_download_error=download_failed`.
+- **Admin playback source selection**: `admin.py` и `admin_transcriptions.html` теперь используют локальный путь как приоритетный `src` плеера, а при его отсутствии автоматически откатываются на внешний URL.
+- **Whisper readiness**: подготовлена база для следующего шага авто-транскрибации через `TranscriptionService` (локальный файл уже доступен на диске).
+
+## [v1.15-audio-pipeline-audit] — 2026-04-22
+
+### Bugfix | Audio Pipeline
+
+- **Bugfix (CODE)**: `admin.py` — фильтр `/admin/transcriptions?status=pending` теперь включает статус `pending_manual_text`. Ранее все реальные аудио-записи из MAX webhook были невидимы в UI (webhook сохранял со статусом `pending_manual_text`, но фильтр смотрел только на `["pending", "draft"]`).
+- **Bugfix (UX)**: `admin_transcriptions.html` — добавлен CSS-класс `.status-pending_manual_text` (янтарный цвет) для корректного рендера badge у аудио-записей из MAX.
+- **Анализ (DATA)**: Записи IDs 8 и 9 в Memories с `audio_url LIKE 'example.com%'` подтверждены как тестовые данные из ручного дебага (`webhook_test.log` строки 11-12, 17-18). Не баг кода. SQL для soft-mark задокументирован.
+- **Анализ (INFRA)**: MAX CDN URL (`vd509.okcdn.ru`) истекает через ~24 часа (`expires` параметр). Реальное production-аудио воспроизведению недоступно после истечения. Требуется локальное кеширование аудио при приёме webhook.
+- **Анализ (ARCH)**: `TranscriptionService` (Whisper) существует но нигде не вызывается. Текущий пайплайн — ручная транскрипция: пользователь отправляет текст следом за аудио. Автоматическая транскрипция через Whisper — следующий шаг.
+
+## [v1.14-route-debug] — 2026-04-22
+
+### Bugfix | Infrastructure
+
+- **Bugfix**: Добавлен маршрут `GET /health` в `main.py` — возвращает `{"status": "ok"}`. Ранее возвращал 404.
+- **Bugfix**: `_require_family_session` теперь передаёт реальный текущий URL в параметр `?next=` вместо хардкоженного `/family/welcome`. Пользователь после логина возвращается на запрошенную страницу (например `/family/timeline`).
+- **Bugfix**: `who_am_i_pin_submit` теперь корректно использует параметр `next` при редиректе после успешного PIN-входа (ранее всегда отправлял на `/family/welcome`). Добавлена защита от open redirect (принимаются только пути, начинающиеся с `/`).
+- **UX Navigation**: в профиле добавлен переход `карточка человека -> семейный граф` через deep-link `/family/tree?root_person_id={id}`.
+- **Graph Focus/Highlight**: страница графа прокидывает `root_person_id` в клиентский JS и подсвечивает/фокусирует соответствующую персону при загрузке (фиксированный root + центрирование через zoom transform после завершения layout).
+- **Анализ данных**: `audio_url = https://example.com/...` — проблема в данных, не в коде. Тестовые записи из ручного дебага бота. SQL для поиска/очистки приложен ниже в документации.
+
+## [v1.13-final-stabilization] — 2026-04-21
 ### Day Finalization
 
 - MAX Bot API: Полная интеграция. Исправлена отправка сообщений (перевод ID в query-параметры).
