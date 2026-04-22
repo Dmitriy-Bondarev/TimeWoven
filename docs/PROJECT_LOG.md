@@ -1,5 +1,23 @@
 # PROJECT LOG — TimeWoven
 
+## Update: P1.14 — Exclude deceased relatives from who-am-I selector
+
+Date: 2026-04-22
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- Список персон для login/who-am-I теперь фильтруется по `is_alive = 1`.
+- Защищены смежные шаги flow (`POST /who-am-i`, `GET/POST /who-am-i/pin`): умершие персоны исключены и при прямом доступе по `person_id`.
+- Умершие сохраняются в базе, графе, карточках и истории, но больше не участвуют в selector-flow входа.
+
 ## Update: Docs artifact — PRODUCT_BACKLOG registry introduced
 
 Date: 2026-04-22

@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from uuid import uuid4
-from urllib.parse import urlparse
+from urllib.parse import quote, unquote, urlparse
 
 from fastapi import APIRouter, Depends, Form, Query, HTTPException, Request, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -33,7 +33,11 @@ def _get_family_member_id(request: Request) -> int | None:
 
 def _require_family_session(request: Request) -> RedirectResponse | None:
     if _get_family_member_id(request) is None:
-        return RedirectResponse(url="/who-am-i?next=/family/welcome", status_code=303)
+        next_url = request.url.path
+        if request.url.query:
+            next_url = f"{next_url}?{request.url.query}"
+        encoded_next = quote(next_url, safe="/")
+        return RedirectResponse(url=f"/who-am-i?next={encoded_next}", status_code=303)
     return None
 
 
@@ -42,6 +46,7 @@ async def family_tree_page(
     request: Request,
     root_person_id: int = Query(1, description="ID персоны для корня графа"),
     depth: int = Query(2, ge=1, le=6, description="Глубина поиска (1-6)"),
+    year: int | None = Query(None, ge=1000, le=2100, description="Год для temporal-режима"),
 ):
     """
     Страница визуализации семейного графа.
@@ -53,13 +58,14 @@ async def family_tree_page(
     if redirect:
         return redirect
 
-    logger.info(f"Family tree page requested: root={root_person_id}, depth={depth}")
+    logger.info(f"Family tree page requested: root={root_person_id}, depth={depth}, year={year}")
     return templates.TemplateResponse(
         "family_tree.html",
         {
             "request": request,
             "root_person_id": root_person_id,
             "depth": depth,
+            "year": year,
         },
     )
 
@@ -68,6 +74,7 @@ async def family_tree_page(
 async def family_tree_json(
     root_person_id: int = Query(..., description="ID персоны для корня графа"),
     depth: int = Query(2, ge=1, le=6, description="Глубина поиска (1-6)"),
+    year: int | None = Query(None, ge=1000, le=2100, description="Год для temporal-режима"),
     session: Session = Depends(get_db),
 ):
     """
@@ -87,13 +94,14 @@ async def family_tree_json(
     :param session: Database session
     :return: FamilyGraph с nodes и edges
     """
-    logger.info(f"Family tree JSON API: root={root_person_id}, depth={depth}")
+    logger.info(f"Family tree JSON API: root={root_person_id}, depth={depth}, year={year}")
     
     try:
         graph = build_family_graph(
             root_person_id=root_person_id,
             depth=depth,
             session=session,
+            year=year,
         )
         logger.info(
             f"Graph built successfully: {len(graph.nodes)} nodes, {len(graph.edges)} edges"
@@ -149,16 +157,41 @@ async def family_person(
 
 
 @router.get("/family/timeline", response_class=HTMLResponse)
-async def family_timeline(request: Request, db: Session = Depends(get_db)):
+async def family_timeline(
+    request: Request,
+    person_id: int | None = Query(None, description="Фильтр timeline по персоне"),
+    union_id: int | None = Query(None, description="Фильтр timeline по союзу"),
+    db: Session = Depends(get_db),
+):
     redirect = _require_family_session(request)
     if redirect:
         return redirect
 
-    from app.models import Union
+    from app.models import Union, UnionChild
     
     items = []
 
+    related_union = None
+    related_person_ids: set[int] = set()
+    if union_id is not None:
+        related_union = db.query(Union).filter(Union.id == union_id).first()
+        if related_union:
+            if related_union.partner1_id:
+                related_person_ids.add(related_union.partner1_id)
+            if related_union.partner2_id:
+                related_person_ids.add(related_union.partner2_id)
+            child_ids = [
+                row.child_id
+                for row in db.query(UnionChild).filter(UnionChild.union_id == related_union.id).all()
+                if row.child_id is not None
+            ]
+            related_person_ids.update(child_ids)
+
     for person in db.query(Person).all():
+        if person_id is not None and person.person_id != person_id:
+            continue
+        if union_id is not None and person.person_id not in related_person_ids:
+            continue
         i18n = (
             db.query(PersonI18n)
             .filter(
@@ -202,6 +235,11 @@ async def family_timeline(request: Request, db: Session = Depends(get_db)):
             )
 
     for union in db.query(Union).all():
+        if person_id is not None and person_id not in (union.partner1_id, union.partner2_id):
+            continue
+        if union_id is not None and union.id != union_id:
+            continue
+
         if union.start_date:
             p1_name = "Персона"
             p2_name = "Персона"
@@ -235,6 +273,20 @@ async def family_timeline(request: Request, db: Session = Depends(get_db)):
                 }
             )
 
+        if union.end_date:
+            items.append(
+                {
+                    "date": union.end_date,
+                    "date_display": union.end_date or "—",
+                    "title": f"Окончание союза: {p1_name} + {p2_name}",
+                    "text": "",
+                    "person_id": union.partner1_id,
+                    "avatar_url": None,
+                    "source": "events",
+                    "type": "event",
+                }
+            )
+
     text_filter = or_(
         and_(Memory.transcript_readable.isnot(None), Memory.transcript_readable != ""),
         and_(Memory.transcript_verbatim.isnot(None), Memory.transcript_verbatim != ""),
@@ -246,6 +298,11 @@ async def family_timeline(request: Request, db: Session = Depends(get_db)):
         text_filter,
         Memory.is_archived == False,
     )
+
+    if person_id is not None:
+        memories_query = memories_query.filter(Memory.author_id == person_id)
+    if union_id is not None and related_person_ids:
+        memories_query = memories_query.filter(Memory.author_id.in_(list(related_person_ids)))
 
     memories = memories_query.all()
 
@@ -371,7 +428,12 @@ async def who_am_i(request: Request, next: str = "/family/welcome", db: Session 
         return RedirectResponse(url="/family/welcome", status_code=303)
 
     people = []
-    for person in db.query(Person).order_by(Person.person_id).all():
+    for person in (
+        db.query(Person)
+        .filter(Person.is_alive == 1)
+        .order_by(Person.person_id)
+        .all()
+    ):
         i18n = (
             db.query(PersonI18n)
             .filter(
@@ -400,12 +462,20 @@ async def who_am_i_submit(
     next: str = Form("/family/welcome"),
     db: Session = Depends(get_db),
 ):
-    person = db.query(Person).filter(Person.person_id == person_id).first()
+    person = (
+        db.query(Person)
+        .filter(
+            Person.person_id == person_id,
+            Person.is_alive == 1,
+        )
+        .first()
+    )
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
 
+    encoded_next = quote(next or "/family/welcome", safe="/")
     return RedirectResponse(
-        url=f"/who-am-i/pin?person_id={person_id}&next={next}",
+        url=f"/who-am-i/pin?person_id={person_id}&next={encoded_next}",
         status_code=303,
     )
 
@@ -420,7 +490,14 @@ async def who_am_i_pin(
     if _get_family_member_id(request) is not None:
         return RedirectResponse(url="/family/welcome", status_code=303)
 
-    person = db.query(Person).filter(Person.person_id == person_id).first()
+    person = (
+        db.query(Person)
+        .filter(
+            Person.person_id == person_id,
+            Person.is_alive == 1,
+        )
+        .first()
+    )
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
 
@@ -458,14 +535,25 @@ async def who_am_i_pin_submit(
     next: str = Form("/family/welcome"),
     db: Session = Depends(get_db),
 ):
-    person = db.query(Person).filter(Person.person_id == person_id).first()
+    decoded_next = unquote(next or "")
+    person = (
+        db.query(Person)
+        .filter(
+            Person.person_id == person_id,
+            Person.is_alive == 1,
+        )
+        .first()
+    )
     if not person or not person.pin or person.pin != pin:
+        encoded_next = quote(decoded_next or "/family/welcome", safe="/")
         return RedirectResponse(
-            url=f"/who-am-i/pin?person_id={person_id}&next={next}&error=invalid_pin",
+            url=f"/who-am-i/pin?person_id={person_id}&next={encoded_next}&error=invalid_pin",
             status_code=303,
         )
 
-    response = RedirectResponse(url="/family/welcome", status_code=303)
+    # Защита от open redirect: принимаем только внутренние пути
+    safe_next = decoded_next if (decoded_next and decoded_next.startswith("/") and not decoded_next.startswith("//")) else "/family/welcome"
+    response = RedirectResponse(url=safe_next, status_code=303)
     response.set_cookie(
         key=FAMILY_COOKIE_NAME,
         value=str(person_id),
@@ -574,7 +662,12 @@ async def family_reply_submit(
         db.add(quote)
         db.commit()
 
-    return RedirectResponse(url=f"/family/reply/{memory_id}?person_id={person_id}&saved=1", status_code=303)
+    # Never put None in the redirect URL — FastAPI would 422 on the receiving GET.
+    if person_id is not None:
+        redirect_url = f"/family/reply/{memory_id}?person_id={person_id}&saved=1"
+    else:
+        redirect_url = f"/family/reply/{memory_id}?saved=1"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/profile/avatar")

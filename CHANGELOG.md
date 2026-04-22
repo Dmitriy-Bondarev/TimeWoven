@@ -1,5 +1,13 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.15-who-am-i-exclude-deceased-p1_14] — 2026-04-22
+
+### Bugfix | UX | Family Auth Flow
+
+- **Bugfix (Task P1.14)**: экран `Кто вы?` теперь показывает только живых участников (`People.is_alive = 1`).
+- **Flow hardening**: добавлен тот же фильтр в `POST /who-am-i` и `GET/POST /who-am-i/pin`, чтобы исключить выбор умерших через прямой URL или подмену `person_id`.
+- **Product behavior**: умершие остаются в семейной модели (граф/карточки/история), но исключены из login/select-flow.
+
 ## [v1.22.14-product-backlog-bootstrap] — 2026-04-22
 
 ### Process | Documentation
