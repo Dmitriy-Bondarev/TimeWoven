@@ -3,6 +3,20 @@
 > Журнал всех изменений схемы и данных базы данных.  
 > Каждая запись документирует **что** изменилось, **зачем** и **как откатить**.
 
+## 2026-04-22 — Диагностика дат union (5F)
+
+**Проблема:** API возвращал `start_date=null, end_date=null` для всех union-узлов.
+
+**Причина 1 — устаревший процесс:** Сервис был запущен до того, как `family_graph.py` был обновлён в 5E (ModTime файла > StartTime сервиса). После перезапуска данные стали передаваться корректно.
+
+**Причина 2 — неверный парсинг дат:** `extract_year()` в `family_graph.py` делал `split("-")[0]`, но даты хранятся как "DD.MM.YYYY". Итог: `int("06.11.1976")` → ValueError → `None` → все union всегда `is_active=True`. Исправлено: теперь функция проверяет наличие "." и делает `split(".")[-1]` для извлечения года.
+
+**Фактические данные в БД:**
+- union 1: partner1=4, partner2=3, start=06.11.1976, end=10.03.1983
+- union 2: partner1=2, partner2=5, start=07.09.2007, end=31.12.2199
+
+**Откат:** Не нужен (данные не изменялись, только логика чтения исправлена).
+
 ---
 
 ## Формат записи
@@ -52,6 +66,66 @@
 <!-- Новые записи добавляются СВЕРХУ -->
 
 ---
+
+### [1.3] — 2026-04-22 — Поддержка канала Max в People.preferred_ch
+
+**Тип:** Schema
+**Автор:** GitHub Copilot
+**ADR:** —
+**Обратимость:** Reversible
+
+#### Описание
+
+Для админ-формы создания персоны добавлена поддержка канала `Max` как значения `People.preferred_ch`, а также явное значение `None` для случая «канал не задан». Это необходимо, чтобы сохранение персоны с Max-контактом не нарушало CHECK-ограничение.
+
+#### Изменения
+
+| Действие | Объект | Детали |
+|----------|--------|--------|
+| ALTER | `People.preferred_ch` | CHECK обновлён на `('Max', 'TG', 'Email', 'Push', 'None')` |
+
+#### SQL
+
+```sql
+-- Forward
+DO $$
+DECLARE con RECORD;
+BEGIN
+  FOR con IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = '"People"'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%preferred_ch%'
+  LOOP
+    EXECUTE format('ALTER TABLE "People" DROP CONSTRAINT %I', con.conname);
+  END LOOP;
+END $$;
+
+ALTER TABLE "People"
+ADD CONSTRAINT people_preferred_ch_check
+CHECK (preferred_ch IN ('Max', 'TG', 'Email', 'Push', 'None'));
+
+-- Rollback
+ALTER TABLE "People" DROP CONSTRAINT IF EXISTS people_preferred_ch_check;
+ALTER TABLE "People"
+ADD CONSTRAINT people_preferred_ch_check
+CHECK (preferred_ch IN ('TG', 'Email', 'Push'));
+```
+
+#### Валидация
+
+```sql
+SELECT conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conrelid = '"People"'::regclass
+  AND pg_get_constraintdef(oid) ILIKE '%preferred_ch%';
+```
+
+#### Затронутый код
+- `migrations/003_expand_preferred_channel_for_max.sql` — миграция CHECK для `preferred_ch`.
+- `create_postgres_schema.sql` — синхронизирован эталон DDL.
+- `docs/DATABASE_SCHEMA.md` — синхронизирована документация схемы.
 
 ### [1.2] — 2026-04-19 — Перенос на PostgreSQL v1.3 и фикс Quote.id
 
