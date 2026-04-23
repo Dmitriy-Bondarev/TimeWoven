@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Text, Float, text
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Text, Float, DateTime, text
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 from .event import Event
@@ -28,9 +29,24 @@ class Person(Base):
     record_status = Column(String, nullable=False, default="active", server_default=text("'active'"))
 
     translations = relationship("PersonI18n", back_populates="person")
+    aliases = relationship("PersonAlias", back_populates="person", cascade="all, delete-orphan")
     quotes = relationship("Quote", back_populates="author")
     memories_authored = relationship("Memory", foreign_keys="Memory.author_id", back_populates="author")
     memories_created = relationship("Memory", foreign_keys="Memory.created_by", back_populates="creator")
+
+
+class PersonAlias(Base):
+    __tablename__ = "personaliases"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    person_id = Column(Integer, ForeignKey("People.person_id", ondelete="CASCADE"), nullable=False, index=True)
+    alias_text = Column(String, nullable=False)
+    alias_kind = Column(String, nullable=False)
+    used_by_generation = Column(String, nullable=True)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    person = relationship("Person", back_populates="aliases")
 
 
 class PersonI18n(Base):

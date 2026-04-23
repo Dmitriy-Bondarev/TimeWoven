@@ -21,7 +21,7 @@
 
   const state = {
     rootPersonId: window.GRAPH_ROOT_PERSON_ID || 1,
-    depth: Math.max(1, Math.min(5, window.GRAPH_DEPTH || 2)),
+    depth: Math.max(1, Math.min(10, window.GRAPH_DEPTH || 2)),
     focusedPersonId: window.GRAPH_ROOT_PERSON_ID || 1,
     focusHistory: [window.GRAPH_ROOT_PERSON_ID || 1],
     focusHistoryIndex: 0,
@@ -39,7 +39,7 @@
   };
 
   const MIN_DEPTH = 1;
-  const MAX_DEPTH = 5;
+  const MAX_DEPTH = 10;
 
   const container = document.getElementById('graph');
   const tooltipEl = document.getElementById('graph-tooltip');

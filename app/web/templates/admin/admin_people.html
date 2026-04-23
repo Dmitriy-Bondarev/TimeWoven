@@ -33,14 +33,14 @@
         <th>Аватар</th>
         <th>Имя</th>
         <th>Роль</th>
-        <th>Статус записи</th>
+        <th>Статус</th>
+        <th>✎ Ред.</th>
         <th>Телефон</th>
         <th>Канал</th>
         <th>Max ID</th>
         <th>Telegram</th>
         <th>Email</th>
         <th>Алиасы</th>
-        <th>Действия</th>
         <th>Жив</th>
         <th>Воспом.</th>
         <th>Цитаты</th>
@@ -65,6 +65,9 @@
         </td>
         <td class="muted">{{ r.role }}</td>
         <td class="muted">{{ r.record_status }}</td>
+        <td>
+          <a href="/admin/people/{{ r.person_id }}/edit" class="upload-link">Редактировать</a>
+        </td>
         <td class="{% if r.phone == '—' %}badge-warn{% else %}badge-ok{% endif %}">{{ r.phone }}</td>
         <td class="{% if r.preferred_ch == '—' %}badge-warn{% else %}badge-ok{% endif %}">{{ r.preferred_ch }}</td>
         <td class="{% if r.messenger_max_id %}badge-ok{% else %}badge-warn{% endif %}">{{ r.messenger_max_id or '—' }}</td>
@@ -81,9 +84,6 @@
           {% else %}
             <span class="muted">—</span>
           {% endif %}
-        </td>
-        <td>
-          <a href="/admin/people/{{ r.person_id }}/edit" class="upload-link">Редактировать</a>
         </td>
         <td class="{% if r.is_alive %}badge-ok{% else %}muted{% endif %}">
           {% if r.is_alive %}да{% else %}—{% endif %}

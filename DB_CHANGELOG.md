@@ -3,6 +3,72 @@
 > Журнал всех изменений схемы и данных базы данных.  
 > Каждая запись документирует **что** изменилось, **зачем** и **как откатить**.
 
+## [1.8] — 2026-04-23 — T20: personaliases (разговорные имена и обращения)
+
+**Тип:** Schema + Migration  
+**Автор:** project owner  
+**ADR:** —  
+**Обратимость:** Reversible (`DROP TABLE IF EXISTS personaliases;`)
+
+#### Описание
+
+Добавлена отдельная таблица `personaliases` для хранения разговорных форм имён и обращений к персоне: родственные формы, уменьшительные, никнеймы и др. Таблица связана с `People.person_id` (FK, `ON DELETE CASCADE`), чтобы обеспечить чистку alias-ов при удалении персоны. Это подготавливает базу для более точного entity matching в AI-пайплайне.
+
+#### Изменения
+
+| Действие | Объект | Детали |
+|----------|--------|--------|
+| CREATE TABLE | `personaliases` | `id`, `person_id` FK, `alias_text`, `alias_kind`, `used_by_generation`, `note`, `created_at` |
+| CREATE INDEX | `idx_personaliases_person` | ON `personaliases(person_id)` |
+
+#### SQL
+
+```sql
+-- Forward (применение)
+CREATE TABLE IF NOT EXISTS personaliases (
+  id SERIAL PRIMARY KEY,
+  person_id INTEGER NOT NULL REFERENCES "People"(person_id) ON DELETE CASCADE,
+  alias_text VARCHAR NOT NULL,
+  alias_kind VARCHAR NOT NULL CHECK (alias_kind IN (
+    'kinship_term', 'nickname', 'diminutive', 'formal_with_patronymic', 'other'
+  )),
+  used_by_generation VARCHAR NULL CHECK (used_by_generation IN (
+    'parents', 'siblings', 'children', 'grandchildren', 'other'
+  )),
+  note TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_personaliases_person
+ON personaliases(person_id);
+
+-- Rollback (откат)
+DROP TABLE IF EXISTS personaliases;
+```
+
+#### Валидация
+
+```sql
+-- Проверка структуры
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'personaliases'
+ORDER BY ordinal_position;
+
+-- Проверка индекса
+SELECT indexname
+FROM pg_indexes
+WHERE tablename = 'personaliases';
+```
+
+#### Затронутый код
+- `migrations/007_add_person_aliases.sql` — новая миграция таблицы `PersonAliases`.
+- `app/models/__init__.py` — `PersonAlias` model + relationship `Person.aliases`.
+- `app/api/routes/admin.py` — API для add/delete alias + read-only alias list в `/admin/people`.
+- `app/web/templates/admin/admin_people.html` — отображение alias-ов в таблице людей.
+
+---
+
 ## [1.7] — 2026-04-23 — T18.B: Таблица max_chat_sessions
 
 **Тип:** Schema + Migration  

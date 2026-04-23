@@ -194,8 +194,10 @@
     {% endif %}
 
     <form method="post" action="/admin/people/{{ person.person_id }}/edit">
+      <!-- 1. ОСНОВНЫЕ ДАННЫЕ: Аватар, пол, роль, статусы -->
       <fieldset>
-        <legend>Аватар</legend>
+        <legend>👤 Основные данные</legend>
+        
         <div class="avatar-row">
           {% if form_data.get('avatar_url') %}
             <img src="{{ form_data.get('avatar_url') }}" class="avatar" alt="avatar">
@@ -207,10 +209,6 @@
             <a href="/admin/avatars" class="upload-link">Загрузить новый</a>
           </div>
         </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Основное</legend>
 
         <div class="two-col">
           <div>
@@ -222,33 +220,30 @@
             </select>
           </div>
           <div>
-            <label for="default_lang">Язык по умолчанию</label>
-            <select id="default_lang" name="default_lang">
-              <option value="ru" {% if form_data.get('default_lang') in [None, '', 'ru'] %}selected{% endif %}>ru</option>
-              <option value="en" {% if form_data.get('default_lang') == 'en' %}selected{% endif %}>en</option>
+            <label for="role">Роль в системе</label>
+            <select id="role" name="role">
+              <option value="placeholder" {% if form_data.get('role') in [None, '', 'placeholder'] %}selected{% endif %}>Не выбрано / placeholder</option>
+              <option value="relative" {% if form_data.get('role') == 'relative' %}selected{% endif %}>Родственник</option>
+              <option value="family_admin" {% if form_data.get('role') == 'family_admin' %}selected{% endif %}>Администратор семьи</option>
+              <option value="bot_only" {% if form_data.get('role') == 'bot_only' %}selected{% endif %}>Техническая (бот)</option>
             </select>
           </div>
         </div>
 
         <label class="checkbox" for="is_alive">
           <input id="is_alive" type="checkbox" name="is_alive" {% if form_data.get('is_alive') in [True, 'on', 'true', '1', 1] %}checked{% endif %}>
-          Жив
+          Жив / Активен
         </label>
 
         <label class="checkbox" for="is_user">
           <input id="is_user" type="checkbox" name="is_user" {% if form_data.get('is_user') in [True, 'on', 'true', '1', 1] %}checked{% endif %}>
           Это пользователь приложения
         </label>
+      </fieldset>
 
-        <div>
-          <label for="role">Роль в системе</label>
-          <select id="role" name="role">
-            <option value="placeholder" {% if form_data.get('role') in [None, '', 'placeholder'] %}selected{% endif %}>Не выбрано / placeholder</option>
-            <option value="relative" {% if form_data.get('role') == 'relative' %}selected{% endif %}>Родственник</option>
-            <option value="family_admin" {% if form_data.get('role') == 'family_admin' %}selected{% endif %}>Администратор семьи</option>
-            <option value="bot_only" {% if form_data.get('role') == 'bot_only' %}selected{% endif %}>Техническая (бот)</option>
-          </select>
-        </div>
+      <!-- 2. ДАТЫ И СОБЫТИЯ: Рождение и смерть -->
+      <fieldset>
+        <legend>📅 Даты и события</legend>
 
         <div class="two-col">
           <div>
@@ -256,12 +251,12 @@
             <input id="birth_date" type="text" name="birth_date" value="{{ form_data.get('birth_date', '') }}">
           </div>
           <div>
-            <label for="birth_date_prec">Точность даты рождения</label>
+            <label for="birth_date_prec">Точность</label>
             <select id="birth_date_prec" name="birth_date_prec">
-              <option value="EXACT" {% if form_data.get('birth_date_prec') in [None, '', 'EXACT'] %}selected{% endif %}>Точная дата</option>
+              <option value="EXACT" {% if form_data.get('birth_date_prec') in [None, '', 'EXACT'] %}selected{% endif %}>Точная</option>
               <option value="ABOUT" {% if form_data.get('birth_date_prec') == 'ABOUT' %}selected{% endif %}>Примерно</option>
-              <option value="YEARONLY" {% if form_data.get('birth_date_prec') == 'YEARONLY' %}selected{% endif %}>Только год</option>
-              <option value="DECADE" {% if form_data.get('birth_date_prec') == 'DECADE' %}selected{% endif %}>Десятилетие</option>
+              <option value="YEARONLY" {% if form_data.get('birth_date_prec') == 'YEARONLY' %}selected{% endif %}>Год</option>
+              <option value="DECADE" {% if form_data.get('birth_date_prec') == 'DECADE' %}selected{% endif %}>Декада</option>
             </select>
           </div>
         </div>
@@ -272,20 +267,29 @@
             <input id="death_date" type="text" name="death_date" value="{{ form_data.get('death_date', '') }}">
           </div>
           <div>
-            <label for="death_date_prec">Точность даты смерти</label>
+            <label for="death_date_prec">Точность</label>
             <select id="death_date_prec" name="death_date_prec">
               <option value="" {% if form_data.get('death_date_prec') in [None, ''] %}selected{% endif %}>-</option>
-              <option value="EXACT" {% if form_data.get('death_date_prec') == 'EXACT' %}selected{% endif %}>Точная дата</option>
+              <option value="EXACT" {% if form_data.get('death_date_prec') == 'EXACT' %}selected{% endif %}>Точная</option>
               <option value="ABOUT" {% if form_data.get('death_date_prec') == 'ABOUT' %}selected{% endif %}>Примерно</option>
-              <option value="YEARONLY" {% if form_data.get('death_date_prec') == 'YEARONLY' %}selected{% endif %}>Только год</option>
-              <option value="DECADE" {% if form_data.get('death_date_prec') == 'DECADE' %}selected{% endif %}>Десятилетие</option>
+              <option value="YEARONLY" {% if form_data.get('death_date_prec') == 'YEARONLY' %}selected{% endif %}>Год</option>
+              <option value="DECADE" {% if form_data.get('death_date_prec') == 'DECADE' %}selected{% endif %}>Декада</option>
             </select>
           </div>
         </div>
+
+        <div>
+          <label for="default_lang">Язык по умолчанию</label>
+          <select id="default_lang" name="default_lang">
+            <option value="ru" {% if form_data.get('default_lang') in [None, '', 'ru'] %}selected{% endif %}>Русский (ru)</option>
+            <option value="en" {% if form_data.get('default_lang') == 'en' %}selected{% endif %}>English (en)</option>
+          </select>
+        </div>
       </fieldset>
 
+      <!-- 3. КОНТАКТЫ: Телефон, каналы связи, email -->
       <fieldset>
-        <legend>Контакты</legend>
+        <legend>📞 Контакты и каналы</legend>
         <div class="two-col">
           <div>
             <label for="phone">Телефон</label>
@@ -320,8 +324,9 @@
         </div>
       </fieldset>
 
+      <!-- 4. ИМЕНА И БИОГРАФИЯ (РУ) -->
       <fieldset>
-        <legend>Имя и биография (RU)</legend>
+        <legend>🇷🇺 Имя и биография (РУ)</legend>
 
         <div class="two-col">
           <div>
@@ -350,8 +355,9 @@
         </div>
       </fieldset>
 
+      <!-- 5. NAMES AND BIOGRAPHY (EN) -->
       <fieldset>
-        <legend>Biography (EN)</legend>
+        <legend>🇬🇧 Names and Biography (EN)</legend>
 
         <div class="two-col">
           <div>
@@ -375,8 +381,9 @@
         </div>
       </fieldset>
 
+      <!-- 6. СЕМЕЙНЫЕ СВЯЗИ: Союзы и дети -->
       <fieldset>
-        <legend>Союзы и дети</legend>
+        <legend>👨‍👩‍👧‍👦 Семейные связи (союзы и дети)</legend>
 
         <div style="margin-bottom: 10px;">
           <a href="/admin/unions/new?person_id={{ person.person_id }}" class="upload-link">Новый союз</a>
@@ -407,6 +414,15 @@
         {% else %}
           <div class="muted">Для этой персоны союзы не найдены.</div>
         {% endif %}
+      </fieldset>
+
+      <!-- 7. ВОСПОМИНАНИЯ И ИСТОРИИ (зарезервировано для будущих версий) -->
+      <fieldset>
+        <legend>💭 Воспоминания, истории и медиа</legend>
+        <div class="muted" style="padding: 10px; font-style: italic;">
+          Раздел для добавления воспоминаний, личных историй и медиа-файлов. 
+          Функциональность в разработке.
+        </div>
       </fieldset>
 
       <div class="actions">

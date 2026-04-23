@@ -67,7 +67,7 @@ def _require_family_session(request: Request) -> RedirectResponse | None:
 async def family_tree_page(
     request: Request,
     root_person_id: int = Query(1, description="ID персоны для корня графа"),
-    depth: int = Query(2, ge=1, le=6, description="Глубина поиска (1-6)"),
+    depth: int = Query(2, ge=1, le=10, description="Глубина поиска (1-10)"),
     year: int | None = Query(None, ge=1000, le=2100, description="Год для temporal-режима"),
 ):
     """
@@ -95,7 +95,7 @@ async def family_tree_page(
 @router.get("/family/tree/json", response_model=FamilyGraph)
 async def family_tree_json(
     root_person_id: int = Query(..., description="ID персоны для корня графа"),
-    depth: int = Query(2, ge=1, le=6, description="Глубина поиска (1-6)"),
+    depth: int = Query(2, ge=1, le=10, description="Глубина поиска (1-10)"),
     year: int | None = Query(None, ge=1000, le=2100, description="Год для temporal-режима"),
     session: Session = Depends(get_db),
 ):
@@ -112,7 +112,7 @@ async def family_tree_json(
     Рёбра типов "partner" (Person <-> Union) или "child" (Union <-> Person).
     
     :param root_person_id: ID персоны для корня графа
-    :param depth: Глубина BFS (1-6)
+    :param depth: Глубина BFS (1-10)
     :param session: Database session
     :return: FamilyGraph с nodes и edges
     """

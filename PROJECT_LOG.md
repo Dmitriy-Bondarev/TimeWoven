@@ -1,5 +1,46 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T24 — UX-пакет для админской работы с семейным архивом
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- `app/web/templates/admin/admin_people.html`: ссылка `Редактировать` перенесена ближе к началу строки (сразу после статуса), чтобы не требовалась горизонтальная прокрутка таблицы.
+- `app/api/routes/tree.py`: лимит параметра `depth` увеличен до `1..10` для `/family/tree` и `/family/tree/json`.
+- `app/web/static/js/family_graph.js`: фронтенд-контрол глубины увеличен до `MAX_DEPTH=10` (и начальное ограничение `Math.min(..., 10)`).
+- `app/web/templates/admin/admin_person_edit.html`: форма перегруппирована в рабочие блоки (основные данные, даты и статусы, контакты, союз/дети, зарезервированный блок под будущие воспоминания) без изменения маршрутов.
+
+---
+
+## Update: T23.4 — корректировка союза 9 под новую семью
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No (data-only)
+
+### Changes
+
+- Выполнена data-корректировка `Unions.id=9`: `partner1_id=57`, `partner2_id=58`.
+- Набор детей союза 9 приведён к `{16,59,60}`: удалены лишние child-связи для `union_id=9`, вставлены недостающие.
+- Проведён SQL-proof до/после: до — `(52,53)` + `{54}`, после — `(57,58)` + `{16,59,60}`.
+
+---
+
 ## Update: T19 — live bot replies for Max session flow
 
 Date: 2026-04-23

@@ -1,5 +1,21 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.28-admin-ux-depth10-t24] — 2026-04-23
+
+### Feature | Admin UX | Family Graph
+
+- **Feature (T24.1)**: в списке `/admin/people` ссылка `Редактировать` перемещена ближе к началу строки (после статуса записи) для работы без горизонтального скролла.
+- **Feature (T24.2)**: максимальная глубина family graph повышена до `10` в backend (`/family/tree`, `/family/tree/json`) и frontend-контролах.
+- **Feature (T24.3)**: форма `/admin/people/{person_id}/edit` перегруппирована в рабочие блоки (основные данные, даты/статусы, контакты, семейные связи, резерв под воспоминания) без изменения существующих маршрутов.
+
+## [v1.22.27-union-9-family-correction-t23_4] — 2026-04-23
+
+### Fix | Data Correction | Family
+
+- **Fix (T23.4)**: выполнена корректировка `Unions.id=9` под новую семью: партнёры обновлены до `(57,58)`.
+- Набор детей для союза 9 приведён к целевому `{16,59,60}` с SQL-proof до/после.
+- Изменение data-only, без миграций схемы.
+
 ## [v1.22.26-max-live-replies-session-flow-t19] — 2026-04-23
 
 ### Feature | Max Bot | Live Replies For Session Flow
