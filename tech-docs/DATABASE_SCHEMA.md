@@ -119,7 +119,8 @@
 | `created_at` | varchar | Дата/время создания | |
 | `created_by` | int4 | FK -> People (кто создал запись) | |
 | `source_type` | varchar | Источник (voice, text, imported) | |
-| `transcription_status` | varchar | Статус: pending, completed, error (по умолчанию 'pending') | |
+| `transcription_status` | varchar | Статус: pending, published, archived, draft, pending_manual_text (по умолчанию 'pending') | |
+| `is_archived` | bool | Архивный флаг записи (по умолчанию false) | NOT NULL |
 
 ### Таблица `MemoryPeople`
 Связь воспоминания с участвующими в нем людьми.
@@ -202,6 +203,22 @@
 | `source_type` | varchar | Источник (upload, scan, external) | NOT NULL |
 | `created_at` | varchar | Дата загрузки | |
 | `metadata` | text | Дополнительные данные | |
+
+### Таблица `MaxContactEvents`
+Минимальный inbox для входящих contact attachments из Max без авто-создания людей.
+
+| Столбец | Тип | Описание | Ограничения |
+|---------|-----|----------|----------|
+| `id` | serial4 | PK | NOT NULL |
+| `created_at` | varchar | Время фиксации contact event | NOT NULL |
+| `sender_max_user_id` | varchar | MAX user id отправителя | NOT NULL, INDEX |
+| `contact_max_user_id` | varchar | MAX user id переданного контакта | INDEX |
+| `contact_name` | varchar | Полное имя из `payload.max_info.name` | |
+| `contact_first_name` | varchar | Имя из `payload.max_info.first_name` | |
+| `contact_last_name` | varchar | Фамилия из `payload.max_info.last_name` | |
+| `raw_payload` | text | Полный compact JSON входящего payload | NOT NULL |
+| `matched_person_id` | int4 | FK -> People(person_id), nullable для будущего review/merge | FK |
+| `status` | varchar | new, matched, merged, archived | NOT NULL, DEFAULT 'new', CHECK, INDEX |
 
 ---
 

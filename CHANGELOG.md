@@ -1,5 +1,24 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.21-duplicate-people-cleanup-t17] — 2026-04-23
+
+### Cleanup | People | Max Contacts
+
+- **Cleanup (T17)**: `People.person_id IN (40, 43)` переведены в `record_status='test_archived'` — дубли, выявленные при ручной ревизии Max contact events после T16.
+- FK-диагностика по всем таблицам показала нулевые ссылки на 40/43 — ребайнд не потребовался.
+- `person_id IN (41, 42)` подтверждены как live-активные (`active`, `relative`, ru+en в `People_I18n`).
+- Физическое удаление строк не выполнялось; `messenger_max_id` для 2 и 8 корректны.
+
+## [v1.22.20-max-contact-events-no-autocreate-t16] — 2026-04-23
+
+### Fix | Max Contacts | Duplicate Protection
+
+- **Fix (T16)**: отключено авто-создание `People` из Max contact attachments в `/webhooks/maxbot/incoming`.
+- **Feature (T16)**: добавлен минимальный contact inbox `MaxContactEvents` для enrichment-событий (`new|matched|merged|archived`) с сохранением raw payload.
+- **Cleanup (T16)**: `People.person_id IN (35..39)` переведены в `record_status='test_archived'` (без удаления записей).
+- **Cleanup (T16)**: тестовые marker memories `TEST CONTACT*` архивируются (`is_archived=true`, `transcription_status='archived'`, `source_type='max_contact_test_marker'`) и не попадают в live timeline.
+- **Live UX hardening**: family surfaces (`who-am-i`, tree, timeline, welcome random memory) используют только `People.record_status='active'` и боевые published, non-archived memories.
+
 ## [v1.22.19-record-status-live-family-filtering-t14] — 2026-04-23
 
 ### Feature | Family UX | People

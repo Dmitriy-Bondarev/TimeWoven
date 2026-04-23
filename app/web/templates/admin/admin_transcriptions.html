@@ -25,6 +25,8 @@
     .status-pending { background: #1e293b; color: var(--muted); }
     .status-pending_manual_text { background: #1c1917; color: #d97706; border: 1px solid #78350f; }
     .status-error { background: #450a0a; color: #fca5a5; }
+    .source-type { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .test-badge { display: inline-block; margin-left: 8px; background: #7f1d1d; color: #fecaca; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
     audio { width: 100%; margin-bottom: 16px; border-radius: 8px; }
     .audio-meta { color: var(--muted); font-size: 12px; margin: -8px 0 12px; }
     .transcript-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
@@ -81,6 +83,7 @@
           {% endif %}
         </div>
         <div class="date">{{ m.created_at or '' }} &middot; ID: {{ m.id }}</div>
+        <div class="source-type">source_type: {{ m.source_type or '—' }}{% if m.source_type == 'max_contact_test_marker' %}<span class="test-badge">TEST MARKER</span>{% endif %}</div>
       </div>
       <span class="status status-{{ m.transcription_status or 'pending' }}">{{ m.transcription_status or 'pending' }}</span>
     </div>

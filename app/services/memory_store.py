@@ -7,6 +7,10 @@ from app.db.session import SessionLocal
 from app.models import Memory, Person
 
 
+def _is_test_contact_marker(text: str) -> bool:
+    return "test contact" in (text or "").strip().lower()
+
+
 def _resolve_person_id_by_messenger(db, user_id: str) -> int | None:
     person = (
         db.query(Person)
@@ -28,6 +32,7 @@ def create_memory_from_max(user_id: str, text: str, raw_payload: dict | None = N
     """
     normalized_user_id = str(user_id or "").strip()
     normalized_text = str(text or "").strip()
+    is_contact_marker = _is_test_contact_marker(normalized_text)
     if not normalized_user_id:
         return {"saved": False, "error": "user_id is required"}
     if not normalized_text:
@@ -49,14 +54,19 @@ def create_memory_from_max(user_id: str, text: str, raw_payload: dict | None = N
             "max_user_id": normalized_user_id,
             "raw_payload": raw_payload if isinstance(raw_payload, dict) else {},
         }
+        memory_json = json.dumps(metadata, ensure_ascii=False)
+
+        memory_source_type = "max_contact_test_marker" if is_contact_marker else "max_messenger"
+        memory_status = "archived" if is_contact_marker else "published"
 
         memory = Memory(
             author_id=resolved_person_id,
             content_text=normalized_text,
-            transcript_verbatim=json.dumps(metadata, ensure_ascii=False),
+            transcript_verbatim=memory_json,
             transcript_readable=normalized_text,
-            source_type="max_messenger",
-            transcription_status="published",
+            source_type=memory_source_type,
+            transcription_status=memory_status,
+            is_archived=is_contact_marker,
             created_at=datetime.utcnow().isoformat(),
         )
 
@@ -69,7 +79,9 @@ def create_memory_from_max(user_id: str, text: str, raw_payload: dict | None = N
             "memory_id": memory.id,
             "person_id": resolved_person_id,
             "external_id": external_id,
-            "source": "max_messenger",
+            "source": memory_source_type,
+            "transcription_status": memory_status,
+            "is_archived": bool(memory.is_archived),
         }
     except Exception as exc:
         db.rollback()
@@ -123,14 +135,18 @@ async def save_raw_memory(user_id: str, text: str, audio_url: str = None, person
 
         # TODO: when "new profile" onboarding step is implemented, use created person_id here.
 
+        normalized_text = str(text or "").strip()
+        is_contact_marker = _is_test_contact_marker(normalized_text)
+
         memory = Memory(
             author_id=resolved_person_id,
-            content_text=text,
+            content_text=normalized_text,
             audio_url=audio_url,
-            transcript_verbatim=text,
-            transcript_readable=text,
-            source_type="max_bot",
-            transcription_status="published",
+            transcript_verbatim=normalized_text,
+            transcript_readable=normalized_text,
+            source_type="max_contact_test_marker" if is_contact_marker else "max_bot",
+            transcription_status="archived" if is_contact_marker else "published",
+            is_archived=is_contact_marker,
             created_at=datetime.utcnow().isoformat(),
         )
 
@@ -143,6 +159,7 @@ async def save_raw_memory(user_id: str, text: str, audio_url: str = None, person
             "memory_id": memory.id,
             "person_id": resolved_person_id,
             "transcription_status": memory.transcription_status,
+            "is_archived": bool(memory.is_archived),
         }
     except Exception as exc:
         db.rollback()

@@ -1,5 +1,48 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T17 — Soft-archive duplicate People 40/43 after Max contacts manual review
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No (data-only)
+
+### Changes
+
+- Диагностика FK для `person_id IN (40, 43)`: нулевые ссылки во всех таблицах — ребайнд не потребовался.
+- `People.person_id=40` переведён в `record_status='test_archived'` (дубль `person_id=2`; `messenger_max_id` уже был перенесён вручную).
+- `People.person_id=43` переведён в `record_status='test_archived'` (дубль `person_id=8`; `messenger_max_id` уже был перенесён вручную).
+- `person_id IN (41, 42)` подтверждены как `active` + `relative` + ru/en в `People_I18n` — изменений не вносилось.
+- Записи физически не удалены (soft cleanup через `record_status`, как в T14/T16).
+
+---
+
+## Update: T16 — Max contacts ingestion hardening and duplicate cleanup
+
+Date: 2026-04-23
+
+### Structural change
+
+Yes
+
+### Schema change
+
+Yes
+
+### Changes
+
+- Контактные attachment-события из Max больше не создают `People` автоматически: вместо этого сохраняются в `MaxContactEvents` (raw payload + sender/contact ids + names + status).
+- В `bot_webhooks` удалён path авто-создания contact-person (`role='member'`, `is_user=1`, `messenger_max_id`) при `type='contact'`.
+- Выполнен cleanup тестовых дублей: `People.person_id IN (35,36,37,38,39)` помечены `record_status='test_archived'`.
+- Выполнен cleanup test marker memories: `Memories.id IN (20..24)` и future `TEST CONTACT` markers переводятся в archived (`is_archived=true`, `transcription_status='archived'`, `source_type='max_contact_test_marker'`).
+- Live family surfaces ужесточены до `People.record_status='active'` (who-am-i, family tree/json, timeline, welcome random memory).
+- Админка продолжает видеть архивные/тестовые записи для ручной ревизии.
+
 ## Update: T14 — person record_status and live family hiding for test_archived
 
 Date: 2026-04-23

@@ -106,7 +106,7 @@ def is_edge_active_for_year(
 
 
 def is_live_visible_person(person: Person) -> bool:
-    return (person.record_status or "active") != "test_archived"
+    return (person.record_status or "active") == "active"
 
 
 def get_person(session: Session, person_id: int) -> Optional[Person]:
@@ -114,7 +114,7 @@ def get_person(session: Session, person_id: int) -> Optional[Person]:
         session.query(Person)
         .filter(
             Person.person_id == person_id,
-            or_(Person.record_status.is_(None), Person.record_status != "test_archived"),
+            Person.record_status == "active",
         )
         .first()
     )

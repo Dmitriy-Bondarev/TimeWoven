@@ -1,4 +1,4 @@
--- TimeWoven PostgreSQL Schema v1.3
+-- TimeWoven PostgreSQL Schema v1.4
 
 CREATE TABLE IF NOT EXISTS "People" (
     person_id       SERIAL PRIMARY KEY,
@@ -80,7 +80,9 @@ CREATE TABLE IF NOT EXISTS "Memories" (
     confidence_score    FLOAT,
     created_at          VARCHAR DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
     created_by          INTEGER REFERENCES "People"(person_id),
-    source_type         VARCHAR
+    source_type         VARCHAR,
+    transcription_status VARCHAR DEFAULT 'pending',
+    is_archived         BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS "MemoryPeople" (
@@ -127,3 +129,20 @@ CREATE TABLE IF NOT EXISTS "PersonRelationship" (
     valid_to             VARCHAR,
     comment              VARCHAR
 );
+
+CREATE TABLE IF NOT EXISTS "MaxContactEvents" (
+    id                  SERIAL PRIMARY KEY,
+    created_at          VARCHAR NOT NULL,
+    sender_max_user_id  VARCHAR NOT NULL,
+    contact_max_user_id VARCHAR,
+    contact_name        VARCHAR,
+    contact_first_name  VARCHAR,
+    contact_last_name   VARCHAR,
+    raw_payload         TEXT NOT NULL,
+    matched_person_id   INTEGER REFERENCES "People"(person_id),
+    status              VARCHAR NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'matched', 'merged', 'archived'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_max_contact_events_sender ON "MaxContactEvents" (sender_max_user_id);
+CREATE INDEX IF NOT EXISTS idx_max_contact_events_contact ON "MaxContactEvents" (contact_max_user_id);
+CREATE INDEX IF NOT EXISTS idx_max_contact_events_status ON "MaxContactEvents" (status);

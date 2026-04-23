@@ -149,3 +149,18 @@ class BotSession(Base):
     user_id = Column(String, primary_key=True)
     current_step = Column(String)
     data_json = Column(Text)
+
+
+class MaxContactEvent(Base):
+    __tablename__ = "MaxContactEvents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    created_at = Column(String, nullable=False)
+    sender_max_user_id = Column(String, nullable=False, index=True)
+    contact_max_user_id = Column(String, nullable=True, index=True)
+    contact_name = Column(String, nullable=True)
+    contact_first_name = Column(String, nullable=True)
+    contact_last_name = Column(String, nullable=True)
+    raw_payload = Column(Text, nullable=False)
+    matched_person_id = Column(Integer, ForeignKey("People.person_id"), nullable=True)
+    status = Column(String, nullable=False, default="new", server_default=text("'new'"), index=True)

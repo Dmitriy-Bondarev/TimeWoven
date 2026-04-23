@@ -168,6 +168,7 @@ async def admin_transcriptions(
                 "transcript_verbatim": m.transcript_verbatim,
                 "transcript_readable": m.transcript_readable,
                 "transcription_status": m.transcription_status,
+                "source_type": m.source_type,
                 "created_at": m.created_at,
             }
         )

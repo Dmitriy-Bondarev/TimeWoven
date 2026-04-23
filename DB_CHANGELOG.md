@@ -3,6 +3,39 @@
 > Журнал всех изменений схемы и данных базы данных.  
 > Каждая запись документирует **что** изменилось, **зачем** и **как откатить**.
 
+## [1.6] — 2026-04-23 — T17: Soft-archive duplicate People 40 и 43
+
+**Тип:** Data  
+**Автор:** project owner  
+**ADR:** —  
+**Обратимость:** Reversible (UPDATE record_status = 'active' WHERE person_id IN (40, 43))
+
+#### Описание
+
+После T16 при ручной ревизии Max contact событий выявлены два дубля:
+- `person_id=40` — дубль `person_id=2`; `messenger_max_id` уже вручную перенесён с 40 → 2 до начала задачи.
+- `person_id=43` — дубль `person_id=8`; `messenger_max_id` уже вручную перенесён с 43 → 8 до начала задачи.
+
+Диагностика FK показала нулевые ссылки на 40/43 во всех связанных таблицах (Memories, MemoryPeople, Quotes, PersonRelationship, Unions, UnionChildren, AvatarHistory, Events, EventParticipants, MaxContactEvents). Ребайнд не потребовался.
+
+Записи `person_id IN (41, 42)` подтверждены как реальные новые люди: `role='relative'`, `record_status='active'`, наличие ru+en в `People_I18n`.
+
+#### Изменения
+
+| Действие | Объект | Детали |
+|----------|--------|--------|
+| UPDATE | `People.record_status` | person_id=40 → `test_archived` (дубль person_id=2) |
+| UPDATE | `People.record_status` | person_id=43 → `test_archived` (дубль person_id=8) |
+
+#### Валидация
+
+- `live_duplicates_should_be_zero` = 0 ✅
+- `active_relatives_41_42_should_be_two` = 2 ✅
+- person_id=2: `messenger_max_id=40338535`, `record_status=active` ✅
+- person_id=8: `messenger_max_id=82604752`, `record_status=active` ✅
+
+---
+
 ## 2026-04-22 — Диагностика дат union (5F)
 
 **Проблема:** API возвращал `start_date=null, end_date=null` для всех union-узлов.
@@ -66,6 +99,103 @@
 <!-- Новые записи добавляются СВЕРХУ -->
 
 ---
+
+### [1.5] — 2026-04-23 — T16 Max contacts: event inbox + cleanup duplicate people/memories
+
+**Тип:** Schema + Data
+**Автор:** GitHub Copilot
+**ADR:** —
+**Обратимость:** Partially reversible
+
+#### Описание
+
+Отключено авто-создание `People` из входящих Max contact attachments: теперь контакты фиксируются в новой таблице `MaxContactEvents` как enrichment events. Выполнен cleanup тестовых дублей и служебных marker-memories без удаления данных.
+
+#### Изменения
+
+| Действие | Объект | Детали |
+|----------|--------|--------|
+| ADD | `MaxContactEvents` | Inbox таблица contact events (`new|matched|merged|archived`) |
+| ADD | `idx_max_contact_events_*` | Индексы по `sender_max_user_id`, `contact_max_user_id`, `status` |
+| UPDATE | `People.record_status` | `person_id IN (35,36,37,38,39) -> test_archived` |
+| UPDATE | `Memories` | `id IN (20..24)` и future `TEST CONTACT` markers -> `is_archived=true`, `transcription_status='archived'`, `source_type='max_contact_test_marker'` |
+
+#### SQL
+
+```sql
+-- Forward
+CREATE TABLE IF NOT EXISTS "MaxContactEvents" (
+  id                  SERIAL PRIMARY KEY,
+  created_at          VARCHAR NOT NULL,
+  sender_max_user_id  VARCHAR NOT NULL,
+  contact_max_user_id VARCHAR,
+  contact_name        VARCHAR,
+  contact_first_name  VARCHAR,
+  contact_last_name   VARCHAR,
+  raw_payload         TEXT NOT NULL,
+  matched_person_id   INTEGER REFERENCES "People"(person_id),
+  status              VARCHAR NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'matched', 'merged', 'archived'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_max_contact_events_sender ON "MaxContactEvents" (sender_max_user_id);
+CREATE INDEX IF NOT EXISTS idx_max_contact_events_contact ON "MaxContactEvents" (contact_max_user_id);
+CREATE INDEX IF NOT EXISTS idx_max_contact_events_status ON "MaxContactEvents" (status);
+
+UPDATE "People"
+SET record_status = 'test_archived'
+WHERE person_id IN (35, 36, 37, 38, 39);
+
+UPDATE "Memories"
+SET
+  is_archived = true,
+  transcription_status = 'archived',
+  source_type = 'max_contact_test_marker'
+WHERE
+  id IN (20, 21, 22, 23, 24)
+  OR (
+    source_type = 'max_messenger'
+    AND (
+      COALESCE(content_text, '') ILIKE '%TEST CONTACT%'
+      OR COALESCE(transcript_readable, '') ILIKE '%TEST CONTACT%'
+    )
+  );
+
+-- Rollback (data rollback partial by design)
+DROP INDEX IF EXISTS idx_max_contact_events_sender;
+DROP INDEX IF EXISTS idx_max_contact_events_contact;
+DROP INDEX IF EXISTS idx_max_contact_events_status;
+DROP TABLE IF EXISTS "MaxContactEvents";
+
+UPDATE "People"
+SET record_status = 'active'
+WHERE person_id IN (35, 36, 37, 38, 39);
+```
+
+#### Валидация
+
+```sql
+SELECT person_id, record_status
+FROM "People"
+WHERE person_id IN (35, 36, 37, 38, 39)
+ORDER BY person_id;
+
+SELECT id, is_archived, transcription_status, source_type
+FROM "Memories"
+WHERE id IN (20, 21, 22, 23, 24)
+ORDER BY id;
+
+SELECT count(*) FROM "MaxContactEvents";
+```
+
+#### Затронутый код
+- `migrations/005_max_contacts_events_and_cleanup.sql`
+- `app/api/routes/bot_webhooks.py`
+- `app/services/memory_store.py`
+- `app/models/__init__.py`
+- `app/api/routes/tree.py`
+- `app/services/family_graph.py`
+- `create_postgres_schema.sql`
+- `tech-docs/DATABASE_SCHEMA.md`
 
 ### [1.4] — 2026-04-23 — Person.record_status и скрытие test_archived в live UX
 

@@ -43,7 +43,7 @@ def _looks_like_technical_blob(text: str) -> bool:
 
 
 def _is_live_visible_person(model):
-    return or_(model.record_status.is_(None), model.record_status != "test_archived")
+    return model.record_status == "active"
 
 
 def _get_family_member_id(request: Request) -> int | None:
@@ -421,7 +421,14 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
 
     memory = (
         db.query(Memory)
-        .filter(Memory.transcription_status == "published", text_filter)
+        .join(Person, Person.person_id == Memory.author_id)
+        .filter(
+            Memory.author_id.isnot(None),
+            Memory.is_archived == False,
+            Memory.transcription_status == "published",
+            _is_live_visible_person(Person),
+            text_filter,
+        )
         .order_by(func.random())
         .first()
     )

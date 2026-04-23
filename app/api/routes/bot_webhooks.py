@@ -7,11 +7,10 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Request
 import httpx
-from sqlalchemy import func
 
 from app.bot.max_messenger import MaxMessengerBot
 from app.db.session import SessionLocal
-from app.models import Memory, Person, PersonI18n
+from app.models import MaxContactEvent, Memory, Person, PersonI18n
 from app.services.ai_analyzer import analyze_memory_text
 from app.services.memory_store import attach_analysis_to_memory, create_memory_from_max
 
@@ -264,47 +263,36 @@ def _extract_contact_items(payload: dict) -> list[dict[str, str]]:
 
         contact_user_id = max_info.get("user_id")
         first_name = max_info.get("first_name")
-        if contact_user_id is None or not first_name:
+        if contact_user_id is None:
             continue
 
         contacts.append(
             {
                 "user_id": str(contact_user_id).strip(),
-                "first_name": str(first_name).strip(),
+                "first_name": str(first_name).strip() if first_name is not None else "",
+                "last_name": str(max_info.get("last_name") or "").strip(),
+                "name": str(max_info.get("name") or "").strip(),
             }
         )
 
     return contacts
 
 
-def _link_or_create_person_by_contact(db, user_id: str, first_name: str) -> Person:
-    person = db.query(Person).filter(Person.messenger_max_id == user_id).first()
-    if person:
-        return person
-
-    next_person_id = (db.query(func.max(Person.person_id)).scalar() or 0) + 1
-
-    person = Person(
-        person_id=next_person_id,
-        is_alive=1,
-        role="member",
-        messenger_max_id=user_id,
-        default_lang="ru",
-        is_user=1,
+def _save_max_contact_event(db, sender_max_user_id: str, contact_item: dict[str, str], raw_payload: dict) -> MaxContactEvent:
+    event = MaxContactEvent(
+        created_at=datetime.utcnow().isoformat(),
+        sender_max_user_id=sender_max_user_id,
+        contact_max_user_id=contact_item.get("user_id") or None,
+        contact_name=contact_item.get("name") or None,
+        contact_first_name=contact_item.get("first_name") or None,
+        contact_last_name=contact_item.get("last_name") or None,
+        raw_payload=json.dumps(raw_payload, ensure_ascii=False, separators=(",", ":")),
+        status="new",
     )
-    db.add(person)
-    db.flush()
-
-    person_i18n = PersonI18n(
-        person_id=person.person_id,
-        lang_code="ru",
-        first_name=first_name,
-        last_name="",
-    )
-    db.add(person_i18n)
+    db.add(event)
     db.commit()
-    db.refresh(person)
-    return person
+    db.refresh(event)
+    return event
 
 
 def _save_pending_audio_memory(
@@ -326,12 +314,14 @@ def _save_pending_audio_memory(
     if download_error:
         metadata["audio_download_error"] = download_error
 
+    memory_json = json.dumps(metadata, ensure_ascii=False)
+
     memory = Memory(
         author_id=person_id,
         created_by=person_id,
         content_text="",
         audio_url=audio_url,
-        transcript_verbatim=json.dumps(metadata, ensure_ascii=False),
+        transcript_verbatim=memory_json,
         source_type="max_audio_attachment",
         transcription_status="pending_manual_text",
         created_at=datetime.utcnow().isoformat(),
@@ -427,16 +417,17 @@ async def incoming_webhook(request: Request):
 
         if contact_items:
             for contact in contact_items:
-                linked_person = _link_or_create_person_by_contact(
+                event = _save_max_contact_event(
                     db=db,
-                    user_id=contact["user_id"],
-                    first_name=contact["first_name"],
+                    sender_max_user_id=max_id,
+                    contact_item=contact,
+                    raw_payload=payload,
                 )
                 logger.info(
-                    "PERSON_LINKED: %s ID: %s (person_id=%s)",
-                    contact["first_name"],
+                    "MAX contact event stored sender=%s contact=%s event_id=%s",
+                    max_id,
                     contact["user_id"],
-                    linked_person.person_id,
+                    event.id,
                 )
 
         if audio_attachment and not message_text:
@@ -503,11 +494,24 @@ async def incoming_webhook(request: Request):
                 )
                 raise HTTPException(status_code=500, detail="Failed to save memory")
 
+            memory_id = save_result.get("memory_id")
+            if save_result.get("transcription_status") == "archived":
+                response_text = "Служебное сообщение получено и отправлено в архив."
+                await bot.send_message(user_id=max_id, text=response_text)
+                return {
+                    "status": "ok",
+                    "identified": bool(person),
+                    "person_id": save_result.get("person_id"),
+                    "memory_id": memory_id,
+                    "analysis_status": "skipped_archived_marker",
+                    "analysis_provider": "none",
+                    "response_text": response_text,
+                }
+
             analysis_result = analyze_memory_text(message_text)
             analysis_status = str(analysis_result.get("status", "unknown"))
             analysis_provider = str(analysis_result.get("raw_provider", "unknown"))
 
-            memory_id = save_result.get("memory_id")
             if isinstance(memory_id, int):
                 persist_analysis_result = attach_analysis_to_memory(memory_id, analysis_result)
                 if not persist_analysis_result.get("saved"):
