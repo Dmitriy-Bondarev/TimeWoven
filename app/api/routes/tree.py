@@ -7,7 +7,7 @@ from urllib.parse import quote, unquote, urlparse
 from fastapi import APIRouter, Depends, Form, Query, HTTPException, Request, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, false
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -40,6 +40,10 @@ def _looks_like_technical_blob(text: str) -> bool:
         return True
 
     return False
+
+
+def _is_live_visible_person(model):
+    return or_(model.record_status.is_(None), model.record_status != "test_archived")
 
 
 def _get_family_member_id(request: Request) -> int | None:
@@ -139,7 +143,14 @@ async def family_person(
     person_id: int,
     session: Session = Depends(get_db),
 ):
-    person = session.query(Person).filter(Person.person_id == person_id).first()
+    person = (
+        session.query(Person)
+        .filter(
+            Person.person_id == person_id,
+            _is_live_visible_person(Person),
+        )
+        .first()
+    )
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
 
@@ -187,26 +198,33 @@ async def family_timeline(
         return redirect
 
     from app.models import Union, UnionChild
-    
+
     items = []
+    visible_people = (
+        db.query(Person)
+        .filter(_is_live_visible_person(Person))
+        .order_by(Person.person_id)
+        .all()
+    )
+    visible_person_ids = {person.person_id for person in visible_people}
 
     related_union = None
     related_person_ids: set[int] = set()
     if union_id is not None:
         related_union = db.query(Union).filter(Union.id == union_id).first()
         if related_union:
-            if related_union.partner1_id:
+            if related_union.partner1_id in visible_person_ids:
                 related_person_ids.add(related_union.partner1_id)
-            if related_union.partner2_id:
+            if related_union.partner2_id in visible_person_ids:
                 related_person_ids.add(related_union.partner2_id)
             child_ids = [
                 row.child_id
                 for row in db.query(UnionChild).filter(UnionChild.union_id == related_union.id).all()
-                if row.child_id is not None
+                if row.child_id is not None and row.child_id in visible_person_ids
             ]
             related_person_ids.update(child_ids)
 
-    for person in db.query(Person).all():
+    for person in visible_people:
         if person_id is not None and person.person_id != person_id:
             continue
         if union_id is not None and person.person_id not in related_person_ids:
@@ -254,6 +272,10 @@ async def family_timeline(
             )
 
     for union in db.query(Union).all():
+        if union.partner1_id is not None and union.partner1_id not in visible_person_ids:
+            continue
+        if union.partner2_id is not None and union.partner2_id not in visible_person_ids:
+            continue
         if person_id is not None and person_id not in (union.partner1_id, union.partner2_id):
             continue
         if union_id is not None and union.id != union_id:
@@ -312,17 +334,25 @@ async def family_timeline(
         and_(Memory.content_text.isnot(None), Memory.content_text != ""),
     )
 
-    memories_query = db.query(Memory).filter(
-        Memory.author_id.isnot(None),
-        text_filter,
-        Memory.is_archived == False,
-        Memory.transcription_status == "published",
+    memories_query = (
+        db.query(Memory)
+        .join(Person, Person.person_id == Memory.author_id)
+        .filter(
+            Memory.author_id.isnot(None),
+            text_filter,
+            Memory.is_archived == False,
+            Memory.transcription_status == "published",
+            _is_live_visible_person(Person),
+        )
     )
 
     if person_id is not None:
         memories_query = memories_query.filter(Memory.author_id == person_id)
-    if union_id is not None and related_person_ids:
-        memories_query = memories_query.filter(Memory.author_id.in_(list(related_person_ids)))
+    if union_id is not None:
+        if related_person_ids:
+            memories_query = memories_query.filter(Memory.author_id.in_(list(related_person_ids)))
+        else:
+            memories_query = memories_query.filter(false())
 
     memories = memories_query.all()
 
@@ -453,7 +483,10 @@ async def who_am_i(request: Request, next: str = "/family/welcome", db: Session 
     people = []
     for person in (
         db.query(Person)
-        .filter(Person.is_alive == 1)
+        .filter(
+            Person.is_alive == 1,
+            _is_live_visible_person(Person),
+        )
         .order_by(Person.person_id)
         .all()
     ):
@@ -490,6 +523,7 @@ async def who_am_i_submit(
         .filter(
             Person.person_id == person_id,
             Person.is_alive == 1,
+            _is_live_visible_person(Person),
         )
         .first()
     )
@@ -518,6 +552,7 @@ async def who_am_i_pin(
         .filter(
             Person.person_id == person_id,
             Person.is_alive == 1,
+            _is_live_visible_person(Person),
         )
         .first()
     )
@@ -564,6 +599,7 @@ async def who_am_i_pin_submit(
         .filter(
             Person.person_id == person_id,
             Person.is_alive == 1,
+            _is_live_visible_person(Person),
         )
         .first()
     )

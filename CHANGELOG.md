@@ -1,5 +1,14 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.19-record-status-live-family-filtering-t14] — 2026-04-23
+
+### Feature | Family UX | People
+
+- **Feature (T14)**: добавлено поле `People.record_status` со значениями `active | archived | test_archived`, default `active`.
+- **Live-family filtering**: записи со статусом `test_archived` скрыты из `who-am-i` + PIN flow, `/family/person/{id}`, `/family/tree/json`, `/family/timeline`.
+- **Admin visibility**: `/admin/people` продолжает показывать все записи и теперь отображает колонку `record_status`.
+- **Data patch**: в миграции T14 выполнено `person_id IN (20,21,22,23) -> record_status='test_archived'`.
+
 ## [v1.22.18-timeline-filtering-maiden-ui-polish-t13] — 2026-04-23
 
 ### Fix | Timeline | Profile

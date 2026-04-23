@@ -32,6 +32,7 @@
 | `contact_email` | varchar | Email для связи | |
 | `avatar_url` | varchar | URL аватара | |
 | `pin` | varchar | PIN-код доступа | |
+| `record_status` | varchar | Статус записи: active, archived, test_archived | NOT NULL, DEFAULT 'active', CHECK constraint |
 
 ### Таблица `People_I18n`
 Локализация имен и биографий.
@@ -219,6 +220,7 @@
 - `gender`: 'M', 'F', 'Unknown'
 - `birth_date_prec`, `death_date_prec`: 'EXACT', 'ABOUT', 'YEARONLY', 'DECADE'
 - `preferred_ch`: 'Max', 'TG', 'Email', 'Push', 'None'
+- `record_status`: 'active', 'archived', 'test_archived'
 - `MemoryPeople.role`: 'author', 'mentioned', 'addressee', 'subject'
 
 ---

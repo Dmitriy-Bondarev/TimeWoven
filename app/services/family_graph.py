@@ -105,8 +105,19 @@ def is_edge_active_for_year(
     return relation_active
 
 
+def is_live_visible_person(person: Person) -> bool:
+    return (person.record_status or "active") != "test_archived"
+
+
 def get_person(session: Session, person_id: int) -> Optional[Person]:
-    return session.query(Person).filter(Person.person_id == person_id).first()
+    return (
+        session.query(Person)
+        .filter(
+            Person.person_id == person_id,
+            or_(Person.record_status.is_(None), Person.record_status != "test_archived"),
+        )
+        .first()
+    )
 
 
 def get_person_i18n(
@@ -307,6 +318,8 @@ def build_family_graph(
                 continue
 
             for partner in get_union_partners(session, union.id):
+                if not is_live_visible_person(partner):
+                    continue
                 p_birth = extract_birth_year(partner.birth_date)
                 if year is not None and p_birth is not None and year < p_birth:
                     continue
@@ -338,6 +351,8 @@ def build_family_graph(
                     queue.append((person_key, dist + 1))
 
             for child in get_union_children(session, union.id):
+                if not is_live_visible_person(child):
+                    continue
                 c_birth = extract_birth_year(child.birth_date)
                 if year is not None and c_birth is not None and year < c_birth:
                     continue

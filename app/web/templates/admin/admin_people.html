@@ -33,6 +33,7 @@
         <th>Аватар</th>
         <th>Имя</th>
         <th>Роль</th>
+        <th>Статус записи</th>
         <th>Телефон</th>
         <th>Канал</th>
         <th>Max ID</th>
@@ -61,6 +62,7 @@
           {% endif %}
         </td>
         <td class="muted">{{ r.role }}</td>
+        <td class="muted">{{ r.record_status }}</td>
         <td class="{% if r.phone == '—' %}badge-warn{% else %}badge-ok{% endif %}">{{ r.phone }}</td>
         <td class="{% if r.preferred_ch == '—' %}badge-warn{% else %}badge-ok{% endif %}">{{ r.preferred_ch }}</td>
         <td class="{% if r.messenger_max_id %}badge-ok{% else %}badge-warn{% endif %}">{{ r.messenger_max_id or '—' }}</td>

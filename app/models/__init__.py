@@ -25,6 +25,7 @@ class Person(Base):
     contact_email = Column(String, nullable=True)
     avatar_url = Column(String)
     pin = Column(String)
+    record_status = Column(String, nullable=False, default="active", server_default=text("'active'"))
 
     translations = relationship("PersonI18n", back_populates="person")
     quotes = relationship("Quote", back_populates="author")

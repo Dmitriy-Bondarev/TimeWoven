@@ -366,6 +366,7 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
             "person_id": p.person_id,
             "name": name,
             "role": p.role or "",
+            "record_status": p.record_status or "active",
             "phone": p.phone or "",
             "preferred_ch": p.preferred_ch or "",
             "messenger_max_id": p.messenger_max_id or "",

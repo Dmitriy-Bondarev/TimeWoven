@@ -1,5 +1,24 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T14 — person record_status and live family hiding for test_archived
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+Yes
+
+### Changes
+
+- В `People` добавлено поле `record_status` (`active|archived|test_archived`, default `active`).
+- Live family surfaces скрывают только `test_archived`: `who-am-i` + PIN flow, `/family/person/{id}`, `/family/tree/json`, `/family/timeline`.
+- Админский список `/admin/people` сохраняет видимость всех записей и показывает `record_status` отдельной колонкой.
+- Добавлена миграция `migrations/004_add_record_status_to_people.sql`, включая data update: `person_id IN (20,21,22,23) -> test_archived`.
+
 ## Update: T13 — finalize T11 timeline filtering and T12 maiden name UI polish
 
 Date: 2026-04-23

@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS "People" (
     messenger_tg_id VARCHAR UNIQUE,
     contact_email   VARCHAR,
     avatar_url      VARCHAR,
-    pin             VARCHAR
+    pin             VARCHAR,
+    record_status   VARCHAR NOT NULL DEFAULT 'active' CHECK (record_status IN ('active', 'archived', 'test_archived'))
 );
 
 CREATE TABLE IF NOT EXISTS "People_I18n" (

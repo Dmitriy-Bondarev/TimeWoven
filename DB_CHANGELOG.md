@@ -67,6 +67,83 @@
 
 ---
 
+### [1.4] — 2026-04-23 — Person.record_status и скрытие test_archived в live UX
+
+**Тип:** Schema + Data
+**Автор:** GitHub Copilot
+**ADR:** —
+**Обратимость:** Reversible
+
+#### Описание
+
+В таблицу `People` добавлено поле `record_status` с дефолтным значением `active` и CHECK-ограничением на значения `active|archived|test_archived`. В рамках T14 выполнен data patch: персоны с `person_id IN (20,21,22,23)` переведены в `test_archived` для скрытия из live family UX при сохранении доступности в админке.
+
+#### Изменения
+
+| Действие | Объект | Детали |
+|----------|--------|--------|
+| ADD | `People.record_status` | `VARCHAR NOT NULL DEFAULT 'active'` |
+| ALTER | `People` | Добавлен CHECK `people_record_status_check` |
+| UPDATE | `People.record_status` | `person_id IN (20,21,22,23) -> 'test_archived'` |
+
+#### SQL
+
+```sql
+-- Forward
+ALTER TABLE "People"
+ADD COLUMN IF NOT EXISTS record_status VARCHAR NOT NULL DEFAULT 'active';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'people_record_status_check'
+      AND conrelid = '"People"'::regclass
+  ) THEN
+    ALTER TABLE "People"
+    ADD CONSTRAINT people_record_status_check
+    CHECK (record_status IN ('active', 'archived', 'test_archived'));
+  END IF;
+END $$;
+
+UPDATE "People"
+SET record_status = 'active'
+WHERE record_status IS NULL;
+
+UPDATE "People"
+SET record_status = 'test_archived'
+WHERE person_id IN (20, 21, 22, 23);
+
+-- Rollback
+UPDATE "People"
+SET record_status = 'active'
+WHERE person_id IN (20, 21, 22, 23);
+
+ALTER TABLE "People" DROP CONSTRAINT IF EXISTS people_record_status_check;
+ALTER TABLE "People" DROP COLUMN IF EXISTS record_status;
+```
+
+#### Валидация
+
+```sql
+SELECT person_id, record_status
+FROM "People"
+WHERE person_id IN (20, 21, 22, 23)
+ORDER BY person_id;
+
+SELECT conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conrelid = '"People"'::regclass
+  AND conname = 'people_record_status_check';
+```
+
+#### Затронутый код
+- `migrations/004_add_record_status_to_people.sql` — schema + data migration.
+- `app/models/__init__.py` — поле `Person.record_status`.
+- `create_postgres_schema.sql` — синхронизация эталонного DDL.
+- `tech-docs/DATABASE_SCHEMA.md` — синхронизация документации схемы.
+
 ### [1.3] — 2026-04-22 — Поддержка канала Max в People.preferred_ch
 
 **Тип:** Schema

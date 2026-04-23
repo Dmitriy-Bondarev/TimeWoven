@@ -45,6 +45,7 @@ def create_person_with_i18n(
         contact_email=_optional_text(person_payload.get("contact_email")),
         avatar_url=_optional_text(person_payload.get("avatar_url")),
         is_user=_to_flag(person_payload.get("is_user"), default=0),
+        record_status=_optional_text(person_payload.get("record_status")) or "active",
         messenger_max_id=(
             _optional_text(person_payload.get("max_user_id"))
             or _optional_text(person_payload.get("messenger_max_id"))
