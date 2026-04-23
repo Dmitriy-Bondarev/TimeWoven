@@ -1,5 +1,28 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T18.A — AI-провайдер llama_local (LLaMA local HTTP server)
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- В `app/services/ai_analyzer.py` добавлен класс `LlamaLocalAnalyzerProvider` (`provider_name="llama_local"`).
+- Читает `AI_LLAMA_LOCAL_URL` из `.env`; POST `{"text": str}`; парсит `{"summary", "people", "events", "dates"}`.
+- Таймаут 30 с (`LLAMA_LOCAL_TIMEOUT_SECONDS`); все ошибки → `status="error"`, сервис не падает.
+- Добавлено поле `events` в возвращаемый словарь (для LLaMA-ответа; другие провайдеры возвращают пустой список).
+- `_build_provider` в `ProviderAgnosticAnalyzer` дополнен веткой `"llama_local"`.
+- Обновлены `TECH_PASSPORT.md` (раздел M2 AI abstraction) и `TimeWoven_Anchor_2026-04-23.md` (AI-анализ + Max-бот).
+
+---
+
 ## Update: T17 — Soft-archive duplicate People 40/43 after Max contacts manual review
 
 Date: 2026-04-23

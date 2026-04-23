@@ -1,5 +1,17 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.22-llama-local-ai-provider-t18a] — 2026-04-23
+
+### Feature | AI | Max Bot
+
+- **Feature (T18.A)**: добавлен AI-провайдер `llama_local` в `ai_analyzer.py`.
+- Читает URL из `AI_LLAMA_LOCAL_URL`; POST `{"text": ...}`; ожидает `{"summary", "people", "events", "dates"}`.
+- Timeout 30 с; сетевые ошибки, таймаут и невалидный JSON возвращают `status="error"`, исключение наружу не пробрасывается.
+- Поле `events` из ответа LLaMA сохраняется в `AnalysisResult` (новое поле, остальные провайдеры его не заполняют).
+- `.env`: `AI_PROVIDER=llama_local`, `AI_LLAMA_LOCAL_URL=http://127.0.0.1:19000/analyze`.
+- Туннель: `ssh -N -R 19000:localhost:9000 root@193.187.95.221` (Mac → VPS).
+- Обновлены `TECH_PASSPORT.md` и `TimeWoven_Anchor_2026-04-23.md`.
+
 ## [v1.22.21-duplicate-people-cleanup-t17] — 2026-04-23
 
 ### Cleanup | People | Max Contacts

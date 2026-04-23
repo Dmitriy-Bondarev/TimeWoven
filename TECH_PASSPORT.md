@@ -65,10 +65,11 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 * **Обработчик логики:** `app.bot.max_messenger.MaxMessengerBot`
 * **Статус:** Минимальный контур `Max -> Memory` замкнут (M1): входящий текст сохраняется в `Memories` и отправляется короткий ack-ответ в чат. Базовый person mapping работает по `messenger_max_id`; при отсутствии соответствия используется inbox (`author_id=NULL`).
 * **M2 (AI abstraction):** после сохранения памяти webhook может вызвать provider-agnostic анализатор `analyze_memory_text(...)`.
-   - Провайдер выбирается через `.env`: `AI_PROVIDER=disabled|mock|anthropic|local_stub`.
+   - Провайдер выбирается через `.env`: `AI_PROVIDER=disabled|mock|anthropic|local_stub|llama_local`.
    - При `disabled`/ошибке провайдера webhook не падает; сохранение Memory и ACK остаются гарантированными.
    - Результат анализа (если есть) сохраняется в metadata памяти (`transcript_verbatim`) без изменений схемы БД.
-   - `local_stub` использует внешний локальный HTTP-endpoint `AI_LOCAL_STUB_URL` и безопасно возвращает `status=error`, если сервис недоступен или ответ невалиден.
+   - `local_stub` использует внешний локальный HTTP-endpoint (`AI_LOCAL_STUB_URL`) и безопасно возвращает `status=error`, если сервис недоступен или ответ невалиден.
+   - `llama_local` (**T18.A, 2026-04-23**) — провайдер для локального LLaMA-совместимого HTTP-сервера (Mac M5 Pro). Читает URL из `AI_LLAMA_LOCAL_URL`, делает `POST {"text": ...}`, ожидает ответ `{"summary", "people", "events", "dates"}`. Доступен через SSH-туннель (`ssh -N -R 19000:localhost:9000 root@193.187.95.221`). При любой сетевой ошибке, таймауте или невалидном JSON безопасно возвращает `status="error"`, не роняя сервис.
 
 ---
 

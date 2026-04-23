@@ -144,6 +144,92 @@ class LocalStubAnalyzerProvider(BaseAnalyzerProvider):
         }
 
 
+LLAMA_LOCAL_TIMEOUT_SECONDS = 30.0
+
+
+class LlamaLocalAnalyzerProvider(BaseAnalyzerProvider):
+    """Provider for a locally-hosted LLaMA-compatible HTTP server.
+
+    Expects AI_LLAMA_LOCAL_URL to point at an endpoint accepting
+    POST {"text": str} and returning {"summary", "people", "events", "dates"}.
+    Network errors and invalid responses are caught and returned as status="error".
+    """
+
+    provider_name = "llama_local"
+
+    def __init__(self) -> None:
+        self.url = os.getenv("AI_LLAMA_LOCAL_URL", "").strip()
+
+    def _error_result(self, error_message: str, status_code: int | None = None) -> dict[str, Any]:
+        raw_provider: dict[str, Any] = {
+            "provider": self.provider_name,
+            "endpoint": self.url,
+            "error": error_message,
+        }
+        if status_code is not None:
+            raw_provider["status_code"] = status_code
+        return _empty_analysis(status="error", raw_provider=raw_provider)
+
+    def _normalize_list(self, value: Any) -> list[Any]:
+        return value if isinstance(value, list) else []
+
+    def analyze(self, text: str) -> dict[str, Any]:
+        normalized = (text or "").strip()
+        if not normalized:
+            return _empty_analysis(
+                status="ok",
+                raw_provider={"provider": self.provider_name, "endpoint": self.url},
+            )
+
+        if not self.url:
+            return self._error_result("missing AI_LLAMA_LOCAL_URL")
+
+        try:
+            response = httpx.post(
+                self.url,
+                json={"text": normalized},
+                timeout=LLAMA_LOCAL_TIMEOUT_SECONDS,
+            )
+        except httpx.HTTPError as exc:
+            logger.warning("llama_local request failed endpoint=%s: %s", self.url, exc)
+            return self._error_result(str(exc))
+
+        if response.status_code != 200:
+            logger.warning(
+                "llama_local returned non-200 endpoint=%s status_code=%s",
+                self.url,
+                response.status_code,
+            )
+            return self._error_result(
+                f"unexpected status code: {response.status_code}",
+                status_code=response.status_code,
+            )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            logger.warning("llama_local returned invalid JSON endpoint=%s: %s", self.url, exc)
+            return self._error_result("invalid JSON response", status_code=response.status_code)
+
+        if not isinstance(payload, dict):
+            logger.warning("llama_local returned non-object JSON endpoint=%s", self.url)
+            return self._error_result("response JSON is not an object", status_code=response.status_code)
+
+        return {
+            "summary": str(payload.get("summary", "") or "").strip(),
+            "persons": self._normalize_list(payload.get("people")),
+            "dates": self._normalize_list(payload.get("dates")),
+            "locations": [],
+            "events": self._normalize_list(payload.get("events")),
+            "raw_provider": {
+                "provider": self.provider_name,
+                "endpoint": self.url,
+                "status_code": response.status_code,
+            },
+            "status": "ok",
+        }
+
+
 class AnthropicAnalyzerProvider(BaseAnalyzerProvider):
     provider_name = "anthropic"
 
@@ -231,6 +317,8 @@ class ProviderAgnosticAnalyzer:
             return MockAnalyzerProvider()
         if provider_name == "local_stub":
             return LocalStubAnalyzerProvider()
+        if provider_name == "llama_local":
+            return LlamaLocalAnalyzerProvider()
         if provider_name == "anthropic":
             return AnthropicAnalyzerProvider()
 
