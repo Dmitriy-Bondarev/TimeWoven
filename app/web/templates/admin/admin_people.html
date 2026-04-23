@@ -39,6 +39,8 @@
         <th>Max ID</th>
         <th>Telegram</th>
         <th>Email</th>
+        <th>Алиасы</th>
+        <th>Действия</th>
         <th>Жив</th>
         <th>Воспом.</th>
         <th>Цитаты</th>
@@ -68,6 +70,21 @@
         <td class="{% if r.messenger_max_id %}badge-ok{% else %}badge-warn{% endif %}">{{ r.messenger_max_id or '—' }}</td>
         <td class="{% if r.messenger_tg_id %}badge-ok{% else %}badge-warn{% endif %}">{{ r.messenger_tg_id or '—' }}</td>
         <td class="{% if r.contact_email %}badge-ok{% else %}badge-warn{% endif %}">{{ r.contact_email or '—' }}</td>
+        <td>
+          {% if r.aliases %}
+            {% for a in r.aliases %}
+              <div class="muted" style="margin-bottom: 4px;">
+                {{ a.alias_text }}
+                <span style="opacity: 0.75;">({{ a.alias_kind }}{% if a.used_by_generation %}, {{ a.used_by_generation }}{% endif %})</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="/admin/people/{{ r.person_id }}/edit" class="upload-link">Редактировать</a>
+        </td>
         <td class="{% if r.is_alive %}badge-ok{% else %}muted{% endif %}">
           {% if r.is_alive %}да{% else %}—{% endif %}
         </td>

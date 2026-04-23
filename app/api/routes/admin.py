@@ -9,12 +9,13 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, Request, Form, File, UploadFile, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.bot.max_messenger import MaxMessengerBot
 from app.db.session import get_db
-from app.models import Memory, Person, PersonI18n, Quote
-from app.services import create_person_with_i18n
+from app.models import Memory, Person, PersonAlias, PersonI18n, Quote, Union, UnionChild
+from app.services import create_person_with_i18n, update_person_with_i18n
 from app.security import get_daily_password, require_admin, make_admin_token, ADMIN_COOKIE_NAME
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -25,6 +26,8 @@ router = APIRouter(
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
 ALLOWED_ROLES = {"placeholder", "relative", "family_admin", "bot_only"}
+ALIAS_KINDS = {"kinship_term", "nickname", "diminutive", "formal_with_patronymic", "other"}
+ALIAS_GENERATIONS = {"parents", "siblings", "children", "grandchildren", "other"}
 
 
 def _clean_optional_text(value: object) -> str | None:
@@ -33,14 +36,14 @@ def _clean_optional_text(value: object) -> str | None:
 
 
 def _normalize_preferred_channel(raw_value: object, is_alive: bool) -> str | None:
-    """Map UI channel values to DB-compatible values; no channel is stored as NULL."""
+    """Map UI channel values to DB-compatible values using canonical People.preferred_ch values."""
     normalized = str(raw_value or "").strip().upper()
 
     if not normalized:
-        return None if not is_alive else None
+        return "None"
 
     if normalized in {"NONE", "NO", "NULL", "НЕ ЗАДАН", "НЕТ КАНАЛА", "NONE/NULL"}:
-        return None
+        return "None"
     if normalized == "MAX":
         return "Max"
     if normalized == "TG":
@@ -51,6 +54,110 @@ def _normalize_preferred_channel(raw_value: object, is_alive: bool) -> str | Non
         return "Push"
 
     raise ValueError("Недопустимое значение канала связи")
+
+
+def _person_name_ru(db: Session, person_id: int | None) -> str:
+    if not person_id:
+        return "—"
+
+    i18n = (
+        db.query(PersonI18n)
+        .filter(PersonI18n.person_id == person_id, PersonI18n.lang_code == "ru")
+        .first()
+    )
+    if i18n:
+        name = " ".join([part for part in (i18n.first_name, i18n.last_name) if part]).strip()
+        if name:
+            return name
+    return f"Персона #{person_id}"
+
+
+def _build_union_rows_for_person(db: Session, person_id: int) -> list[dict]:
+    unions = (
+        db.query(Union)
+        .filter(or_(Union.partner1_id == person_id, Union.partner2_id == person_id))
+        .order_by(Union.id.asc())
+        .all()
+    )
+
+    rows: list[dict] = []
+    for union in unions:
+        other_partner_id = union.partner2_id if union.partner1_id == person_id else union.partner1_id
+
+        children_links = (
+            db.query(UnionChild)
+            .filter(UnionChild.union_id == union.id)
+            .order_by(UnionChild.id.asc())
+            .all()
+        )
+        children = [
+            {
+                "child_id": link.child_id,
+                "name": _person_name_ru(db, link.child_id),
+            }
+            for link in children_links
+        ]
+
+        rows.append(
+            {
+                "union_id": union.id,
+                "partner_id": other_partner_id,
+                "partner_name": _person_name_ru(db, other_partner_id),
+                "start_date": union.start_date or "—",
+                "end_date": union.end_date or "—",
+                "children": children,
+            }
+        )
+
+    return rows
+
+
+def _build_person_form_data(person: Person, ru_i18n: PersonI18n | None, en_i18n: PersonI18n | None) -> dict:
+    return {
+        "gender": person.gender or "Unknown",
+        "default_lang": person.default_lang or "ru",
+        "is_alive": bool(person.is_alive),
+        "is_user": bool(person.is_user),
+        "role": person.role or "placeholder",
+        "birth_date": person.birth_date or "",
+        "birth_date_prec": person.birth_date_prec or "",
+        "death_date": person.death_date or "",
+        "death_date_prec": person.death_date_prec or "",
+        "phone": person.phone or "",
+        "max_user_id": person.messenger_max_id or "",
+        "preferred_ch": person.preferred_ch or "None",
+        "avatar_url": person.avatar_url or "",
+        "contact_email": person.contact_email or "",
+        "maiden_name_ru": person.maiden_name or "",
+        "first_name_ru": ru_i18n.first_name if ru_i18n else "",
+        "last_name_ru": ru_i18n.last_name if ru_i18n else "",
+        "patronymic_ru": ru_i18n.patronymic if ru_i18n else "",
+        "biography_ru": ru_i18n.biography if ru_i18n else "",
+        "first_name_en": en_i18n.first_name if en_i18n else "",
+        "last_name_en": en_i18n.last_name if en_i18n else "",
+        "patronymic_en": en_i18n.patronymic if en_i18n else "",
+        "biography_en": en_i18n.biography if en_i18n else "",
+    }
+
+
+def _load_person_for_edit(db: Session, person_id: int) -> tuple[Person, dict, list[dict]]:
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    ru_i18n = (
+        db.query(PersonI18n)
+        .filter(PersonI18n.person_id == person_id, PersonI18n.lang_code == "ru")
+        .first()
+    )
+    en_i18n = (
+        db.query(PersonI18n)
+        .filter(PersonI18n.person_id == person_id, PersonI18n.lang_code == "en")
+        .first()
+    )
+    form_data = _build_person_form_data(person, ru_i18n, en_i18n)
+    union_rows = _build_union_rows_for_person(db, person_id)
+    return person, form_data, union_rows
 
 
 @router.get("/")
@@ -362,6 +469,22 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
 
         memories_count = db.query(Memory).filter(Memory.author_id == p.person_id).count()
         quotes_count = db.query(Quote).filter(Quote.author_id == p.person_id).count()
+        alias_rows = (
+            db.query(PersonAlias)
+            .filter(PersonAlias.person_id == p.person_id)
+            .order_by(PersonAlias.id.asc())
+            .all()
+        )
+        aliases = [
+            {
+                "id": alias.id,
+                "alias_text": alias.alias_text,
+                "alias_kind": alias.alias_kind,
+                "used_by_generation": alias.used_by_generation,
+                "note": alias.note,
+            }
+            for alias in alias_rows
+        ]
 
         rows.append({
             "person_id": p.person_id,
@@ -377,6 +500,7 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
             "avatar_url": p.avatar_url,
             "memories_count": memories_count,
             "quotes_count": quotes_count,
+            "aliases": aliases,
         })
 
     return templates.TemplateResponse(
@@ -502,3 +626,205 @@ async def admin_person_new_submit(request: Request, db: Session = Depends(get_db
         return render_error(f"Ошибка при создании персоны: {exc}")
 
     return RedirectResponse(url="/admin/people", status_code=302)
+
+
+@router.get("/people/{person_id}/edit", response_class=HTMLResponse)
+async def admin_person_edit_form(person_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    person, form_data, union_rows = _load_person_for_edit(db, person_id)
+    return templates.TemplateResponse(
+        "admin/admin_person_edit.html",
+        {
+            "request": request,
+            "error": None,
+            "person": person,
+            "form_data": form_data,
+            "union_rows": union_rows,
+        },
+    )
+
+
+@router.post("/people/{person_id}/edit", response_class=HTMLResponse)
+async def admin_person_edit_submit(person_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    person, _, union_rows = _load_person_for_edit(db, person_id)
+    form = await request.form()
+
+    def render_error(message: str):
+        form_data = dict(form)
+        form_data["is_alive"] = "is_alive" in form
+        form_data["is_user"] = "is_user" in form
+        return templates.TemplateResponse(
+            "admin/admin_person_edit.html",
+            {
+                "request": request,
+                "error": message,
+                "person": person,
+                "form_data": form_data,
+                "union_rows": union_rows,
+            },
+            status_code=400,
+        )
+
+    ru_first_name = str(form.get("first_name_ru") or "").strip()
+    if not ru_first_name:
+        return render_error("Поле «Имя (RU)» обязательно для заполнения.")
+
+    allowed_genders = {"M", "F", "Unknown"}
+    gender = (form.get("gender") or "Unknown").strip()
+    if gender not in allowed_genders:
+        return render_error("Некорректное значение поля «Пол».")
+
+    allowed_langs = {"ru", "en"}
+    default_lang = (form.get("default_lang") or "ru").strip()
+    if default_lang not in allowed_langs:
+        return render_error("Некорректное значение языка по умолчанию.")
+
+    is_alive = "is_alive" in form
+    try:
+        preferred_ch = _normalize_preferred_channel(form.get("preferred_ch"), is_alive=is_alive)
+    except ValueError as exc:
+        return render_error(str(exc))
+
+    birth_date_prec = (form.get("birth_date_prec") or "").strip() or None
+    death_date_prec = (form.get("death_date_prec") or "").strip() or None
+    allowed_precisions = {"EXACT", "ABOUT", "YEARONLY", "DECADE"}
+    raw_role = (form.get("role") or "placeholder").strip()
+    role = raw_role if raw_role in ALLOWED_ROLES else "placeholder"
+    if birth_date_prec and birth_date_prec not in allowed_precisions:
+        return render_error("Некорректная точность даты рождения.")
+    if death_date_prec and death_date_prec not in allowed_precisions:
+        return render_error("Некорректная точность даты смерти.")
+
+    person_data = {
+        "gender": gender,
+        "is_alive": is_alive,
+        "role": role,
+        "default_lang": default_lang,
+        "is_user": "is_user" in form,
+        "birth_date": _clean_optional_text(form.get("birth_date")),
+        "birth_date_prec": birth_date_prec,
+        "death_date": _clean_optional_text(form.get("death_date")),
+        "death_date_prec": death_date_prec,
+        "phone": _clean_optional_text(form.get("phone")),
+        "contact_email": _clean_optional_text(form.get("contact_email")),
+        "max_user_id": _clean_optional_text(form.get("max_user_id")),
+        "preferred_ch": preferred_ch,
+        "avatar_url": _clean_optional_text(form.get("avatar_url")),
+    }
+    maiden_name = (form.get("maiden_name_ru") or "").strip() or None
+    person_data["maiden_name"] = maiden_name
+
+    ru_data = {
+        "first_name": ru_first_name,
+        "last_name": (form.get("last_name_ru") or "").strip() or None,
+        "patronymic": (form.get("patronymic_ru") or "").strip() or None,
+        "biography": (form.get("biography_ru") or "").strip() or None,
+    }
+
+    en_data = {
+        "first_name": (form.get("first_name_en") or "").strip(),
+        "last_name": (form.get("last_name_en") or "").strip() or None,
+        "patronymic": (form.get("patronymic_en") or "").strip() or None,
+        "biography": (form.get("biography_en") or "").strip() or None,
+    }
+
+    try:
+        update_person_with_i18n(db, person_id=person_id, person_data=person_data, ru_data=ru_data, en_data=en_data)
+    except IntegrityError as exc:
+        db.rollback()
+        details = str(getattr(exc, "orig", exc)).lower()
+        if "messenger_max_id" in details and "unique" in details:
+            return render_error("Такой Max ID уже существует")
+        if "preferred_ch" in details or "people_preferred_ch_check" in details:
+            return render_error("Недопустимое значение канала связи")
+        return render_error("Не удалось сохранить запись, проверь поля контактов")
+    except ValueError as exc:
+        return render_error(str(exc))
+    except Exception as exc:
+        return render_error(f"Ошибка при сохранении персоны: {exc}")
+
+    return RedirectResponse(url="/admin/people", status_code=302)
+
+
+@router.post("/people/{person_id}/aliases", response_class=JSONResponse)
+async def admin_create_person_alias(
+    person_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid_json"}, status_code=400)
+
+    alias_text = str((payload or {}).get("alias_text") or "").strip()
+    alias_kind = str((payload or {}).get("alias_kind") or "").strip()
+    used_by_generation = _clean_optional_text((payload or {}).get("used_by_generation"))
+    note = _clean_optional_text((payload or {}).get("note"))
+
+    if not alias_text:
+        return JSONResponse({"error": "alias_text is required"}, status_code=400)
+    if alias_kind not in ALIAS_KINDS:
+        return JSONResponse({"error": "invalid alias_kind"}, status_code=400)
+    if used_by_generation and used_by_generation not in ALIAS_GENERATIONS:
+        return JSONResponse({"error": "invalid used_by_generation"}, status_code=400)
+
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        return JSONResponse({"error": "person not found"}, status_code=404)
+
+    alias = PersonAlias(
+        person_id=person_id,
+        alias_text=alias_text,
+        alias_kind=alias_kind,
+        used_by_generation=used_by_generation,
+        note=note,
+    )
+    db.add(alias)
+    db.commit()
+    db.refresh(alias)
+
+    return JSONResponse(
+        {
+            "saved": True,
+            "alias": {
+                "id": alias.id,
+                "person_id": alias.person_id,
+                "alias_text": alias.alias_text,
+                "alias_kind": alias.alias_kind,
+                "used_by_generation": alias.used_by_generation,
+                "note": alias.note,
+                "created_at": alias.created_at.isoformat() if alias.created_at else None,
+            },
+        }
+    )
+
+
+@router.delete("/aliases/{alias_id}", response_class=JSONResponse)
+async def admin_delete_person_alias(
+    alias_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    alias = db.query(PersonAlias).filter(PersonAlias.id == alias_id).first()
+    if not alias:
+        return JSONResponse({"error": "alias not found"}, status_code=404)
+
+    db.delete(alias)
+    db.commit()
+    return JSONResponse({"deleted": True, "alias_id": alias_id})

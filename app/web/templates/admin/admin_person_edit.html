@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Редактирование персоны</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #020617;
+      --card: #0f172a;
+      --line: #1e293b;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --danger: #f43f5e;
+      --ok: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 0%, #1f2937 0, #020617 50%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 24px;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .back {
+      display: inline-block;
+      margin-bottom: 18px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    h1 {
+      margin: 0 0 18px;
+      color: var(--accent);
+      font-size: 30px;
+    }
+    .error {
+      margin: 0 0 16px;
+      border: 1px solid color-mix(in oklab, var(--danger), white 25%);
+      background: color-mix(in oklab, var(--danger), transparent 85%);
+      color: #fecdd3;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    form {
+      display: grid;
+      gap: 16px;
+    }
+    fieldset {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #111827 0%, var(--card) 100%);
+      border-radius: 12px;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    legend {
+      color: var(--accent);
+      font-weight: 700;
+      padding: 0 6px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input[type="text"], select, textarea {
+      width: 100%;
+      background: #020617;
+      color: var(--text);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 14px;
+    }
+    textarea { resize: vertical; }
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .checkbox input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--ok);
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .avatar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      border: 1px dashed #334155;
+      border-radius: 10px;
+    }
+    .avatar {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 50%;
+      border: 2px solid #334155;
+    }
+    .avatar-fallback {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1e293b;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .upload-link {
+      display: inline-block;
+      color: #020617;
+      background: var(--accent);
+      text-decoration: none;
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .union-card {
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px;
+      background: #020617;
+      margin-bottom: 10px;
+    }
+    .union-title {
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .children {
+      margin-top: 8px;
+      border-top: 1px solid #1e293b;
+      padding-top: 8px;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #1f2937;
+    }
+    .ghost {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 11px 8px;
+    }
+    @media (max-width: 780px) {
+      .two-col { grid-template-columns: 1fr; }
+      body { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/admin/people" class="back">&larr; К списку персон</a>
+    <h1>Редактирование персоны #{{ person.person_id }}</h1>
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/admin/people/{{ person.person_id }}/edit">
+      <fieldset>
+        <legend>Аватар</legend>
+        <div class="avatar-row">
+          {% if form_data.get('avatar_url') %}
+            <img src="{{ form_data.get('avatar_url') }}" class="avatar" alt="avatar">
+          {% else %}
+            <div class="avatar-fallback">нет фото</div>
+          {% endif %}
+          <div>
+            <div class="muted" style="margin-bottom: 8px;">Текущий аватар этой персоны</div>
+            <a href="/admin/avatars" class="upload-link">Загрузить новый</a>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Основное</legend>
+
+        <div class="two-col">
+          <div>
+            <label for="gender">Пол</label>
+            <select id="gender" name="gender" required>
+              <option value="M" {% if form_data.get('gender') == 'M' %}selected{% endif %}>Мужской</option>
+              <option value="F" {% if form_data.get('gender') == 'F' %}selected{% endif %}>Женский</option>
+              <option value="Unknown" {% if form_data.get('gender') in [None, '', 'Unknown'] %}selected{% endif %}>Не указан</option>
+            </select>
+          </div>
+          <div>
+            <label for="default_lang">Язык по умолчанию</label>
+            <select id="default_lang" name="default_lang">
+              <option value="ru" {% if form_data.get('default_lang') in [None, '', 'ru'] %}selected{% endif %}>ru</option>
+              <option value="en" {% if form_data.get('default_lang') == 'en' %}selected{% endif %}>en</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="checkbox" for="is_alive">
+          <input id="is_alive" type="checkbox" name="is_alive" {% if form_data.get('is_alive') in [True, 'on', 'true', '1', 1] %}checked{% endif %}>
+          Жив
+        </label>
+
+        <label class="checkbox" for="is_user">
+          <input id="is_user" type="checkbox" name="is_user" {% if form_data.get('is_user') in [True, 'on', 'true', '1', 1] %}checked{% endif %}>
+          Это пользователь приложения
+        </label>
+
+        <div>
+          <label for="role">Роль в системе</label>
+          <select id="role" name="role">
+            <option value="placeholder" {% if form_data.get('role') in [None, '', 'placeholder'] %}selected{% endif %}>Не выбрано / placeholder</option>
+            <option value="relative" {% if form_data.get('role') == 'relative' %}selected{% endif %}>Родственник</option>
+            <option value="family_admin" {% if form_data.get('role') == 'family_admin' %}selected{% endif %}>Администратор семьи</option>
+            <option value="bot_only" {% if form_data.get('role') == 'bot_only' %}selected{% endif %}>Техническая (бот)</option>
+          </select>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <label for="birth_date">Дата рождения</label>
+            <input id="birth_date" type="text" name="birth_date" value="{{ form_data.get('birth_date', '') }}">
+          </div>
+          <div>
+            <label for="birth_date_prec">Точность даты рождения</label>
+            <select id="birth_date_prec" name="birth_date_prec">
+              <option value="EXACT" {% if form_data.get('birth_date_prec') in [None, '', 'EXACT'] %}selected{% endif %}>Точная дата</option>
+              <option value="ABOUT" {% if form_data.get('birth_date_prec') == 'ABOUT' %}selected{% endif %}>Примерно</option>
+              <option value="YEARONLY" {% if form_data.get('birth_date_prec') == 'YEARONLY' %}selected{% endif %}>Только год</option>
+              <option value="DECADE" {% if form_data.get('birth_date_prec') == 'DECADE' %}selected{% endif %}>Десятилетие</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <label for="death_date">Дата смерти</label>
+            <input id="death_date" type="text" name="death_date" value="{{ form_data.get('death_date', '') }}">
+          </div>
+          <div>
+            <label for="death_date_prec">Точность даты смерти</label>
+            <select id="death_date_prec" name="death_date_prec">
+              <option value="" {% if form_data.get('death_date_prec') in [None, ''] %}selected{% endif %}>-</option>
+              <option value="EXACT" {% if form_data.get('death_date_prec') == 'EXACT' %}selected{% endif %}>Точная дата</option>
+              <option value="ABOUT" {% if form_data.get('death_date_prec') == 'ABOUT' %}selected{% endif %}>Примерно</option>
+              <option value="YEARONLY" {% if form_data.get('death_date_prec') == 'YEARONLY' %}selected{% endif %}>Только год</option>
+              <option value="DECADE" {% if form_data.get('death_date_prec') == 'DECADE' %}selected{% endif %}>Десятилетие</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Контакты</legend>
+        <div class="two-col">
+          <div>
+            <label for="phone">Телефон</label>
+            <input id="phone" type="text" name="phone" value="{{ form_data.get('phone', '') }}">
+          </div>
+          <div>
+            <label for="max_user_id">Max Messenger ID</label>
+            <input id="max_user_id" type="text" name="max_user_id" value="{{ form_data.get('max_user_id', '') }}">
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <label for="preferred_ch">Предпочтительный канал</label>
+            <select id="preferred_ch" name="preferred_ch">
+              <option value="NONE" {% if form_data.get('preferred_ch') in [None, '', 'NONE', 'None'] %}selected{% endif %}>Нет канала связи</option>
+              <option value="MAX" {% if form_data.get('preferred_ch') in ['MAX', 'Max'] %}selected{% endif %}>Max</option>
+              <option value="TG" {% if form_data.get('preferred_ch') == 'TG' %}selected{% endif %}>Telegram</option>
+              <option value="EMAIL" {% if form_data.get('preferred_ch') in ['EMAIL', 'Email'] %}selected{% endif %}>Email</option>
+              <option value="PUSH" {% if form_data.get('preferred_ch') in ['PUSH', 'Push'] %}selected{% endif %}>Push</option>
+            </select>
+          </div>
+          <div>
+            <label for="avatar_url">URL аватара</label>
+            <input id="avatar_url" type="text" name="avatar_url" value="{{ form_data.get('avatar_url', '') }}">
+          </div>
+        </div>
+
+        <div>
+          <label for="contact_email">Email</label>
+          <input id="contact_email" type="text" name="contact_email" value="{{ form_data.get('contact_email', '') }}">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Имя и биография (RU)</legend>
+
+        <div class="two-col">
+          <div>
+            <label for="first_name_ru">Имя</label>
+            <input id="first_name_ru" type="text" name="first_name_ru" required value="{{ form_data.get('first_name_ru', '') }}">
+          </div>
+          <div>
+            <label for="last_name_ru">Фамилия</label>
+            <input id="last_name_ru" type="text" name="last_name_ru" value="{{ form_data.get('last_name_ru', '') }}">
+          </div>
+        </div>
+
+        <div>
+          <label for="patronymic_ru">Отчество</label>
+          <input id="patronymic_ru" type="text" name="patronymic_ru" value="{{ form_data.get('patronymic_ru', '') }}">
+        </div>
+
+        <div>
+          <label for="maiden_name_ru">Девичья фамилия (при рождении)</label>
+          <input id="maiden_name_ru" type="text" name="maiden_name_ru" value="{{ form_data.get('maiden_name_ru', '') }}">
+        </div>
+
+        <div>
+          <label for="biography_ru">Биография</label>
+          <textarea id="biography_ru" name="biography_ru" rows="4">{{ form_data.get('biography_ru', '') }}</textarea>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Biography (EN)</legend>
+
+        <div class="two-col">
+          <div>
+            <label for="first_name_en">First name</label>
+            <input id="first_name_en" type="text" name="first_name_en" value="{{ form_data.get('first_name_en', '') }}">
+          </div>
+          <div>
+            <label for="last_name_en">Last name</label>
+            <input id="last_name_en" type="text" name="last_name_en" value="{{ form_data.get('last_name_en', '') }}">
+          </div>
+        </div>
+
+        <div>
+          <label for="patronymic_en">Patronymic / Middle name</label>
+          <input id="patronymic_en" type="text" name="patronymic_en" value="{{ form_data.get('patronymic_en', '') }}">
+        </div>
+
+        <div>
+          <label for="biography_en">Biography</label>
+          <textarea id="biography_en" name="biography_en" rows="4">{{ form_data.get('biography_en', '') }}</textarea>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Союзы и дети (read-only)</legend>
+
+        {% if union_rows %}
+          {% for u in union_rows %}
+            <div class="union-card">
+              <div class="union-title">Союз #{{ u.union_id }}</div>
+              <div class="muted">Партнёр: {{ u.partner_name }}{% if u.partner_id %} (ID {{ u.partner_id }}){% endif %}</div>
+              <div class="muted">Период: {{ u.start_date }} — {{ u.end_date }}</div>
+
+              <div class="children">
+                <div class="muted" style="margin-bottom: 6px;">Дети:</div>
+                {% if u.children %}
+                  {% for c in u.children %}
+                    <div class="muted">- {{ c.name }} (ID {{ c.child_id }})</div>
+                  {% endfor %}
+                {% else %}
+                  <div class="muted">— нет детей</div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="muted">Для этой персоны союзы не найдены.</div>
+        {% endif %}
+      </fieldset>
+
+      <div class="actions">
+        <a class="ghost" href="/family/person/{{ person.person_id }}">Открыть карточку</a>
+        <button type="submit">Сохранить изменения</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>
