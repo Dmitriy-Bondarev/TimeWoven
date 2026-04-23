@@ -1,13 +1,14 @@
+# ===== DATABASE & DATA =====
 # База данных (не в git - только SQL дампы)
 data/db/family.db
 data/db/family.db.backup*
 data/db/*.textClipping
 
-# Аудио файлы
+# Аудио и медиа-файлы
 data/processed/
 data/raw/
 
-# Python
+# ===== PYTHON & VENV =====
 __pycache__/
 *.pyc
 *.pyo
@@ -15,25 +16,38 @@ __pycache__/
 venv/
 .env
 
-# macOS
+# ===== MACOS & IDE =====
 .DS_Store
 .AppleDouble
-
-# IDE
 .vscode/
 .cursor/
 *.swp
-app/static/processed/
-app/static/avatars/
+
+# ===== APP GENERATED FILES =====
 family.db
 *.db
 backups/
+app/static/processed/
+app/static/avatars/
 
-# Временные файлы (папка temp/)
-# Сохраняем только .gitkeep и README.md
+# ===== TEMPORARY & LOCAL SANDBOX =====
+# Полностью игнорируем temp/, кроме маркеров и документации
 temp/*
 !temp/.gitkeep
 !temp/README.md
-.env
+!temp/project_docs/
+
+# Локальные дампы и эксперименты
+temp/project_docs/*
+!temp/project_docs/ADR.template.md
+!temp/project_docs/DB_CHANGELOG.template.md
+!temp/project_docs/TECH_PASSPORT.template.md
+!temp/project_docs/README.template.md
+!temp/project_docs/requirements.template.txt
+!temp/project_docs/README.md
+!temp/project_docs/examples/
+
+# ===== INFRA & CREDENTIALS =====
 hostkey_n8n
 hostkey_n8n.pub
+

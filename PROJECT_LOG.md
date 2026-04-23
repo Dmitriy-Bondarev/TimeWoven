@@ -1,5 +1,35 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T10 — Repository hygiene (docs/tech-docs/temp reorganization)
+
+Date: 2026-04-23
+
+### Structural change
+
+Yes
+
+### Schema change
+
+No
+
+### Changes
+
+- Инвентаризировано содержимое документационных папок.
+- **docs/** теперь содержит только публичные артефакты для GitHub Pages: `CNAME`, `logo.png`.
+  - Удалены: `DATABASE_SCHEMA.md` (перемещён в `tech-docs/`), `snapshots/` (перемещён в `tech-docs/snapshots/`), `PROJECT_LOG.md` (перемещён в корень репозитория).
+- **tech-docs/** стал центральным хранилищем архитектурной документации:
+  - `DATABASE_SCHEMA.md` — техническое описание схемы PostgreSQL.
+  - `adr/` — Architecture Decision Records (ADR-001 до ADR-006).
+  - `snapshots/` — снимки состояния структуры и графов для истории.
+  - `family-graph-snapshot-timeline-notes.md` — исследовательские заметки.
+  - `README.md` — индекс документации.
+- **temp/** остаётся рабочей песочницей, но полностью игнорируется git (кроме `.gitkeep` и `README.md`).
+  - `project_docs/` с шаблонами документации сохранена для справки.
+- **Корень репозитория:** `PROJECT_LOG.md` перемещён сюда для удобного доступа к операционному журналу.
+- `.gitignore` подтверждён и усилен правилами для `temp/`.
+
+**Результат:** репозиторий упорядочен, документация централизована в `tech-docs/`, граница между публичной документацией (`docs/`) и архитектурной (`tech-docs/`) ясна.
+
 ## Update: P1.14 — Exclude deceased relatives from who-am-I selector
 
 Date: 2026-04-22
