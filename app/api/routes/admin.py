@@ -36,14 +36,17 @@ def _clean_optional_text(value: object) -> str | None:
 
 
 def _normalize_preferred_channel(raw_value: object, is_alive: bool) -> str | None:
-    """Map UI channel values to DB-compatible values using canonical People.preferred_ch values."""
+    """Map UI channel values to DB-compatible values.
+
+    No channel is persisted as NULL for backward-compatible DB constraints.
+    """
     normalized = str(raw_value or "").strip().upper()
 
     if not normalized:
-        return "None"
+        return None
 
     if normalized in {"NONE", "NO", "NULL", "НЕ ЗАДАН", "НЕТ КАНАЛА", "NONE/NULL"}:
-        return "None"
+        return None
     if normalized == "MAX":
         return "Max"
     if normalized == "TG":
