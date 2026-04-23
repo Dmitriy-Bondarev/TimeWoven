@@ -14,7 +14,10 @@ CREATE TABLE IF NOT EXISTS "People" (
     successor_id    INTEGER REFERENCES "People"(person_id),
     default_lang    VARCHAR NOT NULL DEFAULT 'ru',
     phone           VARCHAR,
-    preferred_ch    VARCHAR CHECK (preferred_ch IN ('TG', 'Email', 'Push')),
+    preferred_ch    VARCHAR CHECK (preferred_ch IN ('Max', 'TG', 'Email', 'Push', 'None')),
+    messenger_max_id VARCHAR UNIQUE,
+    messenger_tg_id VARCHAR UNIQUE,
+    contact_email   VARCHAR,
     avatar_url      VARCHAR,
     pin             VARCHAR
 );

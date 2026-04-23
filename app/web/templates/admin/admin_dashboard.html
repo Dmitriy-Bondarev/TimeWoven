@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Панель администратора</title>
+  <style>
+    :root { --bg: #020617; --card: #0f172a; --text: #e5e7eb; --muted: #94a3b8; --accent: #f59e0b; --ok: #22c55e; --hover: #1e293b; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; padding: 32px 24px; }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 32px; color: var(--accent); }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 40px; }
+    .tile { 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center; 
+      background: linear-gradient(135deg, var(--card) 0%, #1a2a3a 100%);
+      border: 2px solid #1e293b;
+      border-radius: 16px;
+      padding: 32px;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-height: 200px;
+    }
+    .tile:hover {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, var(--hover) 0%, #243649 100%);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(245, 158, 11, 0.15);
+    }
+    .tile-icon { font-size: 48px; margin-bottom: 16px; }
+    .tile-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; text-align: center; }
+    .tile-desc { font-size: 13px; color: var(--muted); text-align: center; }
+    .section-title { 
+      font-size: 14px; 
+      font-weight: 700; 
+      color: var(--accent); 
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+      margin-top: 40px;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+    .explorer-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .mini-btn { text-decoration: none; color: #020617; background: var(--accent); border-radius: 8px; padding: 8px 10px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; }
+    .mini-btn:hover { opacity: 0.9; }
+    .mini-btn.secondary { color: var(--text); background: #334155; }
+    .pw-box { margin-top: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 16px; font-weight: 700; color: var(--accent); border: 1px solid #334155; border-radius: 8px; padding: 6px 10px; background: #020617; }
+    .muted-note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>🔧 Панель администратора</h1>
+
+  <div class="section-title">Основные функции</div>
+  <div class="dashboard-grid">
+    <a href="/admin/transcriptions" class="tile">
+      <div class="tile-icon">📝</div>
+      <div class="tile-title">Транскрипции</div>
+      <div class="tile-desc">Проверка и редактирование записей</div>
+    </a>
+    <a href="/admin/people" class="tile">
+      <div class="tile-icon">👥</div>
+      <div class="tile-title">Люди & Семья</div>
+      <div class="tile-desc">Управление персонами и семейным деревом</div>
+    </a>
+    <a href="/admin/avatars" class="tile">
+      <div class="tile-icon">🖼️</div>
+      <div class="tile-title">Загрузка аватаров</div>
+      <div class="tile-desc">Управление фотографиями персон</div>
+    </a>
+    <a href="/explorer" class="tile">
+      <div class="tile-icon">🧭</div>
+      <div class="tile-title">TW Explorer</div>
+      <div class="tile-desc">Структура проекта, changelog и предпросмотр файлов</div>
+    </a>
+    <div class="tile" id="tw-explorer-access">
+      <div class="tile-icon">🔐</div>
+      <div class="tile-title">Доступ к TW Explorer</div>
+      <div class="tile-desc">Пароль дня скрыт до запроса</div>
+      <div class="explorer-actions">
+        <button class="mini-btn secondary" id="show-explorer-password" type="button">Показать пароль дня</button>
+        <a href="/explorer/" class="mini-btn">Открыть Explorer</a>
+      </div>
+      <div id="explorer-password-box" class="pw-box" style="display:none;"></div>
+      <div id="explorer-password-error" class="muted-note"></div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const button = document.getElementById("show-explorer-password");
+      const box = document.getElementById("explorer-password-box");
+      const error = document.getElementById("explorer-password-error");
+
+      if (!button || !box || !error) {
+        return;
+      }
+
+      button.addEventListener("click", async function() {
+        error.textContent = "";
+        button.disabled = true;
+        button.textContent = "Загрузка...";
+
+        try {
+          const response = await fetch("/explorer/get-daily-password", { credentials: "same-origin" });
+          if (!response.ok) {
+            throw new Error("Не удалось получить пароль дня");
+          }
+
+          const data = await response.json();
+          box.textContent = data.password || "Пароль не найден";
+          box.style.display = "block";
+          button.textContent = "Обновить пароль";
+        } catch (e) {
+          error.textContent = "Не удалось загрузить пароль дня.";
+          button.textContent = "Показать пароль дня";
+        } finally {
+          button.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -2,18 +2,70 @@ import os
 import logging
 import json
 from datetime import datetime, timedelta
+from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Request
+import httpx
 from sqlalchemy import func
 
 from app.bot.max_messenger import MaxMessengerBot
 from app.db.session import SessionLocal
 from app.models import Memory, Person, PersonI18n
+from app.services.ai_analyzer import analyze_memory_text
+from app.services.memory_store import attach_analysis_to_memory, create_memory_from_max
 
 
 router = APIRouter(prefix="/webhooks/maxbot", tags=["MaxBot Webhooks"])
 MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "").strip()
 logger = logging.getLogger(__name__)
+BASE_DIR = Path(__file__).resolve().parents[2]
+RAW_AUDIO_DIR = BASE_DIR / "web" / "static" / "audio" / "raw"
+
+
+def _sanitize_identifier(raw_value: str, fallback: str = "audio") -> str:
+    cleaned = "".join(ch for ch in str(raw_value) if ch.isalnum() or ch in ("-", "_"))
+    return cleaned[:80] if cleaned else fallback
+
+
+def _guess_audio_extension(audio_url: str) -> str:
+    try:
+        parsed = urlparse(audio_url)
+        suffix = Path(parsed.path).suffix.lower()
+    except Exception:
+        suffix = ""
+    if suffix and len(suffix) <= 8:
+        return suffix
+    return ".ogg"
+
+
+def _download_audio_to_raw(audio_url: str, attachment_id: str) -> str | None:
+    RAW_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    safe_attachment_id = _sanitize_identifier(attachment_id, fallback="attachment")
+    extension = _guess_audio_extension(audio_url)
+    filename = f"max_{safe_attachment_id}_{timestamp}{extension}"
+    target_path = RAW_AUDIO_DIR / filename
+
+    try:
+        with httpx.stream("GET", audio_url, timeout=30.0, follow_redirects=True) as response:
+            response.raise_for_status()
+            with target_path.open("wb") as file_handle:
+                for chunk in response.iter_bytes(chunk_size=8192):
+                    if chunk:
+                        file_handle.write(chunk)
+    except Exception as exc:
+        if target_path.exists():
+            target_path.unlink(missing_ok=True)
+        logger.warning(
+            "Failed to download MAX audio attachment_id=%s from url=%s: %s",
+            attachment_id,
+            audio_url,
+            exc,
+        )
+        return None
+
+    return f"/static/audio/raw/{filename}"
 
 
 def _extract_max_id(payload: dict) -> str:
@@ -255,20 +307,31 @@ def _link_or_create_person_by_contact(db, user_id: str, first_name: str) -> Pers
     return person
 
 
-def _save_pending_audio_memory(db, max_id: str, person_id: int | None, audio_url: str, attachment_id: str) -> Memory:
+def _save_pending_audio_memory(
+    db,
+    max_id: str,
+    person_id: int | None,
+    audio_url: str,
+    attachment_id: str,
+    local_audio_path: str | None = None,
+    download_error: str | None = None,
+) -> Memory:
+    metadata: dict[str, str] = {
+        "attachment_id": attachment_id,
+        "audio_url": audio_url,
+        "max_user_id": max_id,
+    }
+    if local_audio_path:
+        metadata["local_audio_path"] = local_audio_path
+    if download_error:
+        metadata["audio_download_error"] = download_error
+
     memory = Memory(
         author_id=person_id,
         created_by=person_id,
         content_text="",
         audio_url=audio_url,
-        transcript_verbatim=json.dumps(
-            {
-                "attachment_id": attachment_id,
-                "audio_url": audio_url,
-                "max_user_id": max_id,
-            },
-            ensure_ascii=False,
-        ),
+        transcript_verbatim=json.dumps(metadata, ensure_ascii=False),
         source_type="max_audio_attachment",
         transcription_status="pending_manual_text",
         created_at=datetime.utcnow().isoformat(),
@@ -318,17 +381,13 @@ def _link_pending_manual_text(memory: Memory, text: str) -> None:
 
 @router.post("/incoming")
 async def incoming_webhook(request: Request):
-    raw_body = await request.body()
-    with open("webhook_test.log", "a") as f:
-        f.write(f"Received raw body: {raw_body.decode('utf-8', errors='replace')}\n")
-
     try:
         payload = await request.json()
-    except Exception as error:
-        error_message = f"Error processing webhook: {error}"
-        logger.exception(error_message)
-        with open("webhook_test.log", "a") as f:
-            f.write(f"{error_message}\n")
+    except Exception:
+        logger.warning("MAX webhook rejected: invalid JSON payload")
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
     message_payload = payload.get("message") if isinstance(payload.get("message"), dict) else {}
@@ -341,10 +400,7 @@ async def incoming_webhook(request: Request):
         "message.body.attachments": message_body.get("attachments"),
     }
     if any(value is not None for value in media_fragments.values()):
-        with open("webhook_test.log", "a") as f:
-            f.write("MEDIA_DETECTED: ")
-            f.write(json.dumps(media_fragments, ensure_ascii=False))
-            f.write("\n")
+        logger.info("MAX webhook: media fragments detected")
 
     incoming_secret = request.headers.get("X-Max-Bot-Api-Secret", "").strip()
     if not MAX_WEBHOOK_SECRET or incoming_secret != MAX_WEBHOOK_SECRET:
@@ -358,6 +414,8 @@ async def incoming_webhook(request: Request):
 
     if not max_id:
         raise HTTPException(status_code=400, detail="Missing max_id or user_id/from_id in payload")
+    if not message_text and not audio_attachment and not contact_items:
+        raise HTTPException(status_code=400, detail="Missing text in payload")
 
     db = SessionLocal()
     try:
@@ -380,25 +438,28 @@ async def incoming_webhook(request: Request):
                     contact["user_id"],
                     linked_person.person_id,
                 )
-                with open("webhook_test.log", "a") as f:
-                    f.write(
-                        f"PERSON_LINKED: {contact['first_name']} ID: {contact['user_id']} "
-                        f"(person_id={linked_person.person_id})\n"
-                    )
 
-        if audio_attachment:
+        if audio_attachment and not message_text:
+            local_audio_path = _download_audio_to_raw(
+                audio_url=audio_attachment["audio_url"],
+                attachment_id=audio_attachment["attachment_id"],
+            )
+
             saved_memory = _save_pending_audio_memory(
                 db=db,
                 max_id=max_id,
                 person_id=person.person_id if person else None,
                 audio_url=audio_attachment["audio_url"],
                 attachment_id=audio_attachment["attachment_id"],
+                local_audio_path=local_audio_path,
+                download_error=None if local_audio_path else "download_failed",
             )
             logger.info(
-                "Saved pending audio memory %s for max_id=%s attachment_id=%s",
+                "Saved pending audio memory %s for max_id=%s attachment_id=%s local_audio=%s",
                 saved_memory.id,
                 max_id,
                 audio_attachment["attachment_id"],
+                bool(local_audio_path),
             )
             prompt_text = "Аудио получено. Пришлите следом текст, и я привяжу его к записи."
             await bot.send_message(user_id=max_id, text=prompt_text)
@@ -429,19 +490,53 @@ async def incoming_webhook(request: Request):
                     "memory_id": pending_memory.id,
                 }
 
-        if person:
-            person_name = _resolve_person_name(db, person)
-            logger.info("User %s identified. Text: %s", person_name, message_text)
-            greeting = f"Привет, {person_name}! Я тебя узнал."
-            await bot.send_message(user_id=max_id, text=greeting)
+            save_result = create_memory_from_max(
+                user_id=max_id,
+                text=message_text,
+                raw_payload=payload,
+            )
+            if not save_result.get("saved"):
+                logger.error(
+                    "MAX webhook save failed for user_id=%s: %s",
+                    max_id,
+                    save_result.get("error"),
+                )
+                raise HTTPException(status_code=500, detail="Failed to save memory")
+
+            analysis_result = analyze_memory_text(message_text)
+            analysis_status = str(analysis_result.get("status", "unknown"))
+            analysis_provider = str(analysis_result.get("raw_provider", "unknown"))
+
+            memory_id = save_result.get("memory_id")
+            if isinstance(memory_id, int):
+                persist_analysis_result = attach_analysis_to_memory(memory_id, analysis_result)
+                if not persist_analysis_result.get("saved"):
+                    logger.warning(
+                        "MAX webhook analysis metadata save skipped for memory_id=%s: %s",
+                        memory_id,
+                        persist_analysis_result.get("error"),
+                    )
+
+            logger.info(
+                "MAX webhook analysis completed user_id=%s memory_id=%s provider=%s status=%s",
+                max_id,
+                memory_id,
+                analysis_provider,
+                analysis_status,
+            )
+
+            response_text = "Спасибо, я сохранил эту историю в семейный архив."
+            await bot.send_message(user_id=max_id, text=response_text)
             return {
                 "status": "ok",
-                "identified": True,
-                "person_id": person.person_id,
-                "response_text": greeting,
+                "identified": bool(person),
+                "person_id": save_result.get("person_id"),
+                "memory_id": save_result.get("memory_id"),
+                "analysis_status": analysis_status,
+                "analysis_provider": analysis_provider,
+                "response_text": response_text,
             }
 
-        logger.info("Unknown user with max_id: %s. Text: %s", max_id, message_text)
         onboarding_question = "Как мне вас называть?"
         await bot.send_message(user_id=max_id, text=onboarding_question)
         return {

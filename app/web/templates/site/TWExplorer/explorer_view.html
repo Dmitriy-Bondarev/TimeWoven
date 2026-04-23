@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TW Explorer</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #121a2b;
+      --line: #25304a;
+      --text: #e6edf7;
+      --muted: #9aa9c2;
+      --accent: #38bdf8;
+      --warn: #f97316;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", sans-serif; background: radial-gradient(circle at top right, #111f3d 0%, var(--bg) 55%); color: var(--text); min-height: 100vh; padding: 28px 20px; }
+    .wrap { max-width: 1300px; margin: 0 auto; }
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .title { font-size: 28px; font-weight: 700; }
+    .back { color: var(--muted); text-decoration: none; }
+    .back:hover { color: var(--text); }
+    .card { border: 1px solid var(--line); background: rgba(18, 26, 43, 0.92); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    .auth-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .auth-form input { background: #0d1526; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 8px 10px; min-width: 220px; }
+    .btn { background: var(--accent); color: #071018; border: none; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .section-title { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .tree { list-style: none; padding-left: 0; }
+    .tree ul { list-style: none; margin-left: 18px; padding-left: 10px; border-left: 1px dashed var(--line); }
+    .tree li { margin: 6px 0; }
+    .node-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .node-path { color: var(--muted); font-size: 12px; }
+    .preview-link { color: var(--accent); font-size: 12px; text-decoration: none; }
+    .preview-link:hover { text-decoration: underline; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #0a1120; border: 1px solid var(--line); border-radius: 10px; padding: 12px; max-height: 420px; overflow: auto; }
+    .notice { color: var(--muted); font-size: 13px; }
+    .error { color: var(--warn); font-weight: 600; }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1 class="title">TW Explorer</h1>
+      {% if from_admin %}
+        <a href="/admin" class="back">← Назад в админ-панель</a>
+      {% endif %}
+    </div>
+
+    {% if not authorized %}
+      <div class="card">
+        <div class="section-title">Доступ по паролю дня</div>
+        <p class="notice" style="margin-bottom: 10px;">Введите ежедневный пароль для доступа к структуре проекта и логам.</p>
+        {% if auth_error %}
+          <p style="color: var(--warn); margin-bottom: 8px;">{{ auth_error }}</p>
+        {% endif %}
+        <form class="auth-form" method="post" action="/explorer/login{% if from_admin %}?from_admin=1{% endif %}">
+          <input type="password" name="password" placeholder="Пароль дня" required>
+          <button class="btn" type="submit">Открыть Explorer</button>
+        </form>
+      </div>
+    {% else %}
+      <div class="layout">
+        <div>
+          <div class="card">
+            <div class="section-title">Структура проекта</div>
+            <ul class="tree">
+              {% for node in tree recursive %}
+                <li>
+                  {% if node.type == "dir" %}
+                    <div class="node-line">📁 <strong>{{ node.name }}</strong> <span class="node-path">{{ node.path }}</span></div>
+                    {% if node.children %}
+                      <ul>{{ loop(node.children) }}</ul>
+                    {% endif %}
+                  {% else %}
+                    <div class="node-line">
+                      <span>📄 {{ node.name }}</span>
+                      <span class="node-path">{{ node.path }}</span>
+                      {% if node.previewable %}
+                        <a class="preview-link" href="/explorer/?file={{ node.path|urlencode }}{% if from_admin %}&from_admin=1{% endif %}">предпросмотр</a>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="section-title">CHANGELOG.md</div>
+            <pre>{{ changelog_content }}</pre>
+          </div>
+
+          <div class="card">
+            <div class="section-title">Предпросмотр файла</div>
+            {% if preview_error %}
+              <div class="error" style="margin-bottom: 10px;">{{ preview_error }}</div>
+            {% endif %}
+            {% if preview_path %}
+              <p class="notice" style="margin-bottom: 10px;">Файл: {{ preview_path }}</p>
+              <pre>{{ preview_content }}</pre>
+            {% else %}
+              <p class="notice">Выберите файл с расширением .py, .html, .md или .sql в дереве слева.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

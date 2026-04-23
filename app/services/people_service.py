@@ -1,0 +1,82 @@
+from sqlalchemy.orm import Session
+
+from app.models import Person, PersonI18n
+
+
+def _to_flag(value: bool | int | None, default: int) -> int:
+    if value is None:
+        return default
+    return 1 if bool(value) else 0
+
+
+def _optional_text(value: object) -> str | None:
+    cleaned = str(value or "").strip()
+    return cleaned or None
+
+
+def create_person_with_i18n(
+    db: Session,
+    person_data: dict,
+    ru_data: dict,
+    en_data: dict | None = None,
+) -> Person:
+    """Create one People row and related RU/EN People_I18n rows in one transaction."""
+    ru_first_name = str((ru_data or {}).get("first_name") or "").strip()
+    if not ru_first_name:
+        raise ValueError("Поле first_name_ru обязательно")
+
+    person_payload = person_data or {}
+    person = Person(
+        gender=_optional_text(person_payload.get("gender")) or "Unknown",
+        is_alive=_to_flag(person_payload.get("is_alive"), default=1),
+        role=_optional_text(person_payload.get("role")) or "placeholder",
+        default_lang=_optional_text(person_payload.get("default_lang")) or "ru",
+        birth_date=_optional_text(person_payload.get("birth_date")),
+        birth_date_prec=_optional_text(person_payload.get("birth_date_prec")),
+        death_date=_optional_text(person_payload.get("death_date")),
+        death_date_prec=_optional_text(person_payload.get("death_date_prec")),
+        phone=_optional_text(person_payload.get("phone")),
+        preferred_ch=_optional_text(person_payload.get("preferred_ch")),
+        contact_email=_optional_text(person_payload.get("contact_email")),
+        avatar_url=_optional_text(person_payload.get("avatar_url")),
+        is_user=_to_flag(person_payload.get("is_user"), default=0),
+        messenger_max_id=(
+            _optional_text(person_payload.get("max_user_id"))
+            or _optional_text(person_payload.get("messenger_max_id"))
+        ),
+    )
+
+    try:
+        db.add(person)
+        db.flush()
+
+        db.add(
+            PersonI18n(
+                person_id=person.person_id,
+                lang_code="ru",
+                first_name=ru_first_name,
+                last_name=(ru_data or {}).get("last_name"),
+                patronymic=(ru_data or {}).get("patronymic"),
+                biography=(ru_data or {}).get("biography"),
+            )
+        )
+
+        en_first_name = str((en_data or {}).get("first_name") or "").strip()
+        if en_first_name:
+            db.add(
+                PersonI18n(
+                    person_id=person.person_id,
+                    lang_code="en",
+                    first_name=en_first_name,
+                    last_name=(en_data or {}).get("last_name"),
+                    patronymic=(en_data or {}).get("patronymic"),
+                    biography=(en_data or {}).get("biography"),
+                )
+            )
+
+        db.commit()
+        db.refresh(person)
+        return person
+    except Exception:
+        db.rollback()
+        raise

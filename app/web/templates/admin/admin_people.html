@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Контроль данных — люди</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #020617; --card: #0f172a; --text: #e5e7eb; --muted: #94a3b8; --accent: #f59e0b; --ok: #22c55e; --warn: #ef4444; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; padding: 32px 24px; }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 24px; color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid #1e293b; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+    tr:hover td { background: #0f172a; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+    .no-avatar { width: 36px; height: 36px; border-radius: 50%; background: #1e293b; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--warn); }
+    .badge-ok { color: var(--ok); font-weight: 600; }
+    .badge-warn { color: var(--warn); font-weight: 600; }
+    .muted { color: var(--muted); }
+    .upload-link { color: var(--accent); text-decoration: none; font-size: 12px; }
+    .upload-link:hover { text-decoration: underline; }
+    .count { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <a href="/admin" class="back" style="color: var(--muted); font-size: 13px; text-decoration: none; display: inline-block; margin-bottom: 20px;">&larr; Назад в панель</a>
+  <a href="/admin/people/new" style="color: #020617; background: var(--accent); font-size: 13px; text-decoration: none; display: inline-block; margin-left: 10px; margin-bottom: 20px; padding: 8px 12px; border-radius: 8px; font-weight: 700;">+ Новая персона</a>
+  <h1>👥 Контроль качества данных — люди</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Аватар</th>
+        <th>Имя</th>
+        <th>Роль</th>
+        <th>Телефон</th>
+        <th>Канал</th>
+        <th>Max ID</th>
+        <th>Telegram</th>
+        <th>Email</th>
+        <th>Жив</th>
+        <th>Воспом.</th>
+        <th>Цитаты</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="muted">{{ r.person_id }}</td>
+        <td>
+          {% if r.avatar_url %}
+            <img src="{{ r.avatar_url }}" class="avatar" alt="{{ r.name }}">
+          {% else %}
+            <div class="no-avatar">нет</div>
+          {% endif %}
+        </td>
+        <td>
+          <a href="/family/person/{{ r.person_id }}" style="color: inherit; text-decoration: none;">{{ r.name }}</a>
+          {% if not r.avatar_url %}
+            <br><a href="/admin/avatars" class="upload-link">↑ загрузить фото</a>
+          {% endif %}
+        </td>
+        <td class="muted">{{ r.role }}</td>
+        <td class="{% if r.phone == '—' %}badge-warn{% else %}badge-ok{% endif %}">{{ r.phone }}</td>
+        <td class="{% if r.preferred_ch == '—' %}badge-warn{% else %}badge-ok{% endif %}">{{ r.preferred_ch }}</td>
+        <td class="{% if r.messenger_max_id %}badge-ok{% else %}badge-warn{% endif %}">{{ r.messenger_max_id or '—' }}</td>
+        <td class="{% if r.messenger_tg_id %}badge-ok{% else %}badge-warn{% endif %}">{{ r.messenger_tg_id or '—' }}</td>
+        <td class="{% if r.contact_email %}badge-ok{% else %}badge-warn{% endif %}">{{ r.contact_email or '—' }}</td>
+        <td class="{% if r.is_alive %}badge-ok{% else %}muted{% endif %}">
+          {% if r.is_alive %}да{% else %}—{% endif %}
+        </td>
+        <td class="count {% if r.memories_count == 0 %}badge-warn{% else %}badge-ok{% endif %}">{{ r.memories_count }}</td>
+        <td class="count {% if r.quotes_count == 0 %}muted{% else %}badge-ok{% endif %}">{{ r.quotes_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

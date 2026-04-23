@@ -1,32 +1,28 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-PROJECT_DIR="/root/projects/TimeWoven"
-SOURCE_DIR="$PROJECT_DIR/docs"
-TARGET_DIR="/var/www/timewoven"
+# SINGLE SOURCE OF TRUTH:
+# app/web/templates/site/landing.html
 
-echo "==> TimeWoven landing deploy started"
-cd "$PROJECT_DIR"
+SOURCE="/root/projects/TimeWoven/app/web/templates/site/landing.html"
+DEST="/var/www/timewoven/index.html"
+ICON_SOURCE="/root/projects/TimeWoven/app/web/static/logo-128.png"
+ICON_DEST="/var/www/timewoven/logo-128.png"
 
-echo "==> Git status before deploy"
-git status --short || true
+echo "Deploying landing..."
 
-echo "==> Copying landing files"
-mkdir -p "$TARGET_DIR"
-cp -f "$SOURCE_DIR"/index.html "$TARGET_DIR"/
-cp -f "$SOURCE_DIR"/logo.png "$TARGET_DIR"/
+sudo cp -f $SOURCE $DEST
+sudo chown www-data:www-data $DEST
+sudo chmod 644 $DEST
 
-if [ -f "$SOURCE_DIR/CNAME" ]; then
-  cp -f "$SOURCE_DIR"/CNAME "$TARGET_DIR"/
-fi
+sudo cp -f $ICON_SOURCE $ICON_DEST
+sudo chown www-data:www-data $ICON_DEST
+sudo chmod 644 $ICON_DEST
 
-echo "==> Setting permissions"
-chown -R www-data:www-data "$TARGET_DIR"
-find "$TARGET_DIR" -type d -exec chmod 755 {} \;
-find "$TARGET_DIR" -type f -exec chmod 644 {} \;
+echo "Reloading nginx..."
+sudo systemctl reload nginx
 
-echo "==> Testing nginx"
-nginx -t
+echo "Done."
 
-echo "==> Deploy complete"
-ls -la "$TARGET_DIR"
+echo "Checking result:"
+curl -I https://timewoven.ru
+curl -I https://timewoven.ru/logo-128.png

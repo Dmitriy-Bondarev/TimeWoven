@@ -42,12 +42,19 @@ class MaxMessengerBot:
             logger.warning("MAX_BOT_TOKEN is not set; outgoing message was skipped")
             return {"sent": False, "reason": "MAX_BOT_TOKEN is not set"}
 
-        send_url = "https://platform-api.max.ru/messages?chat_id=263777431"
+        normalized_user_id = str(user_id or "").strip()
+        if not normalized_user_id:
+            return {"sent": False, "reason": "user_id is required"}
+
+        send_url = self.send_url
         headers = {
             "Authorization": self.api_token,
             "Content-Type": "application/json",
         }
-        payload = {"text": text}
+        payload = {
+            "chat_id": normalized_user_id,
+            "text": text,
+        }
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:

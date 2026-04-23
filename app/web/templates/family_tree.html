@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  /* ── Wrapper ─────────────────────────────── */
+  #graph-wrapper { position: relative; width: 100%; }
+
+  /* ── Graph canvas ────────────────────────── */
+  #graph {
+    width: 100%;
+    height: calc(100vh - 280px);
+    min-height: 480px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 4px 4px 0 0;
+  }
+  svg { cursor: grab; }
+  svg:active { cursor: grabbing; }
+
+  /* ── Edges ───────────────────────────────── */
+  .edge { stroke-linecap: round; }
+  .edge-partner { stroke: #4a90e2; }
+  .edge-child   { stroke: #22c55e; stroke-dasharray: 7 3; }
+
+  /* ── Controls panel ─────────────────────── */
+  .graph-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .ctrl-group { display: flex; align-items: center; gap: 6px; }
+  .ctrl-spacer { flex: 1; }
+  .ctrl-label  { color: #888; font-size: 12px; white-space: nowrap; }
+  .ctrl-btn {
+    padding: 3px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: #f9fafb;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.5;
+    transition: background .12s, border-color .12s, color .12s, opacity .12s;
+  }
+  .ctrl-btn:hover:not(:disabled) { background: #edf2f7; border-color: #9ca3af; }
+  .ctrl-btn:disabled {
+    opacity: .42;
+    cursor: default;
+    background: #f3f4f6;
+    color: #9ca3af;
+  }
+  .ctrl-btn.active  { background: #3f7cc3; color: #fff; border-color: #3f7cc3; }
+  .ctrl-toggle {
+    display: inline-flex;
+    border: 1px solid #cfd8e3;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8fafc;
+  }
+  .ctrl-toggle .ctrl-btn {
+    border: none;
+    border-right: 1px solid #cfd8e3;
+    border-radius: 0;
+    min-width: 82px;
+  }
+  .ctrl-toggle .ctrl-btn:last-child { border-right: none; }
+  .ctrl-toggle .ctrl-btn.active {
+    background: #2f5f94;
+    color: #fff;
+  }
+  #btn-back:disabled,
+  #btn-forward:disabled {
+    opacity: .32;
+    border-color: #e5e7eb;
+  }
+  .ctrl-input {
+    width: 86px;
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+    background: #fff;
+    color: #222;
+  }
+  .ctrl-input:disabled {
+    background: #f3f4f6;
+    color: #9ca3af;
+    border-color: #e5e7eb;
+  }
+  .ctrl-year-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 2px;
+    flex-wrap: wrap;
+  }
+  .ctrl-year-block {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ctrl-year-slider-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ctrl-year-slider-label {
+    font-size: 11px;
+    color: #6b7280;
+    white-space: nowrap;
+  }
+  #year-slider {
+    width: 340px;
+    max-width: 55vw;
+  }
+  #year-slider:disabled {
+    opacity: .5;
+    cursor: default;
+  }
+  .ctrl-year-help {
+    font-size: 11px;
+    color: #9ca3af;
+  }
+  .ctrl-keyframe-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .ctrl-keyframe-nav.keyframe-mode-on {
+    background: #f2f7fd;
+    border: 1px solid #cfe0f3;
+    border-radius: 8px;
+    padding: 3px 6px;
+  }
+  .ctrl-keyframe-year {
+    min-width: 88px;
+    text-align: center;
+    font-size: 11px;
+    color: #4b5563;
+    font-weight: 600;
+    border-radius: 5px;
+    transition: background-color .18s ease, color .18s ease;
+  }
+  .ctrl-keyframe-year.is-flash {
+    background: #d9ecff;
+    color: #1f3b58;
+  }
+  #depth-display { min-width: 18px; text-align: center; font-weight: 600; color: #333; }
+  #focus-name    { color: #4a90e2; font-weight: 500; max-width: 160px;
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Hover tooltip (name only, no actions) ── */
+  #graph-tooltip {
+    position: absolute;
+    background: rgba(26,26,46,.82);
+    color: #e8e8f0;
+    padding: 4px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    display: none;
+    z-index: 100;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,.22);
+  }
+
+  /* ── Bottom info panel ───────────────────── */
+  #graph-info-panel {
+    margin-top: 10px;
+    padding: 14px 16px;
+    background: #fffdf9;
+    border: 1px solid #ddd4ca;
+    border-radius: 6px;
+    font-size: 13px;
+    min-height: 64px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .gip-placeholder { color: #9ca3af; font-size: 13px; }
+  .gip-content { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; width: 100%; }
+  .gip-main { display: flex; flex-direction: column; gap: 6px; min-width: 320px; max-width: 880px; }
+  .gip-name {
+    font-weight: 700;
+    font-size: 15px;
+    color: #1f1a17;
+    letter-spacing: .01em;
+  }
+  .gip-meta {
+    color: #6d655f;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .gip-section {
+    display: block;
+    margin: 0;
+  }
+  .gip-key {
+    color: #7f746c;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .gip-temporal {
+    color: #244868;
+    background: #eef5fb;
+    border: 1px solid #d7e7f7;
+    border-radius: 5px;
+    padding: 2px 8px;
+    display: inline-block;
+  }
+  .gip-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .gip-btn {
+    padding: 5px 13px;
+    border: 1px solid #ddd4ca;
+    border-radius: 5px;
+    background: #f6f2ea;
+    color: #1f1a17;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .gip-btn:hover { background: #f2e8dc; border-color: #c9b8a8; }
+  .gip-btn.gip-primary {
+    background: #7d4c2e;
+    color: #fff;
+    border-color: #7d4c2e;
+  }
+  .gip-btn.gip-primary:hover { background: #5f3820; border-color: #5f3820; }
+  .gip-btn.gip-secondary {
+    background: #f6f2ea;
+    border-color: #d7c8b9;
+  }
+  .gip-btn.gip-secondary:hover {
+    background: #eee3d6;
+    border-color: #c9b8a8;
+  }
+</style>
+
+<h1 style="margin-bottom: 4px;">Семейный граф</h1>
+<p style="color: #888; font-size: 13px; margin: 0 0 10px;">
+  Клик — выбрать персону. Правая кнопка — сменить корень. Колёсико — масштаб. Drag — перемещение.
+</p>
+
+<div id="graph-wrapper">
+  <div id="graph"></div>
+  <div id="graph-tooltip"></div>
+
+  <div class="graph-controls">
+    <!-- Focus history -->
+    <div class="ctrl-group">
+      <button id="btn-back"    class="ctrl-btn" disabled title="Назад по фокусу">←</button>
+      <button id="btn-forward" class="ctrl-btn" disabled title="Вперёд по фокусу">→</button>
+      <span class="ctrl-label">Фокус:&nbsp;<span id="focus-name">—</span></span>
+    </div>
+
+    <div class="ctrl-spacer"></div>
+
+    <!-- Depth -->
+    <div class="ctrl-group">
+      <span class="ctrl-label">Глубина:</span>
+      <button id="btn-depth-dec" class="ctrl-btn">−</button>
+      <span id="depth-display">{{ depth }}</span>
+      <button id="btn-depth-inc" class="ctrl-btn">+</button>
+    </div>
+
+    <!-- Temporal mode -->
+    <div class="ctrl-group">
+      <span class="ctrl-label">Режим:</span>
+      <div class="ctrl-toggle" role="group" aria-label="Temporal режим">
+        <button id="btn-mode-now" class="ctrl-btn active" title="Текущее состояние графа">Сейчас</button>
+        <button id="btn-mode-year" class="ctrl-btn" title="Состояние графа на выбранный год">По году</button>
+      </div>
+      <div class="ctrl-year-wrap">
+        <input id="year-input" class="ctrl-input" type="number" min="1900" max="2100" value="{{ year or '' }}" placeholder="Год" title="Год для temporal-режима" />
+        <div class="ctrl-year-block">
+          <div class="ctrl-year-slider-row">
+            <span class="ctrl-year-slider-label">Шкала времени</span>
+            <input id="year-slider" type="range" min="1900" max="2100" step="1" value="{{ year or '' }}" title="Год для режима «По году»" />
+          </div>
+          <div id="keyframe-nav" class="ctrl-keyframe-nav" aria-label="Навигация по temporal-кадрам">
+            <button id="btn-keyframe-prev" class="ctrl-btn" title="Предыдущий temporal-кадр">‹ предыдущий слой</button>
+            <span id="keyframe-year" class="ctrl-keyframe-year">Кадр: —</span>
+            <button id="btn-keyframe-next" class="ctrl-btn" title="Следующий temporal-кадр">следующий слой ›</button>
+            <button id="btn-keyframe-mode" class="ctrl-btn" aria-pressed="false" title="Включить режим навигации по слоям времени">Слои времени: OFF</button>
+          </div>
+          <span class="ctrl-year-help">Год для режима «По году»</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="ctrl-group">
+      <span class="ctrl-label">Показать:</span>
+      <button class="ctrl-btn active" data-filter="partner">Партнёры</button>
+      <button class="ctrl-btn active" data-filter="child">Дети</button>
+      <button class="ctrl-btn active" data-filter="deceased">Умершие</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom contextual panel -->
+<div id="graph-info-panel">
+  <div class="gip-placeholder">Кликните по персоне на графе</div>
+  <div class="gip-content" style="display:none">
+    <div class="gip-main">
+      <div class="gip-name"></div>
+      <div class="gip-meta"></div>
+    </div>
+    <div class="gip-actions"></div>
+  </div>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+  window.GRAPH_ROOT_PERSON_ID = {{ root_person_id }};
+  window.GRAPH_DEPTH          = {{ depth }};
+  window.GRAPH_YEAR           = {{ year if year is not none else 'null' }};
+</script>
+<script src="/static/js/family_graph.js?v=6c3_1"></script>
+{% endblock %}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TimeWoven — Воспоминание</title>
+  <style>
+    :root {
+      --bg-0: #0f172a;
+      --bg-1: #1e293b;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #f59e0b;
+      --card: rgba(15, 23, 42, 0.78);
+      --line: rgba(148, 163, 184, 0.3);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, rgba(245, 158, 11, 0.28), transparent 60%),
+        radial-gradient(1000px 500px at 90% -20%, rgba(14, 165, 233, 0.18), transparent 58%),
+        linear-gradient(150deg, var(--bg-0) 0%, var(--bg-1) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .welcome {
+      width: 100%;
+      max-width: 960px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 28px;
+      background: var(--card);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 18px 54px rgba(2, 6, 23, 0.45);
+    }
+    .label {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: #fde68a;
+      margin-bottom: 14px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.05;
+      font-weight: 700;
+    }
+    .subtitle {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+      max-width: 720px;
+    }
+    .memory {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+    .memory-text {
+      margin: 0;
+      font-size: clamp(19px, 2.7vw, 29px);
+      line-height: 1.42;
+      font-weight: 500;
+      white-space: pre-wrap;
+    }
+    .meta {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      object-fit: cover;
+      border: 1px solid var(--line);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-weight: 600;
+      font-size: 14px;
+      transition: transform .15s ease, opacity .15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: var(--accent);
+      color: #1f2937;
+    }
+    .btn-secondary {
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: rgba(2, 6, 23, 0.2);
+    }
+    @media (max-width: 700px) {
+      .welcome { padding: 20px; border-radius: 18px; }
+      .memory { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <section class="welcome">
+    <span class="label">TimeWoven</span>
+    <h1>Золотое воспоминание</h1>
+    <p class="subtitle">Одно живое воспоминание из семейного архива, чтобы начать день с тепла и связи поколений.</p>
+
+    <article class="memory">
+      <p class="memory-text">{{ memory_text }}</p>
+      <div class="meta">
+        {% if author_avatar %}
+          <img class="avatar" src="{{ author_avatar }}" alt="author">
+        {% endif %}
+        {% if author_name %}
+          <span>{{ author_name }}</span>
+        {% endif %}
+        {% if memory_date %}
+          <span>• {{ memory_date }}</span>
+        {% endif %}
+      </div>
+    </article>
+
+    <div class="actions">
+      <a class="btn btn-primary" href="/family/timeline">Посмотреть весь Таймлайн</a>
+      {% if memory_id %}
+        <a class="btn btn-secondary" href="/family/reply/{{ memory_id }}{% if person_id %}?person_id={{ person_id }}{% endif %}">Открыть обсуждение</a>
+      {% endif %}
+    </div>
+  </section>
+</body>
+</html>

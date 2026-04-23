@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Ответ на воспоминание</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #020617;
+      --card: #0f172a;
+      --surface: rgba(15,23,42,0.96);
+      --surface-2: rgba(30,41,59,0.75);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #f59e0b;
+      --border: rgba(148,163,184,0.28);
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0f172a, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(100%, 640px);
+      background: var(--surface);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    .subtitle { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+    .original {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .original-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .original-text { font-size: 15px; line-height: 1.55; }
+    form { display: flex; flex-direction: column; gap: 12px; }
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      resize: vertical;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(15,23,42,0.9);
+      color: var(--text);
+      padding: 12px 14px;
+      font-family: inherit;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 8px;
+      background: var(--accent);
+      color: #111827;
+      border-radius: 14px;
+      border: none;
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+    }
+    .message { margin-top: 12px; font-size: 14px; color: var(--accent); }
+    .back-link {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .responses { margin-top: 28px; }
+    .responses-title { font-size: 15px; color: var(--muted); margin-bottom: 14px; }
+    .response-card {
+      background: rgba(15,23,42,0.88);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .response-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .response-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.14);
+      flex-shrink: 0;
+    }
+    .response-avatar-fallback {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,0.08);
+      color: var(--muted);
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .response-author { font-size: 14px; font-weight: 600; color: var(--text); }
+    .response-date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .response-text { font-size: 14px; line-height: 1.6; color: var(--text); white-space: pre-wrap; }
+    .empty-responses { font-size: 14px; color: var(--muted); padding: 8px 0; }
+  </style>
+</head>
+<body>
+  <section class="card">
+    {% if memory %}
+      <h1>Ответ</h1>
+      <p class="subtitle">на послание от {{ author_name }}</p>
+
+      <div class="original">
+        <div class="original-title">Исходное послание</div>
+        <div class="original-text">
+          {{ memory_text or "Текст исходного воспоминания отсутствует." }}
+        </div>
+      </div>
+
+      <form method="post">
+        <input type="hidden" name="person_id" value="{{ person_id }}">
+        <textarea
+          name="text"
+          required
+          placeholder="Напишите, что вы хотите ответить..."
+        ></textarea>
+        <button type="submit">Сохранить ответ</button>
+      </form>
+
+      {% if message %}
+        <div class="message">{{ message }}</div>
+      {% endif %}
+
+      <div class="responses">
+        <div class="responses-title">Ответы семьи</div>
+
+        {% if responses %}
+          {% for item in responses %}
+            <div class="response-card">
+              <div class="response-header">
+                {% if item.avatar_url %}
+                  <img class="response-avatar" src="{{ item.avatar_url }}" alt="{{ item.author_name }}">
+                {% else %}
+                  <div class="response-avatar-fallback">Нет фото</div>
+                {% endif %}
+
+                <div>
+                  <div class="response-author"><a href="/family/person/{{ item.author_id }}" style="color: inherit; text-decoration: none;">{{ item.author_name }}</a></div>
+                  <div class="response-date">{{ item.created_at or "Без даты" }}</div>
+                </div>
+              </div>
+
+              <div class="response-text">{{ item.text }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-responses">Пока ответов ещё нет.</div>
+        {% endif %}
+      </div>
+    {% else %}
+      <h1>Воспоминание не найдено</h1>
+      {% if message %}
+        <p class="message">{{ message }}</p>
+      {% endif %}
+    {% endif %}
+
+    <a href="/" class="back-link">← Вернуться к импульсу дня</a>
+  </section>
+</body>
+</html>

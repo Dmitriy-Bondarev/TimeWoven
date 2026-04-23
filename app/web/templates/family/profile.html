@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Мой профиль — TimeWoven</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #f59e0b;
+      --border: rgba(148,163,184,0.2);
+      --ok: #22c55e;
+      --card: rgba(15,23,42,0.96);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0f172a, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+    .container { max-width: 480px; margin: 0 auto; }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 24px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--text); }
+
+    /* Шапка */
+    .header {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .avatar-wrap { position: relative; display: inline-block; margin-bottom: 16px; }
+    .avatar {
+      width: 96px; height: 96px;
+      border-radius: 999px;
+      object-fit: cover;
+      border: 2px solid rgba(255,255,255,0.15);
+      display: block;
+    }
+    .avatar-fallback {
+      width: 96px; height: 96px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      display: grid; place-items: center;
+      color: var(--muted); font-size: 12px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .role { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .header-actions {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .graph-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background .2s, border-color .2s, transform .2s;
+    }
+    .graph-chip:hover {
+      background: rgba(245,158,11,0.12);
+      border-color: rgba(245,158,11,0.45);
+      transform: translateY(-1px);
+    }
+    .graph-chip svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Статистика */
+    .stats {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 20px;
+      text-align: center;
+    }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* Загрузка фото */
+    .upload-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 14px;
+    }
+    .file-label {
+      display: block;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 12px;
+      transition: border-color .2s;
+    }
+    .file-label:hover { border-color: var(--accent); color: var(--text); }
+    input[type="file"] { display: none; }
+    .btn {
+      width: 100%;
+      background: var(--accent);
+      color: #111827;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Сообщение */
+    .message {
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: var(--ok);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    /* Ссылки */
+    .links { display: flex; flex-direction: column; gap: 10px; }
+    .link-btn {
+      display: block;
+      text-align: center;
+      text-decoration: none;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 14px;
+      color: var(--text);
+      transition: background .2s;
+    }
+    .link-btn:hover { background: rgba(255,255,255,0.08); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back-link">← Импульс дня</a>
+
+    {% if message %}
+      <div class="message">✓ {{ message }}</div>
+    {% endif %}
+
+    <div class="header">
+      <div class="avatar-wrap">
+        {% if person.avatar_url %}
+          <img class="avatar" src="{{ person.avatar_url }}" alt="{{ name }}">
+        {% else %}
+          <div class="avatar-fallback">Нет фото</div>
+        {% endif %}
+      </div>
+      <h1>{{ name }}</h1>
+      <div class="role">{{ person.role }}</div>
+
+      <div class="header-actions">
+        <a
+          href="/family/tree?root_person_id={{ person.person_id }}"
+          class="graph-chip"
+          title="Показать в семейном дереве"
+          aria-label="Показать в семейном дереве"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v5"></path>
+            <path d="M6 19v-4h12v4"></path>
+            <path d="M6 11h12"></path>
+            <circle cx="12" cy="4" r="2"></circle>
+            <circle cx="6" cy="20" r="2"></circle>
+            <circle cx="18" cy="20" r="2"></circle>
+          </svg>
+          <span>Показать в дереве</span>
+        </a>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">{{ memories_count }}</div>
+          <div class="stat-label">воспоминаний</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">{{ quotes_count }}</div>
+          <div class="stat-label">цитат</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="upload-section">
+      <div class="section-title">Обновить фото профиля</div>
+      <form action="/profile/avatar" method="post" enctype="multipart/form-data" id="avatar-form">
+        <input type="hidden" name="person_id" value="{{ person.person_id }}">
+        <div id="file-drop" onclick="document.getElementById('avatar-file').click()" style="border:1px dashed rgba(148,163,184,0.3); border-radius:12px; padding:20px; text-align:center; color:#9ca3af; font-size:14px; cursor:pointer; margin-bottom:12px;">
+          📷 Нажмите чтобы выбрать фото
+        </div>
+        <input type="file" id="avatar-file" name="file" accept="image/*" required style="display:none;" onchange="document.getElementById('file-drop').textContent = this.files[0].name">
+        <button class="btn" type="submit">Сохранить фото</button>
+      </form>
+    </div>
+    <div class="links">
+      <a href="/family/person/{{ person.person_id }}" class="link-btn">Моя карточка в архиве →</a>
+      <a href="/who-am-i" class="link-btn">Сменить пользователя →</a>
+    </div>
+  </div>
+</body>
+</html>
