@@ -1,5 +1,22 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.26-max-live-replies-session-flow-t19] — 2026-04-23
+
+### Feature | Max Bot | Live Replies For Session Flow
+
+- **Feature (T19)**: добавлен контролируемый reply-слой для Max session flow в новом модуле `app/services/bot_reply.py`.
+- Реализованы функции:
+  - `build_ack_for_new_session(...)`
+  - `build_ack_for_audio(...)`
+  - `build_ack_for_finalize(...)`
+- Основной режим: безопасные жёсткие шаблоны; опционально при `AI_PROVIDER=llama_local` — короткая вариация через AI с hard-limit длины (<=240 символов).
+- Любые AI-сбои не ломают webhook: reply слой автоматически уходит в fallback шаблон.
+- `bot_webhooks.py` подключён к `bot_reply` в 3 ключевых точках:
+  - первое текстовое сообщение новой/пустой сессии;
+  - подтверждение после аудио;
+  - подтверждение после успешной финализации.
+- Smoke-test подтверждён: `text -> audio -> Готово!` возвращает короткие user-friendly ответы и корректно завершает `session -> draft Memory`.
+
 ## [v1.22.25-finalize-command-normalization-t18d] — 2026-04-23
 
 ### Fix | Max Sessions | Finalize Command Parsing

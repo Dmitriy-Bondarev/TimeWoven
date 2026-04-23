@@ -1,5 +1,37 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T19 — live bot replies for Max session flow
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- Добавлен новый модуль `app/services/bot_reply.py` для контролируемых ответов Max-бота.
+- В `bot_reply` реализованы 3 функции для ключевых шагов:
+  - `build_ack_for_new_session(...)`
+  - `build_ack_for_audio(...)`
+  - `build_ack_for_finalize(...)`
+- Reply-слой использует `AI_PROVIDER`:
+  - при `llama_local` может попытаться дать вариацию через AI;
+  - при ошибке AI / disabled / пустом результате — всегда fallback шаблон.
+- Добавлен лимит длины ответа (`<=240`) для финальных user-facing реплик.
+- `app/api/routes/bot_webhooks.py` обновлён: ответы в text/audio/finalize ветках теперь формируются через `bot_reply`.
+- Live smoke-test (HTTP, session flow) пройден:
+  - Step1 reply: "Я записываю эту историю. Можете продолжать, а когда закончите — напишите 'Готово'."
+  - Step2 reply: "Голос получил и сохранил. Можете добавить ещё или написать 'Готово'."
+  - Step3 reply: "Спасибо. Я сохранил эту историю как черновик семейного архива."
+  - SQL: session finalized, memory_id заполнен, `Memory(source_type='max_session', transcription_status='draft')` создана.
+
+---
+
 ## Update: T18.D — finalize command normalization for Max sessions
 
 Date: 2026-04-23

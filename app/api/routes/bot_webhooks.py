@@ -12,6 +12,7 @@ from app.bot.max_messenger import MaxMessengerBot
 from app.db.session import SessionLocal
 from app.models import MaxContactEvent, Person, PersonI18n
 from app.services import max_session_service
+from app.services import bot_reply
 from app.services.transcription import TranscriptionService
 
 
@@ -372,12 +373,11 @@ async def incoming_webhook(request: Request):
                 }
 
             memory = max_session_service.finalize_session(db, session)
-            has_analysis = memory and session.analysis_status == "ok"
             if memory:
-                response_text = (
-                    "Готово! Воспоминания сохранены в черновик и переданы на анализ. Спасибо!"
-                    if has_analysis
-                    else "Готово! Воспоминания сохранены в черновик. Спасибо!"
+                response_text = bot_reply.build_ack_for_finalize(
+                    memory=memory,
+                    session=session,
+                    analysis=None,
                 )
             else:
                 response_text = "Сессия завершена (ошибка сохранения, обратитесь к администратору)."
@@ -451,12 +451,23 @@ async def incoming_webhook(request: Request):
                     db=db, session=session, text=message_text, raw_payload=payload
                 )
 
-            if transcription_status == "ok":
-                response_text = "Голос сохранен и распознан. Фрагмент добавлен в черновик; напишите «Готово», когда завершите."
-            elif not local_audio_path:
-                response_text = "Голос сохранен в черновик (CDN URL). Локальная копия не скачалась, распознавание отложено."
-            else:
-                response_text = "Голос сохранен в черновик. Распознавание сейчас не завершилось; можно продолжать и финализировать."
+            audio_item = {
+                "audio_url": audio_attachment["audio_url"],
+                "local_path": local_audio_path,
+                "transcription_text": transcription_text,
+                "transcription_status": transcription_status,
+                "transcribed_at": transcribed_at,
+                "transcription_error": transcription_error,
+            }
+            response_text = bot_reply.build_ack_for_audio(
+                session=session,
+                audio_item=audio_item,
+                transcription_result={
+                    "status": transcription_status,
+                    "text": transcription_text,
+                    "error": transcription_error,
+                },
+            )
 
             await bot.send_message(user_id=max_id, text=response_text)
             return {
@@ -483,7 +494,14 @@ async def incoming_webhook(request: Request):
                 max_id,
                 session.message_count,
             )
-            response_text = "Принято. Продолжайте или напишите «Готово» для сохранения."
+            if (session.message_count or 0) == 1:
+                response_text = bot_reply.build_ack_for_new_session(
+                    text=message_text,
+                    session=session,
+                    analysis=None,
+                )
+            else:
+                response_text = "Принято. Продолжайте или напишите «Готово» для сохранения."
             await bot.send_message(user_id=max_id, text=response_text)
             return {
                 "status": "ok",
