@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Person, PersonI18n
 
+ALLOWED_ROLES = {"placeholder", "relative", "family_admin", "bot_only"}
+
 
 def _to_flag(value: bool | int | None, default: int) -> int:
     if value is None:
@@ -26,10 +28,12 @@ def create_person_with_i18n(
         raise ValueError("Поле first_name_ru обязательно")
 
     person_payload = person_data or {}
+    raw_role = _optional_text(person_payload.get("role")) or "placeholder"
+    role = raw_role if raw_role in ALLOWED_ROLES else "placeholder"
     person = Person(
         gender=_optional_text(person_payload.get("gender")) or "Unknown",
         is_alive=_to_flag(person_payload.get("is_alive"), default=1),
-        role=_optional_text(person_payload.get("role")) or "placeholder",
+        role=role,
         default_lang=_optional_text(person_payload.get("default_lang")) or "ru",
         maiden_name=_optional_text(person_payload.get("maiden_name")),
         birth_date=_optional_text(person_payload.get("birth_date")),

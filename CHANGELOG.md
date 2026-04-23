@@ -1,5 +1,14 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.17-role-select-admin-form-t9] — 2026-04-23
+
+### Feature | Admin | People
+
+- **Feature (T9)**: поле `Роль в системе` в админ-форме новой персоны переведено с текстового ввода на контролируемый `select`.
+- **Role values**: используется фиксированный набор: `placeholder`, `relative`, `family_admin`, `bot_only`.
+- **Backend guard**: добавлен whitelist/fallback в `admin.py` и `people_service.py`, чтобы исключить мусорные/случайные значения роли.
+- **Schema**: изменений БД нет.
+
 ## [v1.22.16-maiden-name-support-p1_11-t8] — 2026-04-23
 
 ### Feature | UX | People

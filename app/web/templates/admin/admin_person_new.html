@@ -162,7 +162,13 @@
 
         <div>
           <label for="role">Роль в системе</label>
-          <input id="role" type="text" name="role" value="{{ form_data.get('role', 'placeholder') }}">
+          <select id="role" name="role">
+            <option value="placeholder" {% if form_data.get('role') in [None, '', 'placeholder'] %}selected{% endif %}>Не выбрано / placeholder</option>
+            <option value="relative" {% if form_data.get('role') == 'relative' %}selected{% endif %}>Родственник</option>
+            <option value="family_admin" {% if form_data.get('role') == 'family_admin' %}selected{% endif %}>Администратор семьи</option>
+            <option value="bot_only" {% if form_data.get('role') == 'bot_only' %}selected{% endif %}>Техническая (бот)</option>
+          </select>
+          <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);">Роль используется для прав доступа и отображения в будущем. По умолчанию — placeholder.</p>
         </div>
 
         <div class="two-col">

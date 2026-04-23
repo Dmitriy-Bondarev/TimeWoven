@@ -24,6 +24,7 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
+ALLOWED_ROLES = {"placeholder", "relative", "family_admin", "bot_only"}
 
 
 def _clean_optional_text(value: object) -> str | None:
@@ -440,6 +441,8 @@ async def admin_person_new_submit(request: Request, db: Session = Depends(get_db
     birth_date_prec = (form.get("birth_date_prec") or "").strip() or None
     death_date_prec = (form.get("death_date_prec") or "").strip() or None
     allowed_precisions = {"EXACT", "ABOUT", "YEARONLY", "DECADE"}
+    raw_role = (form.get("role") or "placeholder").strip()
+    role = raw_role if raw_role in ALLOWED_ROLES else "placeholder"
     if birth_date_prec and birth_date_prec not in allowed_precisions:
         return render_error("Некорректная точность даты рождения.")
     if death_date_prec and death_date_prec not in allowed_precisions:
@@ -448,7 +451,7 @@ async def admin_person_new_submit(request: Request, db: Session = Depends(get_db
     person_data = {
         "gender": gender,
         "is_alive": is_alive,
-        "role": (form.get("role") or "placeholder").strip() or "placeholder",
+        "role": role,
         "default_lang": default_lang,
         "is_user": "is_user" in form,
         "birth_date": _clean_optional_text(form.get("birth_date")),

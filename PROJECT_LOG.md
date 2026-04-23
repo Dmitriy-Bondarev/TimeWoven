@@ -1,5 +1,24 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T9 — Role select in admin person form
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- `app/web/templates/admin/admin_person_new.html` — текстовое поле роли заменено на `select` с фиксированными значениями: `placeholder`, `relative`, `family_admin`, `bot_only`.
+- `app/api/routes/admin.py` — добавлен whitelist ролей и нормализация input: невалидные значения приводятся к `placeholder`.
+- `app/services/people_service.py` — добавлена сервисная защита по тому же whitelist для устойчивости при альтернативных вызовах.
+- Ручная проверка: форма отдаёт `select`, роли `relative` и `family_admin` корректно сохраняются и отображаются в `/admin/people`.
+
 ## Update: T8 — P1.11 Maiden Name Support
 
 Date: 2026-04-23
