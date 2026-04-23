@@ -1,5 +1,31 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T18.D — finalize command normalization for Max sessions
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- Исправлен `is_finalize_command(...)` в `app/services/max_session_service.py`.
+- Добавлена нормализация команды завершения: trimming + lower + удаление хвостовой пунктуации (`!`, `.`, `?`).
+- Команды вида `Готово!`, `готово!`, `это всё!`, `завершить`, `done`, `finish` теперь корректно триггерят финализацию.
+- В text-ветке webhook команда завершения не пишется как обычный message item.
+- Live validation (`Привет! Это тест сессии` → голосовое → `Готово!`) прошла:
+  - `max_chat_sessions.status = finalized`
+  - `memory_id` заполнен
+  - создана ровно одна `Memory(source_type='max_session', transcription_status='draft')`
+  - audio item + `local_path` присутствуют в metadata памяти.
+
+---
+
 ## Update: T18.C — Max audio transcription inside session flow
 
 Date: 2026-04-23

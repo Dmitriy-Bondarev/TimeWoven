@@ -1,5 +1,15 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.25-finalize-command-normalization-t18d] — 2026-04-23
+
+### Fix | Max Sessions | Finalize Command Parsing
+
+- **Fix (T18.D)**: исправлен переход `Max session -> draft Memory` для команд завершения с пунктуацией (`Готово!`, `это всё!`, и т.д.).
+- `is_finalize_command(...)` теперь нормализует ввод: `strip()`, `lower()`, удаление хвостовой пунктуации `! . ?`.
+- В webhook text-ветке команда завершения не попадает в `draft_items` как обычный текст: вместо этого вызывается `finalize_session(...)`.
+- Подтверждено live-сценарием: `текст -> голос -> Готово!` приводит к `session.status='finalized'`, заполненному `memory_id`, созданию `Memory(source_type='max_session', transcription_status='draft')`.
+- Metadata памяти содержит `session_id`, `draft_items`, `audio_count`, `message_count`, `local_path` и audio-item поля транскрипции.
+
 ## [v1.22.24-max-audio-transcription-session-flow-t18c] — 2026-04-23
 
 ### Feature | Max Bot | Audio Transcription In Session Flow

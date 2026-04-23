@@ -9,6 +9,7 @@ still created — the service never raises outward exceptions.
 
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -37,9 +38,22 @@ FINALIZE_COMMANDS: frozenset[str] = frozenset(
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _normalize_finalize_text(text: str) -> str:
+    """Normalize user text for robust finalize-command matching.
+
+    Rules:
+    - strip leading/trailing spaces
+    - lowercase
+    - drop trailing punctuation: ! . ?
+    """
+    normalized = (text or "").strip().lower()
+    normalized = re.sub(r"[!.?]+$", "", normalized)
+    return normalized.strip()
+
+
 def is_finalize_command(text: str) -> bool:
     """Return True if *text* is a recognized session-finalize command."""
-    return (text or "").strip().lower() in FINALIZE_COMMANDS
+    return _normalize_finalize_text(text) in FINALIZE_COMMANDS
 
 
 def _load_items(session: MaxChatSession) -> list[dict]:
