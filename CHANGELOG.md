@@ -1,5 +1,12 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.18-timeline-filtering-maiden-ui-polish-t13] — 2026-04-23
+
+### Fix | Timeline | Profile
+
+- Family timeline now shows only published items and hides technical raw blobs (T11).
+- Maiden name is now shown as a secondary muted line under the main name (T12).
+
 ## [v1.22.17-role-select-admin-form-t9] — 2026-04-23
 
 ### Feature | Admin | People

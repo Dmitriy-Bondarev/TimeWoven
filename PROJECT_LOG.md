@@ -1,5 +1,23 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T13 — finalize T11 timeline filtering and T12 maiden name UI polish
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- family timeline now shows only published items.
+- raw/json-like payloads are hidden from family timeline.
+- maiden name moved from `h1` to a secondary muted line under the person name.
+
 ## Update: T9 — Role select in admin person form
 
 Date: 2026-04-23

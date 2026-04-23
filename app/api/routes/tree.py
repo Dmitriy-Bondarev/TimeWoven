@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 from uuid import uuid4
 from urllib.parse import quote, unquote, urlparse
@@ -22,6 +23,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 FAMILY_COOKIE_NAME = "family_member_id"
 FAMILY_SESSION_MAX_AGE = 60 * 60 * 24
+_JSON_BLOB_RE = re.compile(r"^\s*[\[{].*[\]}]\s*$", re.DOTALL)
+
+
+def _looks_like_technical_blob(text: str) -> bool:
+    """Hide raw payloads/json-like blobs from public family timeline."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return True
+
+    if _JSON_BLOB_RE.match(cleaned):
+        return True
+
+    lowered = cleaned.lower()
+    if lowered.startswith("{'raw':") or lowered.startswith('{"raw":'):
+        return True
+
+    return False
 
 
 def _get_family_member_id(request: Request) -> int | None:
@@ -298,6 +316,7 @@ async def family_timeline(
         Memory.author_id.isnot(None),
         text_filter,
         Memory.is_archived == False,
+        Memory.transcription_status == "published",
     )
 
     if person_id is not None:
@@ -328,6 +347,9 @@ async def family_timeline(
             or memory.content_text
             or ""
         )
+
+        if _looks_like_technical_blob(text):
+            continue
 
         items.append(
             {

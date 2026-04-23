@@ -193,10 +193,9 @@
       </div>
       {% set maiden = (person.maiden_name or '').strip() %}
       {% set current_last = (person_i18n.last_name or '').strip() if person_i18n else '' %}
+      <h1>{{ name }}</h1>
       {% if maiden and maiden != current_last %}
-        <h1>{{ name }} (урождённая {{ maiden }})</h1>
-      {% else %}
-        <h1>{{ name }}</h1>
+        <p style="font-size: 13px; color: var(--muted); margin: 0 0 4px;">урождённая {{ maiden }}</p>
       {% endif %}
       <div class="role">{{ person.role }}</div>
 
