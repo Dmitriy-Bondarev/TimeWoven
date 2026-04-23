@@ -1,5 +1,26 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T8 — P1.11 Maiden Name Support
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- `app/web/templates/admin/admin_person_new.html` — добавлено поле `Девичья фамилия (при рождении)` (`maiden_name_ru`) в форму создания персоны.
+- `app/api/routes/admin.py` — чтение `maiden_name_ru` из формы, нормализация (`strip`, пустое значение -> `None`) и маппинг в `person_data["maiden_name"]`.
+- `app/services/people_service.py` — запись `maiden_name` в `People.maiden_name` при создании персоны.
+- `app/api/routes/tree.py` — в context профиля добавлен `person_i18n` для корректного сравнения текущей и девичьей фамилии.
+- `app/web/templates/family/profile.html` и `app/web/templates/family/person_card.html` — отображение формата `Имя Фамилия (урождённая X)` только если `maiden_name` заполнено и отличается от текущей фамилии.
+- E2E проверка выполнена через приложение: сценарий с `maiden_name != last_name` показывает скобки, сценарий с пустым `maiden_name` — без скобок.
+
 ## Update: T10 — Repository hygiene (docs/tech-docs/temp reorganization)
 
 Date: 2026-04-23

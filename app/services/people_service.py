@@ -31,6 +31,7 @@ def create_person_with_i18n(
         is_alive=_to_flag(person_payload.get("is_alive"), default=1),
         role=_optional_text(person_payload.get("role")) or "placeholder",
         default_lang=_optional_text(person_payload.get("default_lang")) or "ru",
+        maiden_name=_optional_text(person_payload.get("maiden_name")),
         birth_date=_optional_text(person_payload.get("birth_date")),
         birth_date_prec=_optional_text(person_payload.get("birth_date_prec")),
         death_date=_optional_text(person_payload.get("death_date")),

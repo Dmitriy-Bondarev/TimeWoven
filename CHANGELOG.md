@@ -1,5 +1,15 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.16-maiden-name-support-p1_11-t8] — 2026-04-23
+
+### Feature | UX | People
+
+- **Feature (Task P1.11, T8)**: в админ-форму создания персоны добавлено поле `Девичья фамилия (при рождении)` (`maiden_name_ru`).
+- **Backend normalization**: при создании персоны `maiden_name_ru` нормализуется (`strip`, пустая строка -> `NULL`) и сохраняется в `People.maiden_name`.
+- **Family profile UX**: в карточке `/family/person/{person_id}` отображается формат `Имя Фамилия (урождённая X)`, только если `maiden_name` заполнено и отличается от текущей фамилии.
+- **Regression-safe behavior**: если `maiden_name` отсутствует или совпадает с текущей фамилией, карточка показывает стандартное `Имя Фамилия` без скобок.
+- **Validation**: выполнена E2E проверка через работающее приложение и подтверждены оба сценария отображения.
+
 ## [v1.22.15-who-am-i-exclude-deceased-p1_14] — 2026-04-22
 
 ### Bugfix | UX | Family Auth Flow

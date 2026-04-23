@@ -461,6 +461,8 @@ async def admin_person_new_submit(request: Request, db: Session = Depends(get_db
         "preferred_ch": preferred_ch,
         "avatar_url": _clean_optional_text(form.get("avatar_url")),
     }
+    maiden_name = (form.get("maiden_name_ru") or "").strip() or None
+    person_data["maiden_name"] = maiden_name
 
     ru_data = {
         "first_name": ru_first_name,

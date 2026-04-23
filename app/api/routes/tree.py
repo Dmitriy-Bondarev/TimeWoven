@@ -152,6 +152,7 @@ async def family_person(
             "memories_count": memories_count,
             "quotes_count": quotes_count,
             "message": None,
+            "person_i18n": person_i18n,
         },
     )
 

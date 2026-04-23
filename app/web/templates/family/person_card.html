@@ -151,7 +151,13 @@
         <div class="avatar-fallback">Нет фото</div>
       {% endif %}
       <div class="header-info">
-        <h1>{{ name }}</h1>
+        {% set maiden = (person.maiden_name or '').strip() %}
+        {% set current_last = (person_i18n.last_name or '').strip() if person_i18n else '' %}
+        {% if maiden and maiden != current_last %}
+          <h1>{{ name }} (урождённая {{ maiden }})</h1>
+        {% else %}
+          <h1>{{ name }}</h1>
+        {% endif %}
         <div class="meta">
           {% if birth_date %}
             <span>🎂 {{ birth_date }}</span>

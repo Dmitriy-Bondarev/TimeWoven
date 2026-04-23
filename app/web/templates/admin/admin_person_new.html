@@ -260,6 +260,18 @@
         </div>
 
         <div>
+          <label for="maiden_name_ru">Девичья фамилия (при рождении)</label>
+          <input
+            type="text"
+            id="maiden_name_ru"
+            name="maiden_name_ru"
+            placeholder="например, Дубейко"
+            value="{{ form_data.get('maiden_name_ru', '') }}"
+          >
+          <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);">Заполните, если при рождении была другая фамилия.</p>
+        </div>
+
+        <div>
           <label for="biography_ru">Биография</label>
           <textarea id="biography_ru" name="biography_ru" rows="4">{{ form_data.get('biography_ru', '') }}</textarea>
         </div>
