@@ -53,8 +53,20 @@ def _load_items(session: MaxChatSession) -> list[dict]:
 
 
 def _rebuild_draft_text(items: list[dict]) -> str | None:
-    """Concatenate text items into a single draft string."""
-    parts = [item["text"] for item in items if item.get("type") == "text" and item.get("text")]
+    """Concatenate text + transcribed voice fragments into one draft string."""
+    parts: list[str] = []
+    for item in items:
+        if item.get("type") == "text" and item.get("text"):
+            parts.append(str(item["text"]))
+            continue
+
+        # Include successful voice transcripts in the aggregated draft.
+        if item.get("type") == "audio":
+            voice_text = str(item.get("transcription_text") or "").strip()
+            status = str(item.get("transcription_status") or "")
+            if voice_text and status == "ok":
+                parts.append(f"[voice] {voice_text}")
+
     return "\n".join(parts) if parts else None
 
 
@@ -149,6 +161,10 @@ def add_audio_item(
     local_path: str | None,
     attachment_id: str,
     raw_payload: dict,
+    transcription_text: str | None = None,
+    transcription_status: str = "pending",
+    transcribed_at: str | None = None,
+    transcription_error: str | None = None,
 ) -> None:
     """Append an audio attachment record to the session draft.
 
@@ -156,17 +172,24 @@ def add_audio_item(
     the audio remains accessible even if the CDN URL expires.
     """
     items = _load_items(session)
+    voice_text = str(transcription_text or "").strip() if transcription_text else None
+    transcribed_at_value = transcribed_at or datetime.utcnow().isoformat()
     items.append(
         {
             "type": "audio",
             "audio_url": audio_url,
             "local_path": local_path,
             "attachment_id": attachment_id,
+            "transcription_text": voice_text,
+            "transcription_status": transcription_status,
+            "transcribed_at": transcribed_at_value,
+            "transcription_error": transcription_error,
             "ts": datetime.utcnow().isoformat(),
             "raw_payload": raw_payload,
         }
     )
     session.audio_count = (session.audio_count or 0) + 1
+    session.draft_text = _rebuild_draft_text(items)
     session.draft_items = json.dumps(items, ensure_ascii=False)
     session.updated_at = datetime.utcnow().isoformat()
     db.commit()
@@ -222,6 +245,7 @@ def finalize_session(db, session: MaxChatSession) -> Memory | None:
         "audio_count": session.audio_count,
         "finalized_at": now,
         "draft_items_count": len(items),
+        "draft_items": items,
     }
     if first_audio_url:
         metadata["audio_url"] = first_audio_url

@@ -1,5 +1,17 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.24-max-audio-transcription-session-flow-t18c] — 2026-04-23
+
+### Feature | Max Bot | Audio Transcription In Session Flow
+
+- **Feature (T18.C)**: автоматическая транскрипция аудио встроена в session flow T18.B.
+- После скачивания локального файла webhook пытается выполнить `TranscriptionService.transcribe_file(...)`.
+- Аудио-элемент в `draft_items` теперь хранит: `audio_url`, `local_path`, `transcription_text`, `transcription_status`, `transcribed_at`, `transcription_error`.
+- `draft_text` агрегируется из текстовых сообщений + успешных voice-фрагментов (`[voice] ...`).
+- На `finalize_session(...)` AI анализ запускается по полному агрегированному тексту (включая voice fragments), а `Memory.transcript_verbatim` содержит полные raw `draft_items`.
+- Fallback сохранён: при сбое транскрипции сессия не падает, аудио сохраняется, пользователь получает мягкий ACK.
+- В `bot_webhooks.py` удалён legacy-дубликат `@router.post("/incoming")`; оставлен единый актуальный session-based handler.
+
 ## [v1.22.23-max-chat-sessions-t18b] — 2026-04-23
 
 ### Feature | Max Bot | Sessions + Draft Aggregation + Audio Hardening

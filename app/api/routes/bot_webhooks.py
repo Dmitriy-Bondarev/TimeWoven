@@ -1,7 +1,7 @@
 import os
 import logging
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -10,10 +10,9 @@ import httpx
 
 from app.bot.max_messenger import MaxMessengerBot
 from app.db.session import SessionLocal
-from app.models import MaxContactEvent, Memory, Person, PersonI18n
-from app.services.ai_analyzer import analyze_memory_text
-from app.services.memory_store import attach_analysis_to_memory, create_memory_from_max
+from app.models import MaxContactEvent, Person, PersonI18n
 from app.services import max_session_service
+from app.services.transcription import TranscriptionService
 
 
 router = APIRouter(prefix="/webhooks/maxbot", tags=["MaxBot Webhooks"])
@@ -296,261 +295,12 @@ def _save_max_contact_event(db, sender_max_user_id: str, contact_item: dict[str,
     return event
 
 
-def _save_pending_audio_memory(
-    db,
-    max_id: str,
-    person_id: int | None,
-    audio_url: str,
-    attachment_id: str,
-    local_audio_path: str | None = None,
-    download_error: str | None = None,
-) -> Memory:
-    metadata: dict[str, str] = {
-        "attachment_id": attachment_id,
-        "audio_url": audio_url,
-        "max_user_id": max_id,
-    }
-    if local_audio_path:
-        metadata["local_audio_path"] = local_audio_path
-    if download_error:
-        metadata["audio_download_error"] = download_error
-
-    memory_json = json.dumps(metadata, ensure_ascii=False)
-
-    memory = Memory(
-        author_id=person_id,
-        created_by=person_id,
-        content_text="",
-        audio_url=audio_url,
-        transcript_verbatim=memory_json,
-        source_type="max_audio_attachment",
-        transcription_status="pending_manual_text",
-        created_at=datetime.utcnow().isoformat(),
-    )
-    db.add(memory)
-    db.commit()
-    db.refresh(memory)
-    return memory
+def _to_filesystem_audio_path(local_static_path: str) -> str:
+    """Convert '/static/audio/raw/file.ogg' into absolute project filesystem path."""
+    normalized = local_static_path.strip()
+    return str(BASE_DIR / "web" / normalized.lstrip("/"))
 
 
-def _find_recent_pending_manual_text_memory(db, max_id: str, person_id: int | None) -> Memory | None:
-    threshold = datetime.utcnow() - timedelta(minutes=3)
-    query = db.query(Memory).filter(Memory.transcription_status == "pending_manual_text")
-    if person_id is not None:
-        query = query.filter(Memory.author_id == person_id)
-
-    candidates = query.order_by(Memory.id.desc()).limit(20).all()
-    for candidate in candidates:
-        created_at = candidate.created_at or ""
-        try:
-            created_dt = datetime.fromisoformat(created_at)
-        except ValueError:
-            continue
-
-        if created_dt < threshold:
-            continue
-
-        metadata = {}
-        if candidate.transcript_verbatim:
-            try:
-                metadata = json.loads(candidate.transcript_verbatim)
-            except json.JSONDecodeError:
-                metadata = {}
-
-        metadata_user_id = str(metadata.get("max_user_id", "")).strip()
-        if metadata_user_id == max_id:
-            return candidate
-
-    return None
-
-
-def _link_pending_manual_text(memory: Memory, text: str) -> None:
-    memory.content_text = text
-    memory.transcript_readable = text
-    memory.transcription_status = "published"
-
-
-@router.post("/incoming")
-async def incoming_webhook(request: Request):
-    try:
-        payload = await request.json()
-    except Exception:
-        logger.warning("MAX webhook rejected: invalid JSON payload")
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
-
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
-
-    message_payload = payload.get("message") if isinstance(payload.get("message"), dict) else {}
-    message_body = message_payload.get("body") if isinstance(message_payload.get("body"), dict) else {}
-    media_fragments = {
-        "voice": payload.get("voice"),
-        "audio": payload.get("audio"),
-        "attachment": payload.get("attachment"),
-        "message.attachment": message_payload.get("attachment"),
-        "message.body.attachments": message_body.get("attachments"),
-    }
-    if any(value is not None for value in media_fragments.values()):
-        logger.info("MAX webhook: media fragments detected")
-
-    incoming_secret = request.headers.get("X-Max-Bot-Api-Secret", "").strip()
-    if not MAX_WEBHOOK_SECRET or incoming_secret != MAX_WEBHOOK_SECRET:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    bot = MaxMessengerBot()
-    max_id = _extract_max_id(payload)
-    message_text = _extract_message_text(payload)
-    audio_attachment = _extract_audio_attachment(payload)
-    contact_items = _extract_contact_items(payload)
-
-    if not max_id:
-        raise HTTPException(status_code=400, detail="Missing max_id or user_id/from_id in payload")
-    if not message_text and not audio_attachment and not contact_items:
-        raise HTTPException(status_code=400, detail="Missing text in payload")
-
-    db = SessionLocal()
-    try:
-        person = _autobind_dmitry(db, max_id)
-        if hasattr(Person, "max_id"):
-            person = person or db.query(Person).filter_by(max_id=max_id).first()
-        if not person:
-            person = db.query(Person).filter_by(messenger_max_id=max_id).first()
-
-        if contact_items:
-            for contact in contact_items:
-                event = _save_max_contact_event(
-                    db=db,
-                    sender_max_user_id=max_id,
-                    contact_item=contact,
-                    raw_payload=payload,
-                )
-                logger.info(
-                    "MAX contact event stored sender=%s contact=%s event_id=%s",
-                    max_id,
-                    contact["user_id"],
-                    event.id,
-                )
-
-        if audio_attachment and not message_text:
-            local_audio_path = _download_audio_to_raw(
-                audio_url=audio_attachment["audio_url"],
-                attachment_id=audio_attachment["attachment_id"],
-            )
-
-            saved_memory = _save_pending_audio_memory(
-                db=db,
-                max_id=max_id,
-                person_id=person.person_id if person else None,
-                audio_url=audio_attachment["audio_url"],
-                attachment_id=audio_attachment["attachment_id"],
-                local_audio_path=local_audio_path,
-                download_error=None if local_audio_path else "download_failed",
-            )
-            logger.info(
-                "Saved pending audio memory %s for max_id=%s attachment_id=%s local_audio=%s",
-                saved_memory.id,
-                max_id,
-                audio_attachment["attachment_id"],
-                bool(local_audio_path),
-            )
-            prompt_text = "Аудио получено. Пришлите следом текст, и я привяжу его к записи."
-            await bot.send_message(user_id=max_id, text=prompt_text)
-            return {
-                "status": "ok",
-                "identified": bool(person),
-                "person_id": person.person_id if person else None,
-                "response_text": prompt_text,
-                "memory_id": saved_memory.id,
-            }
-
-        if message_text:
-            pending_memory = _find_recent_pending_manual_text_memory(
-                db=db,
-                max_id=max_id,
-                person_id=person.person_id if person else None,
-            )
-            if pending_memory:
-                _link_pending_manual_text(pending_memory, message_text)
-                db.commit()
-                confirmation_text = "Воспоминание сохранено и текст привязан к аудио!"
-                await bot.send_message(user_id=max_id, text=confirmation_text)
-                return {
-                    "status": "ok",
-                    "identified": bool(person),
-                    "person_id": person.person_id if person else None,
-                    "response_text": confirmation_text,
-                    "memory_id": pending_memory.id,
-                }
-
-            save_result = create_memory_from_max(
-                user_id=max_id,
-                text=message_text,
-                raw_payload=payload,
-            )
-            if not save_result.get("saved"):
-                logger.error(
-                    "MAX webhook save failed for user_id=%s: %s",
-                    max_id,
-                    save_result.get("error"),
-                )
-                raise HTTPException(status_code=500, detail="Failed to save memory")
-
-            memory_id = save_result.get("memory_id")
-            if save_result.get("transcription_status") == "archived":
-                response_text = "Служебное сообщение получено и отправлено в архив."
-                await bot.send_message(user_id=max_id, text=response_text)
-                return {
-                    "status": "ok",
-                    "identified": bool(person),
-                    "person_id": save_result.get("person_id"),
-                    "memory_id": memory_id,
-                    "analysis_status": "skipped_archived_marker",
-                    "analysis_provider": "none",
-                    "response_text": response_text,
-                }
-
-            analysis_result = analyze_memory_text(message_text)
-            analysis_status = str(analysis_result.get("status", "unknown"))
-            analysis_provider = str(analysis_result.get("raw_provider", "unknown"))
-
-            if isinstance(memory_id, int):
-                persist_analysis_result = attach_analysis_to_memory(memory_id, analysis_result)
-                if not persist_analysis_result.get("saved"):
-                    logger.warning(
-                        "MAX webhook analysis metadata save skipped for memory_id=%s: %s",
-                        memory_id,
-                        persist_analysis_result.get("error"),
-                    )
-
-            logger.info(
-                "MAX webhook analysis completed user_id=%s memory_id=%s provider=%s status=%s",
-                max_id,
-                memory_id,
-                analysis_provider,
-                analysis_status,
-            )
-
-            response_text = "Спасибо, я сохранил эту историю в семейный архив."
-            await bot.send_message(user_id=max_id, text=response_text)
-            return {
-                "status": "ok",
-                "identified": bool(person),
-                "person_id": save_result.get("person_id"),
-                "memory_id": save_result.get("memory_id"),
-                "analysis_status": analysis_status,
-                "analysis_provider": analysis_provider,
-                "response_text": response_text,
-            }
-
-        onboarding_question = "Как мне вас называть?"
-        await bot.send_message(user_id=max_id, text=onboarding_question)
-        return {
-            "status": "ok",
-            "identified": False,
-            "response_text": onboarding_question,
-        }
-    finally:
-        db.close()
 @router.post("/incoming")
 async def incoming_webhook(request: Request):
     # --- Parse ---
@@ -569,6 +319,7 @@ async def incoming_webhook(request: Request):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     bot = MaxMessengerBot()
+    transcriber = TranscriptionService()
     max_id = _extract_max_id(payload)
     message_text = _extract_message_text(payload)
     audio_attachment = _extract_audio_attachment(payload)
@@ -641,13 +392,39 @@ async def incoming_webhook(request: Request):
                 "response_text": response_text,
             }
 
-        # --- Audio: guaranteed local download + add to session ---
+        # --- Audio: guaranteed local download + optional auto-transcription ---
         if audio_attachment:
             local_audio_path = _download_audio_to_raw(
                 audio_url=audio_attachment["audio_url"],
                 attachment_id=audio_attachment["attachment_id"],
             )
-            if not local_audio_path:
+
+            transcription_text: str | None = None
+            transcription_status = "pending"
+            transcription_error: str | None = None
+            transcribed_at = datetime.utcnow().isoformat()
+
+            if local_audio_path:
+                fs_audio_path = _to_filesystem_audio_path(local_audio_path)
+                try:
+                    transcription_text = transcriber.transcribe_file(fs_audio_path)
+                    if transcription_text:
+                        transcription_status = "ok"
+                    else:
+                        transcription_status = "error"
+                        transcription_error = "empty transcription result"
+                except Exception as exc:
+                    transcription_status = "error"
+                    transcription_error = str(exc)
+                    logger.warning(
+                        "MAX transcription failed max_id=%s attachment_id=%s: %s",
+                        max_id,
+                        audio_attachment["attachment_id"],
+                        exc,
+                    )
+            else:
+                transcription_status = "error"
+                transcription_error = "audio_download_failed"
                 logger.warning(
                     "MAX audio download failed for max_id=%s attachment_id=%s — CDN URL stored only",
                     max_id,
@@ -662,6 +439,10 @@ async def incoming_webhook(request: Request):
                 local_path=local_audio_path,
                 attachment_id=audio_attachment["attachment_id"],
                 raw_payload=payload,
+                transcription_text=transcription_text,
+                transcription_status=transcription_status,
+                transcribed_at=transcribed_at,
+                transcription_error=transcription_error,
             )
 
             # If the audio message also carries text, add it to the same session
@@ -670,11 +451,13 @@ async def incoming_webhook(request: Request):
                     db=db, session=session, text=message_text, raw_payload=payload
                 )
 
-            dl_note = "" if local_audio_path else " (⚠ файл не скачан — CDN URL сохранён)"
-            response_text = (
-                f"Аудио добавлено в черновик{dl_note}. "
-                "Продолжайте или напишите «Готово» для сохранения."
-            )
+            if transcription_status == "ok":
+                response_text = "Голос сохранен и распознан. Фрагмент добавлен в черновик; напишите «Готово», когда завершите."
+            elif not local_audio_path:
+                response_text = "Голос сохранен в черновик (CDN URL). Локальная копия не скачалась, распознавание отложено."
+            else:
+                response_text = "Голос сохранен в черновик. Распознавание сейчас не завершилось; можно продолжать и финализировать."
+
             await bot.send_message(user_id=max_id, text=response_text)
             return {
                 "status": "ok",
@@ -682,6 +465,9 @@ async def incoming_webhook(request: Request):
                 "session_id": session.id,
                 "audio_local": bool(local_audio_path),
                 "audio_count": session.audio_count,
+                "transcription_status": transcription_status,
+                "transcription_error": transcription_error,
+                "transcription_text": transcription_text,
                 "response_text": response_text,
             }
 

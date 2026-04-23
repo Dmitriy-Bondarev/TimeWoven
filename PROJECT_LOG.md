@@ -1,5 +1,30 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T18.C — Max audio transcription inside session flow
+
+Date: 2026-04-23
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- В `app/api/routes/bot_webhooks.py` в audio-ветке добавлен автоматический вызов `TranscriptionService` после успешного локального скачивания.
+- Результат транскрипции добавляется в `draft_items` текущей open session через `max_session_service.add_audio_item(...)`.
+- Для аудио теперь сохраняются поля: `audio_url`, `local_path`, `transcription_text`, `transcription_status`, `transcribed_at`, `transcription_error`.
+- В `app/services/max_session_service.py` обновлён `_rebuild_draft_text`: включает успешные voice-фрагменты как `[voice] ...`.
+- `finalize_session(...)` теперь всегда кладёт raw `draft_items` в metadata (`Memory.transcript_verbatim`), поэтому в финальной draft memory остаются все результаты транскрипции.
+- Fallback реализован: при неуспехе транскрипции (`empty/error`) webhook не падает, аудио остаётся в черновике, финализация всё равно создаёт Memory.
+- Удалён legacy-дубликат маршрута `/webhooks/maxbot/incoming`; оставлен один актуальный handler.
+- Smoke-tests пройдены: service-level (успех+ошибка), webhook e2e (text+audio+Готово) через HTTP.
+
+---
+
 ## Update: T18.B — Max chat sessions + draft aggregation + audio hardening
 
 Date: 2026-04-23
