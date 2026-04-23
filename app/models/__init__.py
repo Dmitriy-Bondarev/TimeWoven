@@ -164,3 +164,25 @@ class MaxContactEvent(Base):
     raw_payload = Column(Text, nullable=False)
     matched_person_id = Column(Integer, ForeignKey("People.person_id"), nullable=True)
     status = Column(String, nullable=False, default="new", server_default=text("'new'"), index=True)
+
+
+class MaxChatSession(Base):
+    """Session grouping incoming Max messages into a draft until the user sends a finalize command."""
+    __tablename__ = "max_chat_sessions"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    max_user_id     = Column(String, nullable=False, index=True)
+    person_id       = Column(Integer, ForeignKey("People.person_id"), nullable=True)
+    status          = Column(String, nullable=False, default="open", server_default=text("'open'"))
+    created_at      = Column(String, nullable=False)
+    updated_at      = Column(String, nullable=False)
+    finalized_at    = Column(String, nullable=True)
+    draft_text      = Column(Text, nullable=True)   # concatenated text items
+    draft_items     = Column(Text, nullable=True)   # JSON array of {type, ...}
+    message_count   = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    audio_count     = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    memory_id       = Column(Integer, ForeignKey("Memories.id"), nullable=True)
+    analysis_status = Column(String, nullable=True)
+
+    person = relationship("Person", foreign_keys=[person_id])
+    memory = relationship("Memory", foreign_keys=[memory_id])

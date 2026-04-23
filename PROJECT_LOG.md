@@ -1,5 +1,30 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T18.B — Max chat sessions + draft aggregation + audio hardening
+
+Date: 2026-04-23
+
+### Structural change
+
+Yes (new table `max_chat_sessions`)
+
+### Schema change
+
+Yes — миграция `006_add_max_chat_sessions.sql`
+
+### Changes
+
+- Добавлена таблица `max_chat_sessions` (id, max_user_id, person_id FK, status, created/updated/finalized_at, draft_text, draft_items JSON, message_count, audio_count, memory_id FK, analysis_status).
+- Добавлен ORM-модель `MaxChatSession` в `app/models/__init__.py`.
+- Создан `app/services/max_session_service.py`: `get_open_session`, `create_session`, `get_or_create_open_session`, `add_text_item`, `add_audio_item`, `finalize_session`, `is_finalize_command`.
+- Рефакторинг `app/api/routes/bot_webhooks.py`: входящий текст/аудио → `add_text_item`/`add_audio_item`; команда «Готово/Завершить/…» → `finalize_session`; контакты без изменений.
+- Audio hardening: `_download_audio_to_raw` вызывается всегда; при ошибке скачивания сессия не падает, CDN URL сохраняется в `draft_items`.
+- Финализация создаёт `Memory(source_type='max_session', transcription_status='draft')` с AI-metadata.
+- Finalize commands: `готово`, `завершить`, `это всё`, `это все`, `закончить`, `стоп`, `end`, `done`, `finish`.
+- Smoke-test пройден: 9 шагов против реальной БД (lifecycle + fallback при AI error).
+
+---
+
 ## Update: T18.A — AI-провайдер llama_local (LLaMA local HTTP server)
 
 Date: 2026-04-23

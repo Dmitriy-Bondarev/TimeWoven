@@ -1,5 +1,17 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.23-max-chat-sessions-t18b] — 2026-04-23
+
+### Feature | Max Bot | Sessions + Draft Aggregation + Audio Hardening
+
+- **Feature (T18.B)**: новый session-слой для Max-бота (`max_chat_sessions` таблица + `max_session_service.py`).
+- Каждое входящее сообщение (текст или аудио) теперь добавляется в **черновик открытой сессии** вместо немедленного создания опубликованной Memory.
+- Сессия финализируется командой **«Готово» / «Завершить» / «Это всё» / «done» / «finish»**: собирается `draft_text`, запускается AI-анализ, создаётся `Memory(transcription_status='draft')`.
+- **Audio hardening**: аудиофайл гарантированно скачивается в `web/static/audio/raw/` при получении; в сессии хранятся и CDN URL, и локальный путь; при ошибке скачивания сессия продолжается (CDN URL сохраняется, в ACK добавляется предупреждение).
+- **AI fallback**: при недоступности AI-провайдера сессия всё равно финализируется в `Memory(draft)`; ошибка логируется, `analysis_status='error'`.
+- Контактные события (`MaxContactEvents`) — без изменений (T16).
+- Миграция: `migrations/006_add_max_chat_sessions.sql` применена.
+
 ## [v1.22.22-llama-local-ai-provider-t18a] — 2026-04-23
 
 ### Feature | AI | Max Bot

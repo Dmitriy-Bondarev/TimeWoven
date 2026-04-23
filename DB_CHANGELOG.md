@@ -3,6 +3,26 @@
 > Журнал всех изменений схемы и данных базы данных.  
 > Каждая запись документирует **что** изменилось, **зачем** и **как откатить**.
 
+## [1.7] — 2026-04-23 — T18.B: Таблица max_chat_sessions
+
+**Тип:** Schema + Migration  
+**Автор:** project owner  
+**ADR:** —  
+**Обратимость:** Reversible (`DROP TABLE max_chat_sessions;`)
+
+#### Описание
+
+Добавлена таблица `max_chat_sessions` для session-слоя Max-бота (T18.B). Хранит черновики (draft_items JSON, draft_text) групп сообщений от одного max_user_id до команды финализации. При финализации создаётся `Memory(transcription_status='draft')` и запускается AI-анализ.
+
+#### Изменения
+
+| Действие | Объект | Детали |
+|----------|--------|--------|
+| CREATE TABLE | `max_chat_sessions` | id, max_user_id, person_id FK, status, created_at, updated_at, finalized_at, draft_text, draft_items (JSON), message_count, audio_count, memory_id FK, analysis_status |
+| CREATE INDEX | `idx_mcs_user_status` | ON max_chat_sessions(max_user_id, status) |
+
+---
+
 ## [1.6] — 2026-04-23 — T17: Soft-archive duplicate People 40 и 43
 
 **Тип:** Data  

@@ -13,6 +13,7 @@ from app.db.session import SessionLocal
 from app.models import MaxContactEvent, Memory, Person, PersonI18n
 from app.services.ai_analyzer import analyze_memory_text
 from app.services.memory_store import attach_analysis_to_memory, create_memory_from_max
+from app.services import max_session_service
 
 
 router = APIRouter(prefix="/webhooks/maxbot", tags=["MaxBot Webhooks"])
@@ -548,5 +549,165 @@ async def incoming_webhook(request: Request):
             "identified": False,
             "response_text": onboarding_question,
         }
+    finally:
+        db.close()
+@router.post("/incoming")
+async def incoming_webhook(request: Request):
+    # --- Parse ---
+    try:
+        payload = await request.json()
+    except Exception:
+        logger.warning("MAX webhook rejected: invalid JSON payload")
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    # --- Auth ---
+    incoming_secret = request.headers.get("X-Max-Bot-Api-Secret", "").strip()
+    if not MAX_WEBHOOK_SECRET or incoming_secret != MAX_WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    bot = MaxMessengerBot()
+    max_id = _extract_max_id(payload)
+    message_text = _extract_message_text(payload)
+    audio_attachment = _extract_audio_attachment(payload)
+    contact_items = _extract_contact_items(payload)
+
+    if not max_id:
+        raise HTTPException(status_code=400, detail="Missing max_id or user_id/from_id in payload")
+    if not message_text and not audio_attachment and not contact_items:
+        raise HTTPException(status_code=400, detail="No processable content in payload")
+
+    db = SessionLocal()
+    try:
+        # Resolve person
+        person = _autobind_dmitry(db, max_id)
+        if not person:
+            person = db.query(Person).filter_by(messenger_max_id=max_id).first()
+        person_id = person.person_id if person else None
+
+        # --- Contacts: save MaxContactEvent (unchanged from T16) ---
+        if contact_items:
+            for contact in contact_items:
+                event = _save_max_contact_event(
+                    db=db,
+                    sender_max_user_id=max_id,
+                    contact_item=contact,
+                    raw_payload=payload,
+                )
+                logger.info(
+                    "MAX contact event stored sender=%s contact=%s event_id=%s",
+                    max_id,
+                    contact["user_id"],
+                    event.id,
+                )
+            # If contacts-only (no text/audio) — ACK and return
+            if not message_text and not audio_attachment:
+                response_text = "Контакт получен."
+                await bot.send_message(user_id=max_id, text=response_text)
+                return {"status": "ok", "identified": bool(person), "response_text": response_text}
+
+        # --- Finalize command ---
+        if message_text and max_session_service.is_finalize_command(message_text):
+            session = max_session_service.get_open_session(db, max_id)
+            if not session or (not session.draft_text and not session.audio_count):
+                response_text = "Нет активной записи для завершения."
+                await bot.send_message(user_id=max_id, text=response_text)
+                return {
+                    "status": "ok",
+                    "identified": bool(person),
+                    "response_text": response_text,
+                }
+
+            memory = max_session_service.finalize_session(db, session)
+            has_analysis = memory and session.analysis_status == "ok"
+            if memory:
+                response_text = (
+                    "Готово! Воспоминания сохранены в черновик и переданы на анализ. Спасибо!"
+                    if has_analysis
+                    else "Готово! Воспоминания сохранены в черновик. Спасибо!"
+                )
+            else:
+                response_text = "Сессия завершена (ошибка сохранения, обратитесь к администратору)."
+
+            await bot.send_message(user_id=max_id, text=response_text)
+            return {
+                "status": "ok",
+                "identified": bool(person),
+                "session_id": session.id,
+                "memory_id": memory.id if memory else None,
+                "analysis_status": session.analysis_status,
+                "response_text": response_text,
+            }
+
+        # --- Audio: guaranteed local download + add to session ---
+        if audio_attachment:
+            local_audio_path = _download_audio_to_raw(
+                audio_url=audio_attachment["audio_url"],
+                attachment_id=audio_attachment["attachment_id"],
+            )
+            if not local_audio_path:
+                logger.warning(
+                    "MAX audio download failed for max_id=%s attachment_id=%s — CDN URL stored only",
+                    max_id,
+                    audio_attachment["attachment_id"],
+                )
+
+            session = max_session_service.get_or_create_open_session(db, max_id, person_id)
+            max_session_service.add_audio_item(
+                db=db,
+                session=session,
+                audio_url=audio_attachment["audio_url"],
+                local_path=local_audio_path,
+                attachment_id=audio_attachment["attachment_id"],
+                raw_payload=payload,
+            )
+
+            # If the audio message also carries text, add it to the same session
+            if message_text:
+                max_session_service.add_text_item(
+                    db=db, session=session, text=message_text, raw_payload=payload
+                )
+
+            dl_note = "" if local_audio_path else " (⚠ файл не скачан — CDN URL сохранён)"
+            response_text = (
+                f"Аудио добавлено в черновик{dl_note}. "
+                "Продолжайте или напишите «Готово» для сохранения."
+            )
+            await bot.send_message(user_id=max_id, text=response_text)
+            return {
+                "status": "ok",
+                "identified": bool(person),
+                "session_id": session.id,
+                "audio_local": bool(local_audio_path),
+                "audio_count": session.audio_count,
+                "response_text": response_text,
+            }
+
+        # --- Text message: add to session draft ---
+        if message_text:
+            session = max_session_service.get_or_create_open_session(db, max_id, person_id)
+            max_session_service.add_text_item(
+                db=db, session=session, text=message_text, raw_payload=payload
+            )
+            logger.info(
+                "MAX text added to session id=%s max_id=%s message_count=%s",
+                session.id,
+                max_id,
+                session.message_count,
+            )
+            response_text = "Принято. Продолжайте или напишите «Готово» для сохранения."
+            await bot.send_message(user_id=max_id, text=response_text)
+            return {
+                "status": "ok",
+                "identified": bool(person),
+                "session_id": session.id,
+                "message_count": session.message_count,
+                "response_text": response_text,
+            }
+
+        # Should not reach here given the guards above
+        raise HTTPException(status_code=400, detail="No processable content in payload")
     finally:
         db.close()
