@@ -376,7 +376,11 @@
       </fieldset>
 
       <fieldset>
-        <legend>Союзы и дети (read-only)</legend>
+        <legend>Союзы и дети</legend>
+
+        <div style="margin-bottom: 10px;">
+          <a href="/admin/unions/new?person_id={{ person.person_id }}" class="upload-link">Новый союз</a>
+        </div>
 
         {% if union_rows %}
           {% for u in union_rows %}
@@ -384,6 +388,9 @@
               <div class="union-title">Союз #{{ u.union_id }}</div>
               <div class="muted">Партнёр: {{ u.partner_name }}{% if u.partner_id %} (ID {{ u.partner_id }}){% endif %}</div>
               <div class="muted">Период: {{ u.start_date }} — {{ u.end_date }}</div>
+              <div style="margin-top: 8px; margin-bottom: 4px;">
+                <a href="/admin/unions/{{ u.union_id }}/add-child?person_id={{ person.person_id }}" class="upload-link">Добавить ребёнка</a>
+              </div>
 
               <div class="children">
                 <div class="muted" style="margin-bottom: 6px;">Дети:</div>

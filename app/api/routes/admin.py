@@ -9,7 +9,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, Request, Form, File, UploadFile, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.bot.max_messenger import MaxMessengerBot
@@ -73,6 +73,40 @@ def _person_name_ru(db: Session, person_id: int | None) -> str:
         if name:
             return name
     return f"Персона #{person_id}"
+
+
+def _build_people_options(db: Session, exclude_person_ids: set[int] | None = None) -> list[dict]:
+    excluded = exclude_person_ids or set()
+    options: list[dict] = []
+    for person in db.query(Person).order_by(Person.person_id.asc()).all():
+        if person.person_id in excluded:
+            continue
+        options.append(
+            {
+                "person_id": person.person_id,
+                "name": _person_name_ru(db, person.person_id),
+            }
+        )
+    return options
+
+
+def _sync_pk_sequence(db: Session, table_name: str) -> None:
+    """Synchronize SERIAL sequence with MAX(id) for legacy DBs where sequence drifted."""
+    allowed_tables = {"Unions", "UnionChildren"}
+    if table_name not in allowed_tables:
+        raise ValueError("Unsupported table for sequence sync")
+
+    db.execute(
+        text(
+            f"""
+            SELECT setval(
+                pg_get_serial_sequence('"{table_name}"', 'id'),
+                COALESCE((SELECT MAX(id) FROM "{table_name}"), 1),
+                true
+            )
+            """
+        )
+    )
 
 
 def _build_union_rows_for_person(db: Session, person_id: int) -> list[dict]:
@@ -754,6 +788,215 @@ async def admin_person_edit_submit(person_id: int, request: Request, db: Session
         return render_error(f"Ошибка при сохранении персоны: {exc}")
 
     return RedirectResponse(url="/admin/people", status_code=302)
+
+
+@router.get("/unions/new", response_class=HTMLResponse)
+async def admin_union_new_form(person_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    return templates.TemplateResponse(
+        "admin/admin_union_new.html",
+        {
+            "request": request,
+            "error": None,
+            "person": person,
+            "person_name": _person_name_ru(db, person.person_id),
+            "people_options": _build_people_options(db, exclude_person_ids={person.person_id}),
+            "form_data": {
+                "person_id": person.person_id,
+                "partner_id": "",
+                "start_date": "",
+                "end_date": "",
+            },
+        },
+    )
+
+
+@router.post("/unions/new", response_class=HTMLResponse)
+async def admin_union_new_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+
+    def render_error(message: str, status_code: int = 400):
+        person_id_raw = str(form.get("person_id") or "").strip()
+        person_id_for_context = int(person_id_raw) if person_id_raw.isdigit() else None
+        person_for_context = None
+        person_name = ""
+        excluded: set[int] = set()
+        if person_id_for_context is not None:
+            person_for_context = db.query(Person).filter(Person.person_id == person_id_for_context).first()
+            excluded = {person_id_for_context}
+            if person_for_context:
+                person_name = _person_name_ru(db, person_for_context.person_id)
+
+        return templates.TemplateResponse(
+            "admin/admin_union_new.html",
+            {
+                "request": request,
+                "error": message,
+                "person": person_for_context,
+                "person_name": person_name,
+                "people_options": _build_people_options(db, exclude_person_ids=excluded),
+                "form_data": dict(form),
+            },
+            status_code=status_code,
+        )
+
+    try:
+        person_id = int(str(form.get("person_id") or "").strip())
+    except Exception:
+        return render_error("Некорректный person_id")
+
+    try:
+        partner_id = int(str(form.get("partner_id") or "").strip())
+    except Exception:
+        return render_error("Выберите партнёра")
+
+    if partner_id == person_id:
+        return render_error("Партнёр должен отличаться от выбранной персоны")
+
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        return render_error("Персона не найдена", status_code=404)
+
+    partner = db.query(Person).filter(Person.person_id == partner_id).first()
+    if not partner:
+        return render_error("Партнёр не найден")
+
+    start_date = _clean_optional_text(form.get("start_date"))
+    end_date = _clean_optional_text(form.get("end_date"))
+
+    union = Union(
+        partner1_id=person_id,
+        partner2_id=partner_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    try:
+        _sync_pk_sequence(db, "Unions")
+        db.add(union)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return render_error("Не удалось создать союз. Проверьте выбранных участников и попробуйте снова.")
+    except Exception as exc:
+        db.rollback()
+        return render_error(f"Ошибка при создании союза: {exc}")
+
+    return RedirectResponse(url=f"/admin/people/{person_id}/edit", status_code=303)
+
+
+@router.get("/unions/{union_id}/add-child", response_class=HTMLResponse)
+async def admin_union_add_child_form(
+    union_id: int,
+    request: Request,
+    person_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    union = db.query(Union).filter(Union.id == union_id).first()
+    if not union:
+        raise HTTPException(status_code=404, detail="Union not found")
+
+    context_person_id = person_id or union.partner1_id or union.partner2_id
+
+    return templates.TemplateResponse(
+        "admin/admin_union_add_child.html",
+        {
+            "request": request,
+            "error": None,
+            "union": union,
+            "person_id": context_person_id,
+            "partner1_name": _person_name_ru(db, union.partner1_id),
+            "partner2_name": _person_name_ru(db, union.partner2_id),
+            "people_options": _build_people_options(db),
+            "form_data": {
+                "child_id": "",
+                "person_id": context_person_id or "",
+            },
+        },
+    )
+
+
+@router.post("/unions/{union_id}/add-child", response_class=HTMLResponse)
+async def admin_union_add_child_submit(union_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    union = db.query(Union).filter(Union.id == union_id).first()
+    if not union:
+        raise HTTPException(status_code=404, detail="Union not found")
+
+    form = await request.form()
+
+    def render_error(message: str):
+        person_id_raw = str(form.get("person_id") or "").strip()
+        person_id_for_context = int(person_id_raw) if person_id_raw.isdigit() else None
+        return templates.TemplateResponse(
+            "admin/admin_union_add_child.html",
+            {
+                "request": request,
+                "error": message,
+                "union": union,
+                "person_id": person_id_for_context,
+                "partner1_name": _person_name_ru(db, union.partner1_id),
+                "partner2_name": _person_name_ru(db, union.partner2_id),
+                "people_options": _build_people_options(db),
+                "form_data": dict(form),
+            },
+            status_code=400,
+        )
+
+    try:
+        child_id = int(str(form.get("child_id") or "").strip())
+    except Exception:
+        return render_error("Выберите ребёнка")
+
+    child = db.query(Person).filter(Person.person_id == child_id).first()
+    if not child:
+        return render_error("Ребёнок не найден")
+
+    duplicate = (
+        db.query(UnionChild)
+        .filter(UnionChild.union_id == union_id, UnionChild.child_id == child_id)
+        .first()
+    )
+    if duplicate:
+        return render_error("Такой ребёнок уже добавлен в этот союз")
+
+    link = UnionChild(union_id=union_id, child_id=child_id)
+    try:
+        _sync_pk_sequence(db, "UnionChildren")
+        db.add(link)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return render_error("Не удалось добавить ребёнка к союзу. Попробуйте снова.")
+    except Exception as exc:
+        db.rollback()
+        return render_error(f"Ошибка при добавлении ребёнка: {exc}")
+
+    person_id_raw = str(form.get("person_id") or "").strip()
+    person_id_for_redirect = int(person_id_raw) if person_id_raw.isdigit() else None
+    fallback_person_id = union.partner1_id or union.partner2_id
+    redirect_person_id = person_id_for_redirect or fallback_person_id
+
+    if redirect_person_id:
+        return RedirectResponse(url=f"/admin/people/{redirect_person_id}/edit", status_code=303)
+    return RedirectResponse(url="/admin/people", status_code=303)
 
 
 @router.post("/people/{person_id}/aliases", response_class=JSONResponse)
