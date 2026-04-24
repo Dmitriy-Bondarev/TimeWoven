@@ -1,5 +1,100 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.35-family-memory-edit-flow-t25_4] — 2026-04-24
+
+### Feature | Family Memories | Edit Flow (author-only)
+
+- **Feature (T25.4)**: добавлены маршруты редактирования воспоминания: `GET/POST /family/memory/{memory_id}/edit`.
+- **Security (T25.4)**: доступ к edit-route разрешён только автору (`family_member_id` cookie должен совпадать с `Memories.author_id`), иначе `403`.
+- **UX (T25.4)**: в профиле и в timeline ссылка «Редактировать» отображается только автору записи.
+- **Behavior (T25.4)**: после сохранения обновлённый текст сразу виден в профиле и в timeline (источник текста — поля `transcript_readable/transcript_verbatim/content_text`).
+
+## [v1.22.36-landing-waitlist-early-access-t32] — 2026-04-24
+
+### Feature | Landing | Waitlist / Early Access
+
+- **Feature (T32)**: на публичном лендинге добавлен видимый CTA-блок и кнопка «Записаться в ранний доступ», открывающая форму (email/telegram).
+- **Behavior (T32)**: форма отправляет заявку в приложение через публичный API `POST /api/early-access-request`.
+- **Persistence (T32)**: заявки сохраняются в таблицу `EarlyAccessRequests` с временем (`created_at`) и источником `source='landing_waitlist'`.
+
+## [v1.22.37-local-llm-provider-m4] — 2026-04-24
+
+### Feature | AI | Local LLM Provider (VPS localhost)
+
+- **Feature (M4)**: добавлен AI‑провайдер `local_llm` для `app/services/ai_analyzer.py` (через `AI_PROVIDER=local_llm` или legacy `AIPROVIDER=local_llm`).
+- **Integration (M4)**: endpoint берётся из `.env`: `AI_LOCAL_LLM_URL=http://127.0.0.1:9000/analyze`, запрос `POST {"text": ...}`, ответ — AnalysisResult‑совместимый JSON (`summary/persons/dates/locations/raw_provider/status`).
+- **Ops (M4)**: добавлен localhost‑only LLM‑сервис (`ops/local_llm/`) с `GET /health` и `POST /analyze`, docker‑compose + systemd unit `timewoven-llm.service` для автозапуска.
+- **Admin (M4)**: добавлена браузерная проверка `/admin/ai/local-llm-check` со статусом “работает / не работает”.
+
+## [v1.22.37-waitlist-hotfix-mailto-and-admin-500] — 2026-04-24
+
+### Fix | Landing/Admin | Early Access waitlist
+
+- **Fix**: устранён остаточный `mailto`-CTA на боевом статическом лендинге (`timewoven-landing-clean.html`), из-за которого кнопка «Ранний доступ» открывала почтовый клиент вместо формы.
+- **Fix**: `/admin/early-access` больше не падает с 500 при проблемах схемы/таблицы EarlyAccessRequests — страница рендерится и показывает пустое состояние/диагностику.
+
+## [v1.22.34-profile-related-memories-semantics-t31_2] — 2026-04-24
+
+### Fix | Family Profile | Memories Count Semantics
+
+- **Fix (T31.2)**: зафиксирована и стабилизирована единая семантика profile count/list: related visible memories (`author + participant` через `MemoryPeople`, без дублей).
+- **Behavior (T31.2)**: шапка профиля и список профиля используют один helper-source (`get_visible_memories_for_person_for_viewer(...)`) без старых параллельных count-кверей.
+- **UX (T31.2)**: подпись в карточке профиля уточнена до «связанных воспоминаний», чтобы метрика не читалась как authored-only.
+- **Reliability (T31.2)**: audience filter исправлен на SQL-устойчивую форму (`IN (select memory_id ...)`) вместо correlated `EXISTS`, что устранило `InvalidRequestError` в runtime-подсчётах.
+- **Verification (T31.2)**: подтверждены реальные кейсы по `person_id=3`, `person_id=1` и `person_id=4`; во всех кейсах `header_count == list_count`.
+
+## [v1.22.33-family-memory-audience-depth-t28] — 2026-04-24
+
+### Feature | Family Memories | Audience v1
+
+- **Feature (T28)**: добавлен audience filter v1 для family memories по глубине родства с дефолтной глубиной `3` (`FAMILY_MEMORY_AUDIENCE_DEPTH`).
+- **Behavior (T28)**: family-user теперь видит только те опубликованные family-visible memories, которые связаны с людьми из его семейного круга по BFS-графу родства.
+- **Traversal (T28)**: круг строится по `PersonRelationship` (parent/child family edges) и `Unions` (partner edges) без новой ACL-таблицы и без миграции схемы.
+- **Memory matching (T28)**: memory считается видимой, если в круг входит `Memory.author_id` или любой участник из `MemoryPeople`.
+- **Applied surfaces (T28)**: audience-filter включён в `/family/timeline`, `/family/welcome`, `/family/reply/{memory_id}` и в список memories на `/family/person/{person_id}`.
+- **Safety (T28)**: админские экраны не изменены; direct access к `family/reply/{memory_id}` теперь тоже проходит через тот же audience-check.
+
+## [v1.22.32-memories-profile-alignment-t31] — 2026-04-24
+
+### Fix | Memories | Family Profile
+
+- **Fix (T31)**: family profile count и family profile memories list выровнены на общей visibility-логике вместо сырого authored-count по `Memories.author_id`.
+- **Feature (T31)**: добавлен shared helper `app/services/memory_visibility.py` для family-facing memories (`published`, `non-archived`, active author, non-empty text, hidden raw blobs).
+- **Feature (T31)**: профиль человека теперь показывает реальный список видимых воспоминаний с датой, preview, ролью связи `автор | участник` и ссылкой на existing memory reply screen.
+- **Behavior (T31)**: `MemoryPeople` начала учитываться в family profile, поэтому participant memories теперь видны в профиле человека даже если он не автор записи.
+- **UX (T31)**: при отсутствии видимых memories профиль показывает empty state вместо пустого блока.
+- **Audit (T31)**: классификация текущих типов memories и серых зон задокументирована в `tech-docs/memories-visibility-audit-t31.md`.
+
+## [v1.22.31-admin-people-header-filters-t30_3] — 2026-04-24
+
+### Feature | Admin UX | Compact Table Filters
+
+- **Feature (T30.3)**: фильтры в `/admin/people` перенесены в заголовки таблицы как компактные dropdown/popover controls по колонкам `Аватар`, `Роль`, `Статус`, `Канал`, `Жив`.
+- **UX (T30.3)**: отдельный поиск по имени/ID сохранён и работает совместно с колонковыми фильтрами (пересечение условий).
+- **UX (T30.3)**: добавлен единый reset всех фильтров, очищающий и текстовый поиск, и все column filters.
+- **Visual state**: активные фильтры в заголовках теперь заметны через подсветку filter-кнопки.
+- **Compatibility**: sticky header и horizontal scroll таблицы сохранены.
+
+## [v1.22.30-admin-people-extended-filters-t30_2] — 2026-04-24
+
+### Feature | Admin UX | People List
+
+- **Feature (T30.2)**: в `/admin/people` добавлена расширенная панель фильтров: `avatar`, `role`, `status`, `channel`, `alive` + кнопка `Сбросить все фильтры`.
+- **Behavior (T30.2)**: фильтры работают совместно с существующим поиском по имени/ID и применяются на клиенте без backend-query параметров.
+- **Feature (T30.2)**: в строки таблицы добавлены data-ключи фильтрации для прозрачной диагностики состояний.
+- **Avatar rule v1**: `expired_avatar` применяется для живых людей при возрасте последнего актуального аватара `>365` дней; `no_avatar` — отдельное состояние.
+- **Data source**: дата аватара определяется по `AvatarHistory` (последняя `is_current=1`, fallback на последнюю запись по персоне).
+
+## [v1.22.29-admin-ux-hardening-smoke-t30] — 2026-04-24
+
+### Feature | Admin UX | Stability
+
+- **Feature (T30)**: в `/admin/people` добавлены sticky header таблицы и client-side поиск по имени/ID.
+- **UX (T30)**: таблица людей переведена в scroll-контейнер с сохранением горизонтального скролла на узких экранах (включая iPad-width).
+- **Fix (T30)**: исправлен нерабочий endpoint кнопки «Показать пароль дня» на admin dashboard (`/admin/explorer/password`).
+- **Fix (T30)**: добавлен полноценный admin logout flow (`GET/POST /admin/logout`) с очисткой session cookie.
+- **Validation (T30)**: smoke-check ключевых admin страниц пройден без 500/422 регрессий.
+
 ## [v1.22.28-admin-ux-depth10-t24] — 2026-04-23
 
 ### Feature | Admin UX | Family Graph
@@ -566,3 +661,10 @@
   - `GET /admin/login` / `POST /admin/login` — форма входа и временный login‑flow.
   - `GET /admin/avatars` — форма для загрузки аватаров.
 - Legacy‑роутер `family_tree.py` убран из подключения в `main.py`, но оставлен в проекте как рез
+
+TITLE CHANGELOG TimeWoven – v1.22.37-local-llm-and-waitlist-early-access – 2026-04-24
+
+- Feature T32 – Landing waitlist form & admin Early Access view: модальная форма на лендинге (POST /api/early-access-request) и admin /admin/early-access read-only список заявок source=landing_waitlist.
+- Feature M4.2 – Local LLM provider local_llm finalized on VPS (ops/local_llm/, Saiga Mistral 7B GGUF q4_K, AI_PROVIDER=local_llm, admin check /admin/ai/local-llm-check).
+- Feature W1 – Local Whisper small transcription service on VPS (ops/whisper_small/, WHISPER_PROVIDER=local_small, HTTP /health + /transcribe на 127.0.0.1:9100).
+- Integration – Live memory pipeline now uses local providers end-to-end: webhook audio goes through local Whisper (`WHISPER_LOCAL_URL`), and new Memories are analyzed by `local_llm` via `AI_PROVIDER=local_llm`.

@@ -1,5 +1,323 @@
 # PROJECT LOG — TimeWoven
 
+## Update: T25.4 — edit flow для memory (author-only)
+
+Date: 2026-04-24
+
+### Structural change
+
+Yes
+
+### Schema change
+
+No
+
+### Changes
+
+- Добавлены маршруты редактирования воспоминаний: `GET/POST /family/memory/{memory_id}/edit`.
+- Серверная проверка авторства: edit-route доступен только если `family_member_id` из cookie совпадает с `Memories.author_id` (иначе `403`).
+- В UI добавлена ссылка «Редактировать» в `/family/person/{person_id}` и `/family/timeline` только для автора.
+- После сохранения обновлённый текст сразу появляется в профиле/ленте (обновляются поля `content_text`, `transcript_readable`, `transcript_verbatim`).
+
+### Validation
+
+- `python3 -m py_compile app/api/routes/tree.py`
+
+## Update: T32 — waitlist (ранний доступ) на публичном лендинге
+
+Date: 2026-04-24
+
+### Structural change
+
+Yes
+
+### Schema change
+
+Yes (new table `EarlyAccessRequests`)
+
+### Changes
+
+- На лендинге добавлен видимый CTA-блок и кнопка «Записаться в ранний доступ» с формой (email/telegram) в модальном окне.
+- Заявка отправляется из лендинга в приложение через публичный API: `POST /api/early-access-request` (CORS разрешён для `https://timewoven.ru`).
+- Данные сохраняются в таблицу `EarlyAccessRequests` с метками: `contact_value`, `preferred_channel`, `created_at` и `source='landing_waitlist'`.
+- Добавлен админский read-only список заявок: `GET /admin/early-access`.
+
+### Validation
+
+- `python3 -m py_compile app/api/routes/public_api.py app/main.py`
+
+## Update M4 – Local LLM Provider for Memory Analysis
+
+Date: 2026-04-24
+
+### Structural change
+
+Yes
+
+### Schema change
+
+No
+
+### Architecture
+
+- На VPS поднят отдельный localhost‑only HTTP‑сервис `ops/local_llm/`, который слушает `127.0.0.1:9000` и даёт:
+  - `GET /health` → `{"status":"ok"}`
+  - `POST /analyze` → AnalysisResult‑совместимый JSON (`summary/persons/dates/locations/raw_provider/status`)
+- Основное приложение TimeWoven получает анализ через новый AI‑провайдер `local_llm` в `app/services/ai_analyzer.py`.
+
+### Files changed / added
+
+- `app/services/ai_analyzer.py` (новый провайдер `local_llm`, env alias `AIPROVIDER`)
+- `app/api/routes/admin.py` (admin‑проверка `/admin/ai/local-llm-check`)
+- `app/web/templates/admin/admin_ai_local_llm_check.html` (страница статуса)
+- `app/web/templates/admin/admin_dashboard.html` (ссылка на проверку)
+- `ops/local_llm/service.py`, `ops/local_llm/Dockerfile`, `ops/local_llm/docker-compose.yml`, `ops/local_llm/timewoven-llm.service`, `ops/local_llm/README.md`
+- `scripts/test_local_llm.py` (smoke‑скрипт)
+- `.env` (добавлены `AIPROVIDER` и `AI_LOCAL_LLM_URL`, без удаления существующих переменных)
+
+### Validation / How to verify
+
+- LLM service:
+  - `curl -s http://127.0.0.1:9000/health`
+  - `curl -s -X POST http://127.0.0.1:9000/analyze -H 'content-type: application/json' -d '{"text":"Это тестовая история о семье"}'`
+- App-side client:
+  - `AI_PROVIDER=local_llm` и `AI_LOCAL_LLM_URL=http://127.0.0.1:9000/analyze`
+  - `python3 scripts/test_local_llm.py`
+- Admin browser check:
+  - открыть `/admin/ai/local-llm-check` → отображается “работает / не работает” + JSON результата.
+
+## Fix: waitlist defects — landing mailto + admin 500
+
+Date: 2026-04-24
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- Исправлен остаточный статический файл `timewoven-landing-clean.html`, где CTA «Запросить ранний доступ» всё ещё был `mailto:hello@timewoven.ru` и открывал почтовый клиент вместо формы.
+- `/admin/early-access`: добавлен safe fallback на случай DB/схемных ошибок (страница рендерится без 500 и показывает empty state + текст ошибки).
+
+### Validation
+
+- `python3 -m py_compile app/api/routes/admin.py`
+
+## Update: T31.2 — системный фикс семантики count/list в family profile
+
+Date: 2026-04-24
+
+### Structural change
+
+Yes
+
+### Schema change
+
+No
+
+### Changes
+
+- Подтверждена фактическая семантика profile count на реальных данных для `person_id=3`, `person_id=1` (кейс с историческим `16`) и `person_id=4` (нулевой кейс).
+- Введено единое правило профиля v1: основной показатель = related visible memories (`author + participant` через `MemoryPeople`, без дублей, только family-visible + audience-visible).
+- Шапка и список профиля остаются на одном source-of-truth helper: `get_visible_memories_for_person_for_viewer(...)`.
+- UI-подпись счётчика уточнена до «связанных воспоминаний», чтобы не путать метрику related с authored-only.
+- Исправлена техническая нестабильность audience-фильтра (`InvalidRequestError` из-за correlated EXISTS): `filter_memories_for_person_audience(...)` переведён на `IN (select memory_id from MemoryPeople ...)`.
+
+### Verified breakdown (viewer_person_id=1)
+
+- `person_id=3` (Наталия):
+  - `authored_visible_count=7` ids `[2,3,4,11,12,13,15]`
+  - `participant_visible_count=0` ids `[]`
+  - `related_visible_count=7` ids `[15,13,12,11,4,3,2]`
+  - `raw_old_profile_count=9` ids `[2,3,4,10,11,12,13,14,15]`
+  - Текущий профиль: `header=7`, `list=7`.
+- `person_id=1` (кейс исторического `16`):
+  - `authored_visible_count=0` ids `[]`
+  - `participant_visible_count=2` ids `[3,4]`
+  - `related_visible_count=2` ids `[4,3]`
+  - `raw_old_profile_count=16` ids `[16,17,19,20,21,22,23,24,25,26,27,28,29,31,32,39]`
+  - Текущий профиль: `header=2`, `list=2`.
+- `person_id=4` (малый/нулевой кейс):
+  - `authored_visible_count=0` ids `[]`
+  - `participant_visible_count=0` ids `[]`
+  - `related_visible_count=0` ids `[]`
+  - `raw_old_profile_count=0` ids `[]`
+  - Текущий профиль: `header=0`, `list=0`.
+
+### Validation
+
+- `python3 -m py_compile app/services/memory_audience.py app/services/memory_visibility.py app/api/routes/tree.py app/models/__init__.py`
+- Runtime probe через `.env` + `PYTHONPATH=.`: breakdown и ID-списки по 3 персонам получены; `current_profile_header_count == current_profile_list_count` во всех проверенных кейсах.
+
+## Update: T28 — audience rules v1 для family memories
+
+Date: 2026-04-24
+
+### Structural change
+
+Yes
+
+### Schema change
+
+No
+
+### Changes
+
+- Добавлен backend-helper `app/services/memory_audience.py` с правилом audience v1 для family memories.
+- Введена конфигурируемая глубина `FAMILY_MEMORY_AUDIENCE_DEPTH = 3`.
+- Круг допустимых людей для текущего family-user считается BFS-обходом от `family_member_id` из family session/cookie.
+- Для обхода используются `PersonRelationship` как parent/child edges (`bioparent`, `child`, `adoptparent`, `adoptchild`, `stepparent`, `stepchild`, `guardian`, `ward`) и `Unions` как partner edges.
+- Audience-фильтр накладывается поверх уже существующего family visibility слоя T31, а не вместо него: сначала `visible_for_ui`, потом `visible_for_person_by_kinship_depth`.
+- Правило видимости memory v1: запись видна, если `Memory.author_id` входит в разрешённый круг или если в `MemoryPeople` есть хотя бы один участник из этого круга.
+- `app/api/routes/tree.py`: audience-фильтр подключён в `family timeline`, `family welcome`, `family reply` и в список memories на `family/profile`.
+- `app/services/memory_visibility.py`: базовый family-visible query усилен исключением технических source types (`max_contact_test_marker`, `max_session`) до применения audience.
+- `app/models/__init__.py`: добавлены ORM-модели `RelationshipType` и `PersonRelationship`; `MemoryPeople` используется для author/participant matching.
+
+### Product rule v1
+
+- Текущий family-user видит только опубликованные family-visible memories, связанные с людьми в радиусе `N=3` от его `person_id` по семейному графу.
+- Связь memory с кругом определяется по `author_id` и по участникам в `MemoryPeople`.
+- Админские экраны не менялись и не ограничиваются новым audience-фильтром.
+
+### Validation
+
+- `python3 -m py_compile app/api/routes/tree.py app/services/memory_visibility.py app/services/memory_audience.py app/models/__init__.py`
+- Runtime-check на реальной БД после загрузки `.env`: подтверждены реальные `RelationshipType.code`, BFS для `root_person_id=2` возвращает круг из `9` человек на глубине `3`, audience-filtered query исполняется без ошибок.
+
+### Open edge cases
+
+- Если в данных есть семейные связи, не выраженные через `PersonRelationship` или `Unions`, они пока не попадут в audience circle.
+- Исторические/временные интервалы `valid_from/valid_to` в `PersonRelationship` для audience v1 пока не учитываются.
+- Family profile по-прежнему открывается как экран персоны; T28 ограничивает только memories внутри этого экрана, а не сам доступ к карточке.
+
+## Update: T31 — аудит и выравнивание логики Memories
+
+Date: 2026-04-24
+
+### Structural change
+
+Yes
+
+### Schema change
+
+No
+
+### Changes
+
+- Проведён аудит family-facing логики `Memories`: профиль считал raw authored count по `Memories.author_id`, а список воспоминаний в профиле отсутствовал; timeline уже фильтровал только `published + non-archived + active author + non-empty text` и скрывал технические blob-пейлоады.
+- Подтверждено по данным, что `MemoryPeople` в БД заполнена, но ранее не использовалась в family UI.
+- Добавлен общий helper `app/services/memory_visibility.py` с базовой пользовательской фильтрацией memories.
+- `app/api/routes/tree.py`: profile count и profile list переведены на единый helper `get_visible_memories_for_person(...)`; timeline переведён на общий base query/text helper без изменения продуктового правила `published-only`.
+- `app/web/templates/family/profile.html`: добавлен список видимых воспоминаний с ролью связи (`автор` / `участник`), датой, текстовым preview, ссылкой на existing reply screen и аккуратным empty state.
+- Отдельная audit-note сохранена в `tech-docs/memories-visibility-audit-t31.md`.
+
+### Audit notes
+
+- Фактическое расхождение подтверждено на данных: например, у `person_id=1` raw authored count был `16`, но по live visibility в профиле остаются только `2` participant-memory через `MemoryPeople`; у `person_id=3` raw count `9` сужается до `7` live published memories.
+- Из пользовательских экранов исключаются архивные, не опубликованные (`draft`/`archived`), тестовые marker rows (`max_contact_test_marker`) и технические raw blobs.
+- Серые зоны оставлены без schema change: legacy rows со статусом `archived` при `is_archived=false`, а также отсутствие отдельного статуса для `AI-draft` vs `human-approved`.
+
+### Validation
+
+- `python3 -m py_compile app/services/memory_visibility.py app/models/__init__.py app/api/routes/tree.py`
+- Runtime-check helper на реальных данных: profile visibility корректно возвращает authored/participant наборы и выравнивает count/list.
+
+## Update: T30.3 — компактные фильтры в заголовках /admin/people
+
+Date: 2026-04-24
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- `app/web/templates/admin/admin_people.html`: фильтры переработаны в компактный column-oriented формат через header dropdown/popover в колонках `Аватар`, `Роль`, `Статус`, `Канал`, `Жив`.
+- Отдельное поле поиска по `имени/ID` сохранено и работает совместно с колонковыми фильтрами (пересечение условий).
+- Добавлена единая кнопка `Сбросить все фильтры`, которая очищает и текстовый поиск, и все колонковые фильтры.
+- Для активных фильтров добавлена визуальная индикация (подсветка filter-кнопки в заголовке).
+- Sticky header и horizontal scroll сохранены без регрессий.
+
+### Implementation
+
+- Реализация фильтрации: client-side.
+- Источники значений: существующие data-атрибуты строк (`data-avatar-state`, `data-role-key`, `data-status-key`, `data-channel-key`, `data-alive-key`) из backend контекста T30.2.
+- Без изменений модели данных `People` и без миграций.
+
+### Smoke-check
+
+- `/admin/people` после логина: `200`.
+- Проверено наличие header filter controls, reset-кнопки и объединённой логики фильтрации `search + filters`.
+
+---
+
+## Update: T30.2 — расширенные фильтры в /admin/people
+
+Date: 2026-04-24
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- `app/web/templates/admin/admin_people.html`: добавлена панель бизнес-фильтров (avatar, role, status, channel, is_alive) и кнопка `Сбросить все фильтры`.
+- Фильтры работают совместно с существующим поиском по имени/ID (client-side, единый `applyFilter`).
+- Для строк таблицы добавлены data-атрибуты фильтрации: `data-avatar-state`, `data-role-key`, `data-status-key`, `data-channel-key`, `data-alive-key`.
+- `app/api/routes/admin.py`: backend `/admin/people` расширен вычислением признаков `has_avatar`, `avatar_is_expired`, `avatar_state`, `avatar_state_label`, `avatar_last_updated_at` + нормализованные ключи фильтрации.
+
+### Avatar logic (v1)
+
+- Источник даты аватара: `AvatarHistory` (берётся последняя актуальная запись `is_current=1`, fallback — последняя любая запись по персоне).
+- `no_avatar`: отсутствует текущий аватар (нет `People.avatar_url` и нет валидного пути в `AvatarHistory`).
+- `expired_avatar`: только для живых (`is_alive=true`) при наличии аватара и возрасте последнего обновления `> 365` дней.
+- `actual_avatar`: аватар есть и не просрочен; для умерших при наличии аватара применяется `actual_avatar`.
+
+### Smoke-check
+
+- `/admin/people` после логина: `200`, фильтры и data-атрибуты присутствуют в HTML.
+- Sticky header + horizontal scroll контейнер сохранены.
+
+---
+
+## Update: T30 — admin UX hardening и smoke-check
+
+Date: 2026-04-24
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- `app/web/templates/admin/admin_people.html`: добавлены sticky header для таблицы (`position: sticky`, непрозрачный фон, `z-index`) и client-side фильтр по имени/ID без backend-изменений.
+- Для сохранения UX на узких экранах и при широких таблицах добавлен контейнер `table-wrap` с независимым horizontal/vertical scroll.
+- `app/api/routes/admin.py`: добавлены `GET/POST /admin/logout` с очисткой `tw_admin_session` cookie.
+- `app/web/templates/admin/admin_dashboard.html`: исправлен endpoint кнопки «Показать пароль дня» (`/admin/explorer/password`) и добавлена кнопка выхода из админки.
+
+### Smoke-check
+
+- Проверены маршруты: `/admin/people`, `/admin/people/new`, `/admin/people/{id}/edit`, `/admin/transcriptions`, `/admin/avatars`, login/logout flow.
+- Все проверенные маршруты после логина возвращают `200`, logout корректно возвращает `303` на `/admin/login`, повторный доступ без cookie редиректит на login.
+
+---
+
 ## Update: T24 — UX-пакет для админской работы с семейным архивом
 
 Date: 2026-04-23
@@ -944,3 +1262,86 @@ Person lookup result: person_id=2
 ```
 
 ---
+
+## TimeWoven – Update M4.2 Local LLM Provider on VPS
+
+Date: 2026-04-24
+
+### Structural change
+
+No (инфраструктура и конфиг, без изменения доменной модели).
+
+### Schema change
+
+No.
+
+### Changes
+
+Завершена интеграция локального LLM‑провайдера local_llm на VPS для анализа семейных воспоминаний.
+
+В app/services/ai_analyzer.py активирован провайдер local_llm через AI_PROVIDER, используется HTTP‑endpoint AI_LOCAL_LLM_URL с JSON‑протоколом summary/persons/dates/locations/raw_provider/status.
+
+Добавлен admin‑маршрут GET /admin/ai/local-llm-check и шаблон admin_ai_local_llm_check.html, который показывает статус локального провайдера и сырое JSON‑тело ответа.
+
+В ops/local_llm/ поднят отдельный FastAPI‑сервис (service.py) на базе GGUF‑модели Saiga Mistral 7B (q4_K, ~4.1 GB) с эндпоинтами /health и /analyze, Dockerfile и docker-compose.yml биндуют сервис только на 127.0.0.1:9000.
+
+Настроен systemd‑юнит timewoven-llm.service, обеспечивающий автозапуск docker compose up и стабильный runtime после перезагрузки VPS.
+
+### Validation / Proof
+
+curl http://127.0.0.1:9000/health → {"status":"ok"}.
+
+curl http://127.0.0.1:9000/analyze с текстом "Это тестовая история о семье" возвращает JSON со status:"ok", непустым summary:"Тестовая история о семье" и raw_provider.mode:"llama_cpp".
+
+AI_LOCAL_LLM_URL=http://127.0.0.1:9000/analyze python3 scripts/test_local_llm.py завершился успешно с OK и тем же summary.
+
+docker ps показывает timewoven-local-llm в статусе Up с портом 127.0.0.1:9000->9000/tcp; systemctl status timewoven-llm.service в состоянии active (running).
+
+Admin‑страница /admin/ai/local-llm-check под админ‑логином отображает “Локальный AI‑провайдер работает” и JSON‑ответ со status:"ok" и непустым summary.
+
+### Result
+
+Задача M4.2 “Local LLM на VPS доведён до рабочего состояния” переведена в статус ГОТОВО.
+
+Для всех сценариев анализа текстов теперь доступен локальный LLM‑провайдер, не требующий внешних API‑ключей; Anthropic и другие внешние провайдеры могут использоваться как fallback по отдельной конфигурации.
+
+Date 2026-04-24
+TITLE PROJECT LOG TimeWoven – Update W1 Whisper Small Transcription Service on VPS
+Structural change: Yes (новый ops-сервис для транскрипции).
+Schema change: No.
+
+Changes:
+- В ops/whisper_small/ добавлен FastAPI-сервис service.py с эндпоинтами GET /health и POST /transcribe, использующий модель WhisperModel("small", device="cpu", compute_type="int8") с параметрами beam_size=2 и temperature=0.0.
+- Подготовлен Dockerfile на базе python:3.11-slim с установкой faster-whisper и ffmpeg, а также docker-compose.yml для сервиса timewoven-whisper-small, слушающего только 127.0.0.1:9100.
+- Добавлен systemd-юнит timewoven-whisper.service, запускающий docker compose up -d --build и обеспечивающий автозапуск Whisper-сервиса после перезагрузки VPS.
+- В .env настроены переменные WHISPER_PROVIDER=local_small и WHISPER_LOCAL_URL=http://127.0.0.1:9100/transcribe для дальнейшей интеграции в TranscriptionService.
+
+Validation / Proof:
+- curl http://127.0.0.1:9100/health возвращает {"status":"ok"}.
+- curl -X POST http://127.0.0.1:9100/transcribe -F "file=@/root/projects/TimeWoven/app/web/static/audio/raw/max_14557742588039_20260423131047.ogg" возвращает status="ok", language="ru" и осмысленный русский текст, начинающийся с “Это тестовая сессия. Ее задача посмотреть как отработает аудио…”, с duration_seconds ≈ 23.9 и временем обработки ≈ 8.4s на CPU.
+- docker ps --filter name=timewoven-whisper-small показывает контейнер timewoven-whisper-small в статусе Up с портом 127.0.0.1:9100->9100/tcp.
+- systemctl status timewoven-whisper.service в состоянии loaded+enabled, последний ExecStart=/usr/bin/docker compose up -d --build завершился status=0/SUCCESS.
+
+Result:
+- Задача W1 (“Whisper small на VPS (CPU) поднят”) переведена в статус ГОТОВО.
+- На VPS появился локальный сервис транскрипции, готовый к интеграции в основной TranscriptionService; сервис доступен только по 127.0.0.1, не открыт во внешнюю сеть.
+
+Date 2026-04-24
+TITLE PROJECT LOG TimeWoven – Update M4.3/W1.1 Local Providers Integrated into Live Memory Pipeline
+Structural change: No (интеграция существующих локальных сервисов в рабочий pipeline).
+Schema change: No.
+
+Changes:
+- В app/services/ai_analyzer.py функция analyze_memory_text() теперь создаёт ProviderAgnosticAnalyzer с явным provider_name, выбранным из AI_PROVIDER / AIPROVIDER, чтобы рабочий pipeline явно использовал нужный провайдер и это было видно в proof/логах.
+- В app/services/transcription.py добавлен выбор локального Whisper-сервиса по WHISPER_PROVIDER + WHISPER_LOCAL_URL; при local_small/local_* транскрибация идёт через локальный HTTP endpoint, а не через внешний API.
+- Проверен живой путь через POST /webhooks/maxbot/incoming для текста и аудио.
+
+Validation / Proof:
+- Текстовый сценарий: создан Memory id=41 (source_type=max_session, status=draft), в analysis содержатся summary/persons/dates/locations, а analysis.raw_provider.provider="local_llm" и endpoint="http://127.0.0.1:9000/analyze".
+- Голосовой сценарий: POST /webhooks/maxbot/incoming с audio attachment дал transcription_status="ok", затем POST /webhooks/maxbot/incoming с текстом "Готово" создал Memory id=42.
+- Для Memory id=42 в analysis.raw_provider.provider="local_llm", что подтверждает полный end-to-end поток: voice -> local Whisper -> text -> local_llm analysis.
+- Транскрибация прошла при пустом WHISPER_API_TOKEN, что подтверждает использование локального WHISPER_LOCAL_URL вместо внешнего OpenAI endpoint.
+
+Result:
+- Локальные провайдеры LLM и Whisper не только подняты как сервисы на VPS, но и реально интегрированы в живой pipeline создания и анализа Memories.
+- End-to-end сценарий “голосовое воспоминание -> транскрипция -> анализ -> запись в БД” подтверждён на прод-подобной среде.
