@@ -230,6 +230,115 @@ class LlamaLocalAnalyzerProvider(BaseAnalyzerProvider):
         }
 
 
+LOCAL_LLM_TIMEOUT_SECONDS = 180.0
+
+
+class LocalLLMAnalyzerProvider(BaseAnalyzerProvider):
+    """Provider for a local on-host LLM HTTP service.
+
+    Expects AI_LOCAL_LLM_URL to point at POST /analyze accepting {"text": str}
+    and returning an AnalysisResult-compatible JSON:
+      {"summary","persons","dates","locations","raw_provider","status"}.
+    """
+
+    provider_name = "local_llm"
+
+    def __init__(self) -> None:
+        self.url = os.getenv("AI_LOCAL_LLM_URL", "").strip()
+
+    def _error_result(self, error_message: str, status_code: int | None = None) -> dict[str, Any]:
+        raw_provider: dict[str, Any] = {
+            "provider": self.provider_name,
+            "endpoint": self.url,
+            "error": error_message,
+        }
+        if status_code is not None:
+            raw_provider["status_code"] = status_code
+        return _empty_analysis(status="error", raw_provider=raw_provider)
+
+    def _normalize_str_list(self, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        result: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            s = str(item).strip()
+            if s:
+                result.append(s)
+        return result
+
+    def analyze(self, text: str) -> dict[str, Any]:
+        normalized = (text or "").strip()
+        if not normalized:
+            return _empty_analysis(
+                status="ok",
+                raw_provider={"provider": self.provider_name, "endpoint": self.url},
+            )
+
+        if not self.url:
+            return self._error_result("missing AI_LOCAL_LLM_URL")
+
+        try:
+            response = httpx.post(
+                self.url,
+                json={"text": normalized},
+                timeout=LOCAL_LLM_TIMEOUT_SECONDS,
+            )
+        except httpx.HTTPError as exc:
+            logger.warning("local_llm request failed endpoint=%s: %s", self.url, exc)
+            return self._error_result(str(exc))
+
+        if response.status_code != 200:
+            logger.warning(
+                "local_llm returned non-200 endpoint=%s status_code=%s",
+                self.url,
+                response.status_code,
+            )
+            return self._error_result(
+                f"unexpected status code: {response.status_code}",
+                status_code=response.status_code,
+            )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            logger.warning("local_llm returned invalid JSON endpoint=%s: %s", self.url, exc)
+            return self._error_result("invalid JSON response", status_code=response.status_code)
+
+        if not isinstance(payload, dict):
+            logger.warning("local_llm returned non-object JSON endpoint=%s", self.url)
+            return self._error_result("response JSON is not an object", status_code=response.status_code)
+
+        status = str(payload.get("status", "") or "").strip().lower() or "ok"
+        if status != "ok":
+            raw_provider = payload.get("raw_provider")
+            return _empty_analysis(
+                status="error",
+                raw_provider={
+                    "provider": self.provider_name,
+                    "endpoint": self.url,
+                    "status_code": response.status_code,
+                    "remote_status": status,
+                    "raw_provider": raw_provider,
+                },
+            )
+
+        return {
+            "summary": str(payload.get("summary", "") or "").strip(),
+            "persons": self._normalize_str_list(payload.get("persons")),
+            "dates": self._normalize_str_list(payload.get("dates")),
+            "locations": self._normalize_str_list(payload.get("locations")),
+            "raw_provider": {
+                "provider": self.provider_name,
+                "endpoint": self.url,
+                "status_code": response.status_code,
+                "remote_raw_provider": payload.get("raw_provider"),
+            },
+            "status": "ok",
+        }
+
+
 class AnthropicAnalyzerProvider(BaseAnalyzerProvider):
     provider_name = "anthropic"
 
@@ -306,7 +415,9 @@ class AnthropicAnalyzerProvider(BaseAnalyzerProvider):
 
 class ProviderAgnosticAnalyzer:
     def __init__(self, provider_name: str | None = None) -> None:
-        self.provider_name = (provider_name or os.getenv("AI_PROVIDER", "disabled")).strip().lower()
+        env_provider = (os.getenv("AI_PROVIDER", "") or "").strip().lower()
+        legacy_env_provider = (os.getenv("AIPROVIDER", "") or "").strip().lower()
+        self.provider_name = (provider_name or env_provider or legacy_env_provider or "disabled").strip().lower()
         self.provider = self._build_provider(self.provider_name)
         logger.info("AI analyzer initialized with provider=%s", self.provider_name)
 
@@ -317,6 +428,8 @@ class ProviderAgnosticAnalyzer:
             return MockAnalyzerProvider()
         if provider_name == "local_stub":
             return LocalStubAnalyzerProvider()
+        if provider_name == "local_llm":
+            return LocalLLMAnalyzerProvider()
         if provider_name == "llama_local":
             return LlamaLocalAnalyzerProvider()
         if provider_name == "anthropic":
@@ -350,5 +463,11 @@ class MemoryAnalyzer:
 
 
 def analyze_memory_text(text: str) -> dict[str, Any]:
-    analyzer = ProviderAgnosticAnalyzer()
+    # Force an explicit provider_name so logs/proofs show which provider was used.
+    # Behavior remains identical to ProviderAgnosticAnalyzer() because we select
+    # the same env vars in the same priority order.
+    env_provider = (os.getenv("AI_PROVIDER", "") or "").strip().lower()
+    legacy_env_provider = (os.getenv("AIPROVIDER", "") or "").strip().lower()
+    selected = (env_provider or legacy_env_provider or "").strip().lower() or None
+    analyzer = ProviderAgnosticAnalyzer(provider_name=selected)
     return analyzer.analyze_memory_text(text)
