@@ -1,6 +1,6 @@
 # 📸 Технический паспорт проекта: TimeWoven (v1.3-postgres)
 
-> **Дата обновления:** 2026-04-23  
+> **Дата обновления:** 2026-04-25  
 > **Автор:** Дмитрий Бондарев  
 > **Статус:** Active
 
@@ -55,7 +55,22 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 | Сервис             | API / SDK             | Назначение                           |
 |--------------------|-----------------------|--------------------------------------|
 | Telegram Bot       | python-telegram-bot   | «Импульс дня» и уведомления (backlog) |
-| Whisper / ASR      | openai-whisper / CLI  | Транскрибация аудиовоспоминаний (backlog) |
+| Whisper / ASR      | local Whisper small (VPS) | Транскрибация аудиовоспоминаний (active) |
+
+**Актуальное решение (2026-04-24):** Claude / Anthropic API выведен из активного контура проекта. Текущий рабочий путь — локальные провайдеры на VPS: `local_llm` для анализа текста и `local Whisper small` для транскрибации аудио. Legacy-поддержка Anthropic может оставаться как опциональная, но не должна быть default/рекомендуемой.
+
+### 2.4 AI services on VPS (local LLM + Whisper)
+
+**Назначение:** держать чувствительные семейные данные и тяжёлый вывод ML **на той же VPS**, что и приложение, с предсказуемой задержкой и без обязательной передачи сырого аудио/текста в публичные API.
+
+| Systemd / каталог | Роль | Доступ приложения |
+|-------------------|------|-------------------|
+| **`timewoven-llm.service`** | Локальная **LLM** (Docker Compose в `ops/local_llm/`, образ с GGUF), HTTP **127.0.0.1:9000** | Анализ воспоминаний, резюме, прочие AI-фичи через провайдера `local_llm` / local HTTP в `app/services/ai_analyzer.py` (URL из `.env`) |
+| **`timewoven-whisper.service`** | Локальный **Whisper (small)**, **faster-whisper** в Docker, **127.0.0.1:9100** | Транскрибация голосовых файлов; HTTP API в `ops/whisper_small/service.py` |
+
+**Взаимодействие:** FastAPI вызывает эти сервисы **только по localhost**; схема «приложение → Nginx → внешний ASR/LLM» для базового сценария **не** требуется. Обновление моделей/контейнеров **независимо** от релиза веб-приложения (пересборка `docker compose` в соответствующем каталоге `ops/`).
+
+**Зачем так:** (1) приватность — семейный контент остаётся в контуре VPS; (2) предсказуемая стоимость и задержка; (3) можно масштабировать RAM/CPU диска под ML (см. раздел 5) без смены внешнего провайдера.
 
 ### Интеграция с Max Messenger
 * **Тип:** Входящий Webhook (FastAPI)
@@ -65,7 +80,7 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 * **Обработчик логики:** `app.bot.max_messenger.MaxMessengerBot`
 * **Статус:** Минимальный контур `Max -> Memory` замкнут (M1): входящий текст сохраняется в `Memories` и отправляется короткий ack-ответ в чат. Базовый person mapping работает по `messenger_max_id`; при отсутствии соответствия используется inbox (`author_id=NULL`).
 * **M2 (AI abstraction):** после сохранения памяти webhook может вызвать provider-agnostic анализатор `analyze_memory_text(...)`.
-   - Провайдер выбирается через `.env`: `AI_PROVIDER=disabled|mock|anthropic|local_stub|llama_local`.
+   - Провайдер выбирается через `.env`. **Текущий рабочий провайдер анализа: `local_llm`** (VPS). `anthropic/claude` — legacy/optional и не используется как текущий путь.
    - При `disabled`/ошибке провайдера webhook не падает; сохранение Memory и ACK остаются гарантированными.
    - Результат анализа (если есть) сохраняется в metadata памяти (`transcript_verbatim`) без изменений схемы БД.
    - `local_stub` использует внешний локальный HTTP-endpoint (`AI_LOCAL_STUB_URL`) и безопасно возвращает `status=error`, если сервис недоступен или ответ невалиден.
@@ -221,6 +236,7 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 | Services            | `app/services/family_graph.py`, `timeline_service.py` | Сервисы графа и таймлайна              |
 | Web templates       | `app/web/templates/...`    | Все HTML‑шаблоны (family, admin, site)          |
 | Static              | `app/web/static/...`       | JS, CSS, логотипы, аватары, аудио               |
+| Family + TOTP       | `app/api/routes/tree.py`, `app/services/family_access_service.py` | Публичные URL `/family/p/{public_uuid}`, `/family/access/...`, сессия `tw_family_access` |
 
 ### 3.4 Организация документации
 
@@ -271,6 +287,7 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 
 #### **Корень репо:** Основные артефакты и операционная логика
 
+- **`TimeWoven_Anchor_2026-04-25.md`** — срез «как сейчас» (family access, локальные AI, миграции, бэкапы, I18N-май); ранее: `TimeWoven_Anchor_2026-04-23.md`.
 - **`PROJECT_LOG.md`** — операционный журнал всех значимых обновлений и решений; читается вверх по времени (новые записи сверху).
 - **`TECH_PASSPORT.md`** — этот файл, общий технический паспорт.
 - **`PRODUCT_BACKLOG.md`** — живой реестр задач (P-задачи, T-задачи) с статусами и решениями.
@@ -302,6 +319,26 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 
 Temporal‑модель (valid_from/valid_to для PersonRelationship и Unions) описана детально в `DB_CHANGELOG.md` и ADR, и используется для восстановления состояния семьи на произвольную дату. [cite:31][cite:35]
 
+### 4.4 Family access & TOTP (безопасность семейной зоны)
+
+**Модель доступа**
+- У каждой персоны в `People` есть стабильный **`public_uuid`**; публичные ссылки ведут на **`/family/p/{public_uuid}`**, без раскрытия числового `person_id` в URL.
+- **Вход** для гостя: форма на **`/family/access/{public_uuid}`** (TOTP из приложения-аутентификатора и/или **одноразовые backup-коды**), после успешной проверки — **cookie** сессии и редирект на запрошенную страницу.
+- **Guard** семейных страниц (`_require_family_zone` в `app/api/routes/tree.py`): при отсутствии валидной семейной сессии — редирект на **форму доступа по тому же `public_uuid`**, с параметром `next=`, а не на старый who-am-i для публичных путей.
+- Старые URL **`/family/person/{id}`** сохраняются как совместимость: ответ **301** → **`/family/p/{public_uuid}`**.
+
+**TOTP и политика**
+- Секрет TOTP **хранится в БД в зашифрованном виде** (Fernet, ключи окружения `TW_FAMILY_FERNET_KEY` / dev-seed, см. `family_access_service.py`).
+- Проверка кода: **6 цифр**, `pyotp.TOTP(...).verify(code, valid_window=1)` — **±1** временной слот.
+- **Rate limit:** не более **20** попыток на скользящем окне **15 минут** на пару **(IP клиента, public_uuid)** (in-process deque в `family_access_service.py`).
+
+**Сессии и reset**
+- Активные логины хранятся в **`family_access_sessions`** (хеш непрозрачного токена, срок, отзыв).
+- **Cookie** `tw_family_access`: **HttpOnly**, **SameSite=Lax**, **Secure** при HTTPS (см. `set_family_access_cookies` / `cookie_secure_flag`).
+- В админке **reset** доступа: обнуляется секрет TOTP, очищаются backup-коды, **отзываются** все сессии персоны, доступ **закрыт** до повторного setup.
+
+**Админка:** `GET /admin/people/{id}/access` — обеспечение `public_uuid` при первом заходе (`_ensure_public_uuid`), показ **полного** публичного URL (`TW_PUBLIC_BASE_URL` / `request.base_url` / fallback `https://app.timewoven.ru`), копирование в буфер. Подробности — [TimeWoven_Anchor_2026-04-25.md](TimeWoven_Anchor_2026-04-25.md).
+
 ---
 
 ## 5. Инфраструктура и деплой
@@ -316,6 +353,11 @@ Temporal‑модель (valid_from/valid_to для PersonRelationship и Unions
 | SSH                 | `root@193.187.95.221`                     |
 | Путь к проекту      | `/root/projects/TimeWoven`                |
 | Python env          | `/root/projects/TimeWoven/venv` или `.venv` (активное окружение) |
+| **RAM (срез 2026-04-25)** | **~11 Gi** total (существенный рост к ранним конфигурациям **~1.8 Gi** в ADR-003) |
+| **vCPU**            | **6**                                     |
+| **Диск (root)**     | **~157 Gi** total, **~130 Gi** свободно (~14% занято) — запас под аудио, Docker-слой, модели LLM/Whisper, **ежедневные дампы** в `backups/daily` |
+
+Сервер по объёму RAM/диска **рассчитан** на хранение семейного аудио, локальные контейнеры **LLM + Whisper** (`ops/local_llm`, `ops/whisper_small`) и регулярные бэкапы без внешнего object storage «по умолчанию».
 
 ### 5.2 PostgreSQL
 
@@ -368,6 +410,20 @@ systemctl restart timewoven.service
 systemctl status timewoven.service --no-pager
 curl -s https://app.timewoven.ru/health
 ```
+
+### 5.6 Резервное копирование (срез 2026-04-25)
+
+**База данных**
+- Скрипт **`scripts/backup_manager.sh`**: `pg_dump` по `DATABASE_URL` из `.env`, сжатие **gzip** в каталог **`backups/daily/`** с именем `postgres_dump_<UTC>.sql.gz`.
+- Параллельно создаётся **снимок кода/проекта** (tar, с исключениями для ненужного объёма) и **архив upload-папок** — `app/web/static/audio/uploads`, `app/web/static/images/uploads` (если каталога нет — пишется маркер, чтобы прогон был прозрачным).
+- **Ретация** по mtime (порядка **60 дней**), на **воскресенья (UTC)** копии **дополнительно** складываются в `backups/daily/archive/`.
+
+**Пользовательские медиа и сырьё**
+- Критично для восстановления: **аудио-загрузки** (см. пути выше); при появлении единого raw-хранилища (например `app/web/static/audio/raw/`) **включать** в политику копирования отдельным шагом (cron: tar/rsync) — **не** полагаться только на «полный» tarball проекта, если в `.gitignore` лежат большие файлы.
+
+**Ответственность:** периодически проверять **восстановление** из `backups/daily` (хотя бы `gunzip -t` + тестовый restore на staging). Скрипт и расписание (cron) — у владельца инфраструктуры; при смене путей — обновлять `UPLOAD_DIRS` в `backup_manager.sh`.
+
+**Публичный base URL для ссылок (family):** в `.env` рекомендуется **`TW_PUBLIC_BASE_URL=https://app.timewoven.ru`**, чтобы админ-шаблоны и письма не зависели от `request.base_url` за reverse proxy; опционально `TW_DEFAULT_PUBLIC_BASE_URL` в коде как fallback.
 
 ---
 
