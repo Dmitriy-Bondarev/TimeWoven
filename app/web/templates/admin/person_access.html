@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Семейный доступ — {{ name }}</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #020617; --text: #e5e7eb; --muted: #94a3b8; --accent: #f59e0b; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; padding: 32px 24px; }
+    h1 { font-size: 22px; margin-bottom: 12px; }
+    p { color: var(--muted); font-size: 14px; margin: 8px 0; }
+    code { background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+    .btn { padding: 10px 14px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: var(--text); cursor: pointer; font-size: 14px; }
+    .btn-primary { background: var(--accent); color: #111827; border: none; font-weight: 600; }
+    form { margin: 12px 0; }
+    a { color: var(--accent); }
+    .family-link-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .family-link-copy-backdrop { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(2,6,23,0.75); place-items: center; padding: 16px; }
+    .family-link-copy-backdrop.is-open { display: grid; }
+    .family-link-copy-card { max-width: 100%; width: 520px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 20px; box-sizing: border-box; }
+    .family-link-copy-card p { color: #94a3b8; font-size: 14px; margin: 0 0 12px; }
+    .family-link-copy-card input[readonly], .family-link-copy-card textarea[readonly] { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; background: #020617; color: #e5e7eb; font-size: 14px; font-family: ui-monospace, monospace; }
+    .family-link-copy-card .row { display: flex; justify-content: flex-end; margin-top: 12px; gap: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Семейный доступ — {{ name }}</h1>
+  <p class="family-link-row" data-family-public-url="{{ family_public_url|e }}">
+    Публичная ссылка:
+    {% if family_public_url %}
+    <a id="family-open-link" class="link-open" href="{{ family_public_url|e }}" target="_blank" rel="noopener noreferrer" style="word-break:break-all;max-width:100%;"
+      >{{ family_public_url }}</a>
+    {% else %}
+    <span id="family-open-link" style="word-break:break-all;opacity:0.8;">—</span>
+    {% endif %}
+    <button
+      type="button"
+      class="btn btn-primary"
+      id="copy-family-url"
+      data-copy-family-link
+      data-family-public-url="{{ family_public_url|e }}"
+    >Копировать</button>
+  </p>
+  {# Дублируем URL в невидимом блоке — источник для копирования, если data-* в кнопке пуст (кэш/старый рендер). #}
+  <div id="family-link-server-copy" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;white-space:nowrap;" aria-hidden="true">{{ family_public_url|default('', true) }}</div>
+
+  <div id="family-link-copy-modal" class="family-link-copy-backdrop" role="dialog" aria-modal="true" aria-labelledby="family-link-copy-title">
+    <div class="family-link-copy-card">
+      <p id="family-link-copy-title">Скопируйте ссылку</p>
+      <p id="family-link-copy-msg" style="margin-top:-8px;margin-bottom:10px;">Выделите поле ниже и нажмите Ctrl+C (Cmd+C) или «Копировать в буфер».</p>
+      <textarea id="family-link-copy-input" readonly rows="3">{{ family_public_url|default('', true) }}</textarea>
+      <div class="row">
+        <button type="button" class="btn" id="family-link-copy-again">Копировать в буфер</button>
+        <button type="button" class="btn btn-primary" id="family-link-copy-close">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('copy-family-url');
+      var row = document.querySelector('p.family-link-row');
+      var openLink = document.getElementById('family-open-link');
+      var serverBlock = document.getElementById('family-link-server-copy');
+      var modal = document.getElementById('family-link-copy-modal');
+      var input = document.getElementById('family-link-copy-input');
+      var closeBtn = document.getElementById('family-link-copy-close');
+      var againBtn = document.getElementById('family-link-copy-again');
+      var msgEl = document.getElementById('family-link-copy-msg');
+      if (!btn || !input || !modal) return;
+      var label = btn.textContent;
+
+      function resolveUrl() {
+        var s = (btn.getAttribute('data-family-public-url') || '').trim();
+        if (s) return s;
+        if (row) {
+          s = (row.getAttribute('data-family-public-url') || '').trim();
+          if (s) return s;
+        }
+        if (openLink) {
+          s = (openLink.getAttribute('href') || openLink.textContent || '').trim();
+          if (s && s !== '—' && s.indexOf('http') === 0) return s;
+        }
+        if (input) {
+          s = (input.value || input.textContent || '').trim();
+          if (s) return s;
+        }
+        if (serverBlock) {
+          s = (serverBlock.textContent || '').trim();
+          if (s) return s;
+        }
+        return '';
+      }
+
+      function setModalText(url, clipboardOk, showModal) {
+        if (input) {
+          input.value = url;
+        }
+        if (msgEl) {
+          if (!url) {
+            msgEl.textContent = 'Ссылка не задана. Обновите страницу (F5) или снова зайдите в «Семейный доступ».';
+          } else if (clipboardOk) {
+            msgEl.textContent = 'Скопировано в буфер. Ниже — та же ссылка, можно перепроверить.';
+          } else {
+            msgEl.textContent = 'Автокопирование недоступно. Выделите поле (Ctrl+A) и нажмите Ctrl+C, либо «Копировать в буфер».';
+          }
+        }
+        if (showModal) {
+          modal.classList.add('is-open');
+          setTimeout(function () {
+            input.focus();
+            try { input.select(); } catch (e) {}
+            try { if (input.setSelectionRange) input.setSelectionRange(0, url.length); } catch (e2) {}
+          }, 0);
+        } else {
+          modal.classList.remove('is-open');
+        }
+      }
+
+      function copyExecCommand(text) {
+        if (!text) return false;
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { if (ta.setSelectionRange) ta.setSelectionRange(0, text.length); } catch (e) {}
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        return ok;
+      }
+
+      function runCopy() {
+        var u = resolveUrl();
+        if (!u) {
+          setModalText('', false, true);
+          return;
+        }
+        input.value = u;
+        if (window.navigator.clipboard && window.navigator.clipboard.writeText) {
+          window.navigator.clipboard.writeText(u)
+            .then(function () {
+              btn.textContent = 'Скопировано';
+              setTimeout(function () { btn.textContent = label; }, 2000);
+              setModalText(u, true, false);
+            })
+            .catch(function () {
+              var ex = copyExecCommand(u);
+              if (ex) {
+                btn.textContent = 'Скопировано';
+                setTimeout(function () { btn.textContent = label; }, 2000);
+                setModalText(u, true, false);
+              } else {
+                setModalText(u, false, true);
+              }
+            });
+        } else {
+          if (copyExecCommand(u)) {
+            btn.textContent = 'Скопировано';
+            setTimeout(function () { btn.textContent = label; }, 2000);
+            setModalText(u, true, false);
+          } else {
+            setModalText(u, false, true);
+          }
+        }
+      }
+
+      btn.addEventListener('click', runCopy);
+      if (closeBtn) closeBtn.addEventListener('click', function () { modal.classList.remove('is-open'); });
+      if (againBtn) {
+        againBtn.addEventListener('click', function () {
+          var u = input.value || resolveUrl();
+          if (window.navigator.clipboard && window.navigator.clipboard.writeText) {
+            window.navigator.clipboard.writeText(u).catch(function () { copyExecCommand(u); });
+          } else {
+            copyExecCommand(u);
+          }
+          try { input.select(); } catch (e) {}
+        });
+      }
+      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    })();
+  </script>
+  <p>Статус: {% if access_permitted %}<strong>активен</strong>{% elif pending %}ожидает подтверждения TOTP{% else %}не настроен{% endif %}</p>
+  <p>Активных сессий: {{ n_active_sessions }} · Неиспользованных резервных кодов: {{ n_backup_left }}</p>
+
+  {% if request.query_params.get('err') == 'bad_code' %}
+    <p style="color:#f87171;">Неверный код подтверждения.</p>
+  {% endif %}
+
+  <form method="post" action="/admin/people/{{ person.person_id }}/access/setup">
+    <button type="submit" class="btn btn-primary">Настроить / сгенерировать TOTP и резервные коды</button>
+  </form>
+
+  {% if pending %}
+  <form method="post" action="/admin/people/{{ person.person_id }}/access/confirm" style="display:flex;gap:8px;align-items:center;max-width:400px;">
+    <input name="code" type="text" inputmode="numeric" placeholder="Первый TOTP-код" required style="flex:1;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:var(--text);" />
+    <button type="submit" class="btn btn-primary">Подтвердить</button>
+  </form>
+  {% endif %}
+
+  <form method="post" action="/admin/people/{{ person.person_id }}/access/reset" onsubmit="return confirm('Сбросить TOTP и отключить доступ?');">
+    <button type="submit" class="btn" style="background:#450a0a;color:#fecaca;">Сбросить доступ (TOTP + сессии)</button>
+  </form>
+
+  <form method="post" action="/admin/people/{{ person.person_id }}/access/revoke-sessions">
+    <button type="submit" class="btn">Завершить все активные сессии</button>
+  </form>
+
+  <p style="margin-top:32px;"><a href="/admin/people/{{ person.person_id }}/edit">← Назад к редактированию</a></p>
+</body>
+</html>

@@ -1,22 +1,55 @@
 import json
 import os
+from datetime import datetime, timedelta, timezone
 
 # app/routes/admin.py
 
+import base64
+import io
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Request, Form, File, UploadFile, HTTPException
+import pyotp
+import qrcode
+from fastapi import APIRouter, Depends, Request, Form, File, UploadFile, HTTPException, Query
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+import time
+import httpx
 from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.bot.max_messenger import MaxMessengerBot
 from app.db.session import get_db
-from app.models import Memory, Person, PersonAlias, PersonI18n, Quote, Union, UnionChild
+from app.models import (
+    AvatarHistory,
+    EarlyAccessRequest,
+    FamilyAccessSession,
+    Memory,
+    Person,
+    PersonAccessBackupCode,
+    PersonAlias,
+    PersonI18n,
+    Quote,
+    Union,
+    UnionChild,
+)
 from app.services import create_person_with_i18n, update_person_with_i18n
+from app.services.person_alias_service import ALIAS_STATUS, ALIAS_TYPES
 from app.security import get_daily_password, require_admin, make_admin_token, ADMIN_COOKIE_NAME
+from app.services.ai_analyzer import ProviderAgnosticAnalyzer
+from app.services.family_access_service import (
+    clear_backup_codes,
+    decrypt_totp_secret,
+    encrypt_totp_secret,
+    find_person_by_public_uuid,
+    generate_backup_code_plain,
+    new_totp_provisioning_uri,
+    person_family_access_permitted,
+    revoke_all_sessions_for_person,
+    store_backup_codes,
+    verify_totp_code,
+)
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 router = APIRouter(
@@ -26,13 +59,92 @@ router = APIRouter(
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
 ALLOWED_ROLES = {"placeholder", "relative", "family_admin", "bot_only"}
-ALIAS_KINDS = {"kinship_term", "nickname", "diminutive", "formal_with_patronymic", "other"}
-ALIAS_GENERATIONS = {"parents", "siblings", "children", "grandchildren", "other"}
 
 
 def _clean_optional_text(value: object) -> str | None:
     text_value = str(value or "").strip()
     return text_value or None
+
+
+def _parse_datetime_safe(value: object) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+
+    variants = [raw]
+    if raw.endswith("Z"):
+        variants.append(raw[:-1] + "+00:00")
+
+    for candidate in variants:
+        try:
+            dt = datetime.fromisoformat(candidate)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except ValueError:
+            pass
+
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+
+    return None
+
+
+def _role_filter_key(role: str | None) -> str:
+    value = str(role or "").strip().lower()
+    mapping = {
+        "placeholder": "placeholder",
+        "relative": "relative",
+        "family_admin": "familyadmin",
+        "familyadmin": "familyadmin",
+        "bot_only": "botonly",
+        "botonly": "botonly",
+    }
+    return mapping.get(value, "placeholder")
+
+
+def _status_filter_key(record_status: str | None) -> str:
+    value = str(record_status or "active").strip().lower()
+    mapping = {
+        "active": "active",
+        "archived": "archived",
+        "test_archived": "testarchived",
+        "testarchived": "testarchived",
+    }
+    return mapping.get(value, "active")
+
+
+def _channel_filter_key(preferred_ch: str | None) -> str:
+    value = str(preferred_ch or "").strip().lower()
+    mapping = {
+        "max": "max",
+        "tg": "tg",
+        "email": "email",
+        "push": "push",
+        "none": "none",
+        "": "none",
+    }
+    return mapping.get(value, "none")
+
+
+def _avatar_filter_state(
+    *,
+    has_avatar: bool,
+    is_alive: bool,
+    avatar_last_dt: datetime | None,
+    now_utc: datetime,
+) -> tuple[str, bool]:
+    if not has_avatar:
+        return "no_avatar", False
+
+    # Product rule v1: expired applies primarily to living people with avatar age > 365 days.
+    if is_alive and avatar_last_dt and (now_utc - avatar_last_dt > timedelta(days=365)):
+        return "expired_avatar", True
+
+    return "actual_avatar", False
 
 
 def _normalize_preferred_channel(raw_value: object, is_alive: bool) -> str | None:
@@ -208,6 +320,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         {
             "request": request,
             "explorer_url": "/explorer/",
+            "local_llm_check_url": "/admin/ai/local-llm-check",
         },
     )
 
@@ -230,6 +343,293 @@ async def admin_test_impulse(person_id: int, request: Request):
     bot = MaxMessengerBot()
     result = await bot.send_daily_impulse(person_id=person_id)
     return JSONResponse(result)
+
+
+@router.get("/ai/local-llm-check", response_class=HTMLResponse)
+async def admin_local_llm_check(request: Request):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    analyzer = ProviderAgnosticAnalyzer(provider_name="local_llm")
+    result = analyzer.analyze_memory_text("Это тестовая история о семье")
+    ok = (result or {}).get("status") == "ok" and bool(str((result or {}).get("summary") or "").strip())
+
+    return templates.TemplateResponse(
+        "admin/admin_ai_local_llm_check.html",
+        {
+            "request": request,
+            "ok": ok,
+            "provider": "local_llm",
+            "result": result,
+        },
+    )
+
+
+@router.get("/whisper/local-test", response_class=HTMLResponse)
+async def admin_whisper_local_test_form(request: Request):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    return templates.TemplateResponse(
+        "admin/admin_whisper_local_test.html",
+        {
+            "request": request,
+            "result": None,
+            "error": None,
+            "whisper_local_url": os.getenv("WHISPER_LOCAL_URL", "").strip(),
+            "whisper_provider": (os.getenv("WHISPER_PROVIDER", "") or "").strip(),
+        },
+    )
+
+
+@router.post("/whisper/local-test", response_class=HTMLResponse)
+async def admin_whisper_local_test_submit(request: Request, file: UploadFile = File(...)):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    whisper_local_url = os.getenv("WHISPER_LOCAL_URL", "").strip()
+    whisper_provider = (os.getenv("WHISPER_PROVIDER", "") or "").strip()
+    if not whisper_local_url:
+        return templates.TemplateResponse(
+            "admin/admin_whisper_local_test.html",
+            {
+                "request": request,
+                "result": None,
+                "error": "WHISPER_LOCAL_URL не задан (нельзя вызвать локальный Whisper).",
+                "whisper_local_url": whisper_local_url,
+                "whisper_provider": whisper_provider,
+            },
+            status_code=400,
+        )
+
+    content = await file.read()
+    if not content:
+        return templates.TemplateResponse(
+            "admin/admin_whisper_local_test.html",
+            {
+                "request": request,
+                "result": None,
+                "error": "Пустой файл.",
+                "whisper_local_url": whisper_local_url,
+                "whisper_provider": whisper_provider,
+            },
+            status_code=400,
+        )
+
+    start = time.monotonic()
+    try:
+        files = {"file": (file.filename or "audio.bin", content, "application/octet-stream")}
+        response = httpx.post(whisper_local_url, files=files, timeout=240.0)
+        status_code = response.status_code
+        payload = response.json() if response.content else {}
+    except Exception as exc:
+        elapsed = round(time.monotonic() - start, 3)
+        return templates.TemplateResponse(
+            "admin/admin_whisper_local_test.html",
+            {
+                "request": request,
+                "result": {"status": "error", "error": str(exc), "processing_seconds": elapsed},
+                "error": f"Ошибка вызова локального Whisper: {exc}",
+                "whisper_local_url": whisper_local_url,
+                "whisper_provider": whisper_provider,
+            },
+            status_code=502,
+        )
+
+    elapsed = round(time.monotonic() - start, 3)
+    result = payload if isinstance(payload, dict) else {"raw": payload}
+    if isinstance(result, dict):
+        result.setdefault("http_status_code", status_code)
+        result.setdefault("processing_seconds", elapsed)
+
+    ok = isinstance(result, dict) and result.get("status") == "ok" and bool(str(result.get("text") or "").strip())
+    error = None if ok else "Whisper вернул пустой/ошибочный результат."
+
+    return templates.TemplateResponse(
+        "admin/admin_whisper_local_test.html",
+        {
+            "request": request,
+            "result": result,
+            "error": error,
+            "whisper_local_url": whisper_local_url,
+            "whisper_provider": whisper_provider,
+        },
+        status_code=200 if ok else 502,
+    )
+
+
+@router.get("/pipeline/memory-test", response_class=HTMLResponse)
+async def admin_memory_pipeline_test_form(request: Request):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    return templates.TemplateResponse(
+        "admin/admin_memory_pipeline_test.html",
+        {
+            "request": request,
+            "result": None,
+            "error": None,
+            "input_text": "",
+            "whisper_local_url": os.getenv("WHISPER_LOCAL_URL", "").strip(),
+            "whisper_provider": (os.getenv("WHISPER_PROVIDER", "") or "").strip(),
+            "ai_local_llm_url": os.getenv("AI_LOCAL_LLM_URL", "").strip(),
+            "ai_provider": (os.getenv("AI_PROVIDER", "") or "").strip() or (os.getenv("AIPROVIDER", "") or "").strip(),
+        },
+    )
+
+
+@router.post("/pipeline/memory-test", response_class=HTMLResponse)
+async def admin_memory_pipeline_test_submit(
+    request: Request,
+    input_text: str = Form(""),
+    file: UploadFile | None = File(None),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    whisper_local_url = os.getenv("WHISPER_LOCAL_URL", "").strip()
+    whisper_provider = (os.getenv("WHISPER_PROVIDER", "") or "").strip()
+    ai_local_llm_url = os.getenv("AI_LOCAL_LLM_URL", "").strip()
+    ai_provider = (os.getenv("AI_PROVIDER", "") or "").strip() or (os.getenv("AIPROVIDER", "") or "").strip()
+
+    transcript_text = (input_text or "").strip()
+    transcript_payload = None
+    whisper_timing = None
+
+    if file is not None and (file.filename or "").strip():
+        if not whisper_local_url:
+            return templates.TemplateResponse(
+                "admin/admin_memory_pipeline_test.html",
+                {
+                    "request": request,
+                    "result": None,
+                    "error": "WHISPER_LOCAL_URL не задан (нельзя прогнать аудио через local Whisper).",
+                    "input_text": transcript_text,
+                    "whisper_local_url": whisper_local_url,
+                    "whisper_provider": whisper_provider,
+                    "ai_local_llm_url": ai_local_llm_url,
+                    "ai_provider": ai_provider,
+                },
+                status_code=400,
+            )
+
+        audio_content = await file.read()
+        if not audio_content:
+            return templates.TemplateResponse(
+                "admin/admin_memory_pipeline_test.html",
+                {
+                    "request": request,
+                    "result": None,
+                    "error": "Пустой аудиофайл.",
+                    "input_text": transcript_text,
+                    "whisper_local_url": whisper_local_url,
+                    "whisper_provider": whisper_provider,
+                    "ai_local_llm_url": ai_local_llm_url,
+                    "ai_provider": ai_provider,
+                },
+                status_code=400,
+            )
+
+        start = time.monotonic()
+        try:
+            files = {"file": (file.filename or "audio.bin", audio_content, "application/octet-stream")}
+            response = httpx.post(whisper_local_url, files=files, timeout=240.0)
+            transcript_payload = response.json() if response.content else {}
+        except Exception as exc:
+            whisper_timing = round(time.monotonic() - start, 3)
+            return templates.TemplateResponse(
+                "admin/admin_memory_pipeline_test.html",
+                {
+                    "request": request,
+                    "result": None,
+                    "error": f"Ошибка вызова local Whisper: {exc}",
+                    "input_text": transcript_text,
+                    "whisper_local_url": whisper_local_url,
+                    "whisper_provider": whisper_provider,
+                    "ai_local_llm_url": ai_local_llm_url,
+                    "ai_provider": ai_provider,
+                },
+                status_code=502,
+            )
+        whisper_timing = round(time.monotonic() - start, 3)
+        if isinstance(transcript_payload, dict):
+            transcript_payload.setdefault("processing_seconds", whisper_timing)
+        if isinstance(transcript_payload, dict) and transcript_payload.get("status") == "ok":
+            transcript_text = str(transcript_payload.get("text") or "").strip()
+
+    if not transcript_text:
+        return templates.TemplateResponse(
+            "admin/admin_memory_pipeline_test.html",
+            {
+                "request": request,
+                "result": {
+                    "transcript": {"status": "empty", "text": ""},
+                    "analysis": None,
+                    "providers": {
+                        "whisper": {"provider": whisper_provider, "endpoint": whisper_local_url},
+                        "local_llm": {"provider": "local_llm", "endpoint": ai_local_llm_url},
+                    },
+                },
+                "error": "Пустой результат: нет текста для анализа (введите текст или загрузите аудио).",
+                "input_text": (input_text or "").strip(),
+                "whisper_local_url": whisper_local_url,
+                "whisper_provider": whisper_provider,
+                "ai_local_llm_url": ai_local_llm_url,
+                "ai_provider": ai_provider,
+            },
+            status_code=400,
+        )
+
+    analyzer = ProviderAgnosticAnalyzer(provider_name="local_llm")
+    analysis_start = time.monotonic()
+    analysis = analyzer.analyze_memory_text(transcript_text)
+    analysis_timing = round(time.monotonic() - analysis_start, 3)
+
+    result = {
+        "transcript": {
+            "status": "ok",
+            "text": transcript_text,
+            "raw": transcript_payload,
+        },
+        "analysis": analysis,
+        "timings": {
+            "whisper_seconds": whisper_timing,
+            "analysis_seconds": analysis_timing,
+        },
+        "providers": {
+            "whisper": {
+                "provider": whisper_provider or "local_small",
+                "endpoint": whisper_local_url,
+            },
+            "local_llm": {
+                "provider": "local_llm",
+                "endpoint": ai_local_llm_url,
+            },
+        },
+    }
+
+    ok = isinstance(analysis, dict) and analysis.get("status") == "ok"
+    error = None if ok else "Анализатор вернул ошибку (см. JSON ниже)."
+
+    return templates.TemplateResponse(
+        "admin/admin_memory_pipeline_test.html",
+        {
+            "request": request,
+            "result": result,
+            "error": error,
+            "input_text": (input_text or "").strip(),
+            "whisper_local_url": whisper_local_url,
+            "whisper_provider": whisper_provider,
+            "ai_local_llm_url": ai_local_llm_url,
+            "ai_provider": ai_provider,
+        },
+        status_code=200 if ok else 502,
+    )
 
 
 @router.get("/transcriptions")
@@ -289,6 +689,13 @@ async def admin_transcriptions(
 
         audio_player_src = m.audio_url
         audio_source = "external"
+        analysis = None
+        analysis_status = None
+        analysis_summary = None
+        analysis_persons = []
+        analysis_dates = []
+        analysis_locations = []
+        transcription_substatus = None
         if m.transcript_verbatim:
             try:
                 metadata = json.loads(m.transcript_verbatim)
@@ -299,6 +706,28 @@ async def admin_transcriptions(
             if isinstance(local_audio_path, str) and local_audio_path.strip():
                 audio_player_src = local_audio_path.strip()
                 audio_source = "local"
+
+            if isinstance(metadata, dict):
+                cand = metadata.get("analysis")
+                if isinstance(cand, dict):
+                    analysis = cand
+                    analysis_status = str(cand.get("status") or "").strip().lower() or None
+                    analysis_summary = str(cand.get("summary") or "").strip() or None
+                    analysis_persons = cand.get("persons") if isinstance(cand.get("persons"), list) else []
+                    analysis_dates = cand.get("dates") if isinstance(cand.get("dates"), list) else []
+                    analysis_locations = cand.get("locations") if isinstance(cand.get("locations"), list) else []
+
+                items = metadata.get("draft_items")
+                if isinstance(items, list):
+                    statuses = [
+                        str((it or {}).get("transcription_status") or "").strip().lower()
+                        for it in items
+                        if isinstance(it, dict) and it.get("type") == "audio"
+                    ]
+                    if any(s == "error" for s in statuses):
+                        transcription_substatus = "transcription_error"
+                    elif any(s == "pending" for s in statuses):
+                        transcription_substatus = "transcription_pending"
 
         result.append(
             {
@@ -312,8 +741,15 @@ async def admin_transcriptions(
                 "transcript_verbatim": m.transcript_verbatim,
                 "transcript_readable": m.transcript_readable,
                 "transcription_status": m.transcription_status,
+                "transcription_substatus": transcription_substatus,
                 "source_type": m.source_type,
                 "created_at": m.created_at,
+                "analysis": analysis,
+                "analysis_status": analysis_status,
+                "analysis_summary": analysis_summary,
+                "analysis_persons": analysis_persons,
+                "analysis_dates": analysis_dates,
+                "analysis_locations": analysis_locations,
             }
         )
 
@@ -411,6 +847,39 @@ async def admin_login_submit(
     )
 
 
+@router.get("/logout")
+async def admin_logout_get():
+    response = RedirectResponse(url="/admin/login", status_code=303)
+    response.delete_cookie(key=ADMIN_COOKIE_NAME, path="/")
+    return response
+
+
+@router.post("/logout")
+async def admin_logout_post():
+    response = RedirectResponse(url="/admin/login", status_code=303)
+    response.delete_cookie(key=ADMIN_COOKIE_NAME, path="/")
+    return response
+
+
+@router.get("/early-access", response_class=HTMLResponse)
+async def admin_early_access_list(request: Request, db: Session = Depends(get_db)):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    rows = (
+        db.query(EarlyAccessRequest)
+        .order_by(EarlyAccessRequest.created_at.desc())
+        .limit(200)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "admin/early_access.html",
+        {"request": request, "rows": rows},
+    )
+
+
 @router.get("/avatars", response_class=HTMLResponse)
 async def admin_avatars(request: Request, db: Session = Depends(get_db)):
     redirect = require_admin(request)
@@ -488,6 +957,21 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
+    person_ids = [p.person_id for p in people]
+    avatar_rows = (
+        db.query(AvatarHistory)
+        .filter(AvatarHistory.person_id.in_(person_ids))
+        .all()
+        if person_ids
+        else []
+    )
+
+    avatar_by_person: dict[int, list[AvatarHistory]] = {}
+    for row in avatar_rows:
+        avatar_by_person.setdefault(row.person_id, []).append(row)
+
+    now_utc = datetime.now(timezone.utc)
+
     rows = []
     for p in people:
         i18n = (
@@ -508,20 +992,43 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
         quotes_count = db.query(Quote).filter(Quote.author_id == p.person_id).count()
         alias_rows = (
             db.query(PersonAlias)
-            .filter(PersonAlias.person_id == p.person_id)
+            .filter(
+                PersonAlias.person_id == p.person_id,
+                PersonAlias.status == "active",
+            )
             .order_by(PersonAlias.id.asc())
             .all()
         )
         aliases = [
             {
                 "id": alias.id,
-                "alias_text": alias.alias_text,
-                "alias_kind": alias.alias_kind,
+                "label": alias.label,
+                "alias_type": alias.alias_type,
                 "used_by_generation": alias.used_by_generation,
                 "note": alias.note,
             }
             for alias in alias_rows
         ]
+
+        person_avatar_rows = avatar_by_person.get(p.person_id, [])
+        current_avatars = [a for a in person_avatar_rows if int(a.is_current or 0) == 1]
+        candidate_rows = current_avatars or person_avatar_rows
+        latest_avatar = max(
+            candidate_rows,
+            key=lambda a: _parse_datetime_safe(a.created_at) or datetime.min.replace(tzinfo=timezone.utc),
+            default=None,
+        )
+
+        history_has_avatar = bool(latest_avatar and str(latest_avatar.storage_path or "").strip())
+        has_avatar = bool(str(p.avatar_url or "").strip()) or history_has_avatar
+        avatar_last_dt = _parse_datetime_safe(latest_avatar.created_at) if latest_avatar else None
+        is_alive_bool = bool(p.is_alive)
+        avatar_state, avatar_is_expired = _avatar_filter_state(
+            has_avatar=has_avatar,
+            is_alive=is_alive_bool,
+            avatar_last_dt=avatar_last_dt,
+            now_utc=now_utc,
+        )
 
         rows.append({
             "person_id": p.person_id,
@@ -538,11 +1045,307 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
             "memories_count": memories_count,
             "quotes_count": quotes_count,
             "aliases": aliases,
+            "has_avatar": has_avatar,
+            "avatar_is_expired": avatar_is_expired,
+            "avatar_state": avatar_state,
+            "avatar_state_label": (
+                "Нет аватара"
+                if avatar_state == "no_avatar"
+                else "Аватар истёк"
+                if avatar_state == "expired_avatar"
+                else "Аватар актуален"
+            ),
+            "avatar_last_updated_at": latest_avatar.created_at if latest_avatar else None,
+            "role_key": _role_filter_key(p.role),
+            "record_status_key": _status_filter_key(p.record_status),
+            "preferred_ch_key": _channel_filter_key(p.preferred_ch),
+            "is_alive_key": "yes" if is_alive_bool else "no",
         })
 
     return templates.TemplateResponse(
         "admin/admin_people.html",
         {"request": request, "rows": rows},
+    )
+
+
+def _parse_alias_spoken_by(form_value: object) -> int | None:
+    raw = str(form_value or "").strip()
+    if not raw or raw == "0":
+        return None
+    try:
+        return int(raw)
+    except Exception:
+        return None
+
+
+def _normalize_alias_list_filters(status_filter: str, source_filter: str) -> tuple[str, str]:
+    if status_filter not in {"all", "active", "rejected"}:
+        status_filter = "all"
+    if source_filter not in {"all", "ai_extracted", "manual"}:
+        source_filter = "all"
+    return status_filter, source_filter
+
+
+def _load_person_alias_row_dicts(
+    db: Session, person_id: int, status_filter: str, source_filter: str
+) -> tuple[str, str, list[dict]]:
+    status_filter, source_filter = _normalize_alias_list_filters(status_filter, source_filter)
+    q = (
+        db.query(PersonAlias)
+        .filter(PersonAlias.person_id == person_id)
+        .order_by(PersonAlias.id.asc())
+    )
+    if status_filter == "active":
+        q = q.filter(PersonAlias.status == "active")
+    elif status_filter == "rejected":
+        q = q.filter(PersonAlias.status == "rejected")
+    if source_filter == "ai_extracted":
+        q = q.filter(PersonAlias.source == "ai_extracted")
+    elif source_filter == "manual":
+        q = q.filter(PersonAlias.source == "manual")
+
+    rows_out: list[dict] = []
+    for a in q.all():
+        sp_name = "Универсальный"
+        if a.spoken_by_person_id:
+            sp_name = _person_name_ru(db, a.spoken_by_person_id)
+        rows_out.append(
+            {
+                "id": a.id,
+                "label": a.label,
+                "alias_type": a.alias_type,
+                "source": a.source,
+                "status": a.status,
+                "spoken_by_person_id": a.spoken_by_person_id,
+                "spoken_by_label": sp_name,
+                "created_at": a.created_at,
+                "updated_at": a.updated_at,
+            }
+        )
+    return status_filter, source_filter, rows_out
+
+
+@router.get(
+    "/people/{person_id}/aliases",
+    response_class=HTMLResponse,
+    name="admin_person_aliases",
+)
+async def admin_person_aliases_page(
+    request: Request,
+    person_id: int,
+    db: Session = Depends(get_db),
+    status_filter: str = Query("all"),
+    source_filter: str = Query("all"),
+    edit: int | None = Query(None, description="id алиаса для формы правки"),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    status_filter, source_filter, rows_out = _load_person_alias_row_dicts(
+        db, person_id, status_filter, source_filter
+    )
+
+    editing: dict | None = None
+    if edit is not None:
+        ed = (
+            db.query(PersonAlias)
+            .filter(PersonAlias.id == edit, PersonAlias.person_id == person_id)
+            .first()
+        )
+        if ed:
+            sn = "Универсальный"
+            if ed.spoken_by_person_id:
+                sn = _person_name_ru(db, ed.spoken_by_person_id)
+            editing = {
+                "id": ed.id,
+                "label": ed.label,
+                "alias_type": ed.alias_type,
+                "source": ed.source,
+                "status": ed.status,
+                "spoken_by_person_id": ed.spoken_by_person_id,
+                "spoken_by_label": sn,
+            }
+
+    people_spoken = _build_people_options(db, exclude_person_ids={person_id})
+
+    return templates.TemplateResponse(
+        "admin/admin_person_aliases.html",
+        {
+            "request": request,
+            "person_id": person_id,
+            "person_name": _person_name_ru(db, person_id),
+            "rows": rows_out,
+            "editing": editing,
+            "people_spoken": people_spoken,
+            "status_filter": status_filter,
+            "source_filter": source_filter,
+            "alias_types": sorted(ALIAS_TYPES),
+            "form_error": None,
+        },
+    )
+
+
+@router.post("/people/{person_id}/aliases", response_class=HTMLResponse)
+async def admin_person_alias_create_submit(
+    person_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    form = await request.form()
+    label = str(form.get("label") or "").strip()
+    alias_type = str(form.get("alias_type") or "").strip()
+    spoken_id = _parse_alias_spoken_by(form.get("spoken_by_person_id"))
+
+    def re_render_error(message: str) -> HTMLResponse:
+        _, _, rows_out = _load_person_alias_row_dicts(db, person_id, "all", "all")
+        return templates.TemplateResponse(
+            "admin/admin_person_aliases.html",
+            {
+                "request": request,
+                "person_id": person_id,
+                "person_name": _person_name_ru(db, person_id),
+                "rows": rows_out,
+                "editing": None,
+                "people_spoken": _build_people_options(db, exclude_person_ids={person_id}),
+                "status_filter": "all",
+                "source_filter": "all",
+                "alias_types": sorted(ALIAS_TYPES),
+                "form_error": message,
+            },
+            status_code=400,
+        )
+
+    if not label:
+        return re_render_error("Укажите текст алиаса (label).")
+    if alias_type not in ALIAS_TYPES:
+        return re_render_error("Некорректный тип алиаса.")
+    if spoken_id is not None and not db.query(Person).filter(Person.person_id == spoken_id).first():
+        return re_render_error("Выбранный «Кто называет» не найден.")
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    row = PersonAlias(
+        person_id=person_id,
+        label=label,
+        alias_type=alias_type,
+        spoken_by_person_id=spoken_id,
+        source="manual",
+        status="active",
+        updated_at=now,
+    )
+    db.add(row)
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        return re_render_error(f"Не удалось сохранить: {exc}")
+
+    return RedirectResponse(
+        url=f"/admin/people/{person_id}/aliases",
+        status_code=303,
+    )
+
+
+@router.post("/people/{person_id}/aliases/{alias_id}/edit", response_class=HTMLResponse)
+async def admin_person_alias_edit_submit(
+    person_id: int,
+    alias_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    al = (
+        db.query(PersonAlias)
+        .filter(PersonAlias.id == alias_id, PersonAlias.person_id == person_id)
+        .first()
+    )
+    if not al:
+        raise HTTPException(status_code=404, detail="Alias not found")
+
+    form = await request.form()
+    label = str(form.get("label") or "").strip()
+    alias_type = str(form.get("alias_type") or "").strip()
+    status = str(form.get("status") or "").strip()
+    spoken_id = _parse_alias_spoken_by(form.get("spoken_by_person_id"))
+
+    if not label:
+        return RedirectResponse(
+            url=f"/admin/people/{person_id}/aliases?edit={alias_id}",
+            status_code=303,
+        )
+    if alias_type not in ALIAS_TYPES or status not in ALIAS_STATUS:
+        return RedirectResponse(
+            url=f"/admin/people/{person_id}/aliases?edit={alias_id}",
+            status_code=303,
+        )
+    if spoken_id is not None and not db.query(Person).filter(Person.person_id == spoken_id).first():
+        return RedirectResponse(
+            url=f"/admin/people/{person_id}/aliases?edit={alias_id}",
+            status_code=303,
+        )
+
+    al.label = label
+    al.alias_type = alias_type
+    al.status = status
+    al.spoken_by_person_id = spoken_id
+    al.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Save failed")
+
+    return RedirectResponse(
+        url=f"/admin/people/{person_id}/aliases",
+        status_code=303,
+    )
+
+
+@router.post("/people/{person_id}/aliases/{alias_id}/reject", response_class=HTMLResponse)
+async def admin_person_alias_reject(
+    person_id: int,
+    alias_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    al = (
+        db.query(PersonAlias)
+        .filter(PersonAlias.id == alias_id, PersonAlias.person_id == person_id)
+        .first()
+    )
+    if not al:
+        raise HTTPException(status_code=404, detail="Alias not found")
+
+    al.status = "rejected"
+    al.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Save failed")
+
+    return RedirectResponse(
+        url=f"/admin/people/{person_id}/aliases",
+        status_code=303,
     )
 
 
@@ -999,78 +1802,193 @@ async def admin_union_add_child_submit(union_id: int, request: Request, db: Sess
     return RedirectResponse(url="/admin/people", status_code=303)
 
 
-@router.post("/people/{person_id}/aliases", response_class=JSONResponse)
-async def admin_create_person_alias(
-    person_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
+def _qr_png_b64(otpauth_uri: str) -> str:
+    img = qrcode.make(otpauth_uri, box_size=4, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _absolute_app_base_url(request: Request) -> str:
+    """Схема+хост для публичных ссылок: прокси (TW_PUBLIC_BASE_URL) или Host из запроса, иначе дефолт."""
+    o = (os.environ.get("TW_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if o:
+        return o
+    b = str(request.base_url).rstrip("/")
+    if b and b not in ("http://", "https://"):
+        return b
+    return (os.environ.get("TW_DEFAULT_PUBLIC_BASE_URL") or "https://app.timewoven.ru").strip().rstrip(
+        "/"
+    )
+
+
+def _family_profile_public_url(request: Request, public_uuid) -> str:
+    """Ссылка на семейный профиль по public_uuid: https://…/family/p/{uuid}."""
+    base = _absolute_app_base_url(request)
+    s = (str(public_uuid) if public_uuid is not None else "").strip()
+    if not s or s == "None":
+        return ""
+    return f"{base}/family/p/{s}"
+
+
+def _ensure_public_uuid(db: Session, person: Person) -> None:
+    """Публичный UUID обязателен для ссылки; при отсутствии — присваиваем и сохраняем (как в /access/setup)."""
+    if person.public_uuid is not None:
+        return
+    person.public_uuid = uuid4()
+    db.commit()
+    db.refresh(person)
+
+
+@router.get("/people/{person_id}/access", response_class=HTMLResponse)
+async def admin_person_access_page(
+    person_id: int, request: Request, db: Session = Depends(get_db)
 ):
-    redirect = require_admin(request)
-    if redirect:
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
-
-    try:
-        payload = await request.json()
-    except Exception:
-        return JSONResponse({"error": "invalid_json"}, status_code=400)
-
-    alias_text = str((payload or {}).get("alias_text") or "").strip()
-    alias_kind = str((payload or {}).get("alias_kind") or "").strip()
-    used_by_generation = _clean_optional_text((payload or {}).get("used_by_generation"))
-    note = _clean_optional_text((payload or {}).get("note"))
-
-    if not alias_text:
-        return JSONResponse({"error": "alias_text is required"}, status_code=400)
-    if alias_kind not in ALIAS_KINDS:
-        return JSONResponse({"error": "invalid alias_kind"}, status_code=400)
-    if used_by_generation and used_by_generation not in ALIAS_GENERATIONS:
-        return JSONResponse({"error": "invalid used_by_generation"}, status_code=400)
-
+    redir = require_admin(request)
+    if redir:
+        return redir
     person = db.query(Person).filter(Person.person_id == person_id).first()
     if not person:
-        return JSONResponse({"error": "person not found"}, status_code=404)
-
-    alias = PersonAlias(
-        person_id=person_id,
-        alias_text=alias_text,
-        alias_kind=alias_kind,
-        used_by_generation=used_by_generation,
-        note=note,
+        raise HTTPException(status_code=404, detail="Person not found")
+    _ensure_public_uuid(db, person)
+    name = _person_name_ru(db, person_id)
+    pending = bool(
+        person.totp_secret_encrypted
+        and not person.family_access_enabled
+        and not person.family_access_revoked_at
     )
-    db.add(alias)
-    db.commit()
-    db.refresh(alias)
-
-    return JSONResponse(
+    n_sessions = (
+        db.query(FamilyAccessSession)
+        .filter(
+            FamilyAccessSession.person_id == person_id,
+            FamilyAccessSession.revoked_at.is_(None),
+        )
+        .count()
+    )
+    n_backup = (
+        db.query(PersonAccessBackupCode)
+        .filter(
+            PersonAccessBackupCode.person_id == person_id,
+            PersonAccessBackupCode.used_at.is_(None),
+        )
+        .count()
+    )
+    family_public_url = _family_profile_public_url(request, person.public_uuid)
+    return templates.TemplateResponse(
+        "admin/person_access.html",
         {
-            "saved": True,
-            "alias": {
-                "id": alias.id,
-                "person_id": alias.person_id,
-                "alias_text": alias.alias_text,
-                "alias_kind": alias.alias_kind,
-                "used_by_generation": alias.used_by_generation,
-                "note": alias.note,
-                "created_at": alias.created_at.isoformat() if alias.created_at else None,
-            },
-        }
+            "request": request,
+            "person": person,
+            "name": name,
+            "pending": pending,
+            "access_permitted": person_family_access_permitted(person),
+            "n_active_sessions": n_sessions,
+            "n_backup_left": n_backup,
+            "family_public_url": family_public_url,
+        },
     )
 
 
-@router.delete("/aliases/{alias_id}", response_class=JSONResponse)
-async def admin_delete_person_alias(
-    alias_id: int,
+@router.post("/people/{person_id}/access/setup", response_class=HTMLResponse)
+async def admin_person_access_setup(
+    person_id: int, request: Request, db: Session = Depends(get_db)
+):
+    redir = require_admin(request)
+    if redir:
+        return redir
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    if person.public_uuid is None:
+        person.public_uuid = uuid4()
+    person.family_access_revoked_at = None
+    secret = pyotp.random_base32()
+    codes = [generate_backup_code_plain() for _ in range(8)]
+    person.totp_secret_encrypted = encrypt_totp_secret(secret)
+    person.family_access_enabled = False
+    person.totp_enabled_at = None
+    person.totp_last_used_at = None
+    clear_backup_codes(db, person_id)
+    store_backup_codes(db, person_id, codes)
+    db.commit()
+    label = f"{_person_name_ru(db, person_id)} (TW)"
+    uri = new_totp_provisioning_uri(secret, label)
+    b64 = _qr_png_b64(uri)
+    return templates.TemplateResponse(
+        "admin/person_access_setup.html",
+        {
+            "request": request,
+            "person": person,
+            "name": _person_name_ru(db, person_id),
+            "qr_data_uri": f"data:image/png;base64,{b64}",
+            "otpauth_uri": uri,
+            "backup_codes": codes,
+            "public_uuid": str(person.public_uuid),
+        },
+    )
+
+
+@router.post("/people/{person_id}/access/confirm", response_class=HTMLResponse)
+async def admin_person_access_confirm(
+    person_id: int,
     request: Request,
+    code: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    redirect = require_admin(request)
-    if redirect:
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
-
-    alias = db.query(PersonAlias).filter(PersonAlias.id == alias_id).first()
-    if not alias:
-        return JSONResponse({"error": "alias not found"}, status_code=404)
-
-    db.delete(alias)
+    redir = require_admin(request)
+    if redir:
+        return redir
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person or not person.totp_secret_encrypted:
+        raise HTTPException(status_code=400, detail="Run setup first")
+    try:
+        raw = decrypt_totp_secret(person.totp_secret_encrypted)
+    except Exception:
+        return RedirectResponse(
+            url=f"/admin/people/{person_id}/access?err=crypto", status_code=303
+        )
+    if not verify_totp_code(raw, code):
+        return RedirectResponse(
+            url=f"/admin/people/{person_id}/access?err=bad_code", status_code=303
+        )
+    now = datetime.now(timezone.utc)
+    person.family_access_enabled = True
+    person.totp_enabled_at = now
+    person.family_access_revoked_at = None
     db.commit()
-    return JSONResponse({"deleted": True, "alias_id": alias_id})
+    return RedirectResponse(url=f"/admin/people/{person_id}/access", status_code=303)
+
+
+@router.post("/people/{person_id}/access/reset", response_class=HTMLResponse)
+async def admin_person_access_reset(
+    person_id: int, request: Request, db: Session = Depends(get_db)
+):
+    redir = require_admin(request)
+    if redir:
+        return redir
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    person.totp_secret_encrypted = None
+    person.family_access_enabled = False
+    person.totp_enabled_at = None
+    person.totp_last_used_at = None
+    person.family_access_revoked_at = datetime.now(timezone.utc)
+    clear_backup_codes(db, person_id)
+    revoke_all_sessions_for_person(db, person_id)
+    db.commit()
+    return RedirectResponse(url=f"/admin/people/{person_id}/access", status_code=303)
+
+
+@router.post("/people/{person_id}/access/revoke-sessions", response_class=HTMLResponse)
+async def admin_person_access_revoke_sessions(
+    person_id: int, request: Request, db: Session = Depends(get_db)
+):
+    redir = require_admin(request)
+    if redir:
+        return redir
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    revoke_all_sessions_for_person(db, person_id)
+    return RedirectResponse(url=f"/admin/people/{person_id}/access", status_code=303)
