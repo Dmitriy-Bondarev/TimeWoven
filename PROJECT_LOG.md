@@ -1,5 +1,187 @@
 # PROJECT LOG — TimeWoven
 
+## Decision: T37 — family graph split into Graph Lite / Time Machine / Legacy Graph
+
+Date: 2026-04-25
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Decision / Notes
+
+- Продуктово: family graph больше не рассматривается как один общий перегруженный интерфейс.
+- Принято разделение на три поверхности:
+  - **Graph Lite** — основной семейный граф для структуры семьи и быстрой навигации.
+  - **Time Machine** — отдельная семейная temporal‑поверхность для просмотра семьи по годам.
+  - **Legacy Graph** — текущий граф сохраняется как admin-only / personal experimental tool.
+- `personal timeline` уже выполняет роль story-board отдельного человека.
+- Отдельный Story Mode в графе пока **не является текущим приоритетом**.
+- Graph Lite и Time Machine планируются как **family-facing surfaces**.
+- Privacy/visibility для graph/time views — отдельный будущий эпик.
+- Важное уточнение для будущей visibility model: запрос на скрытие персоны, союза или части истории может исходить от **одного** участника семьи и **не обязан** автоматически становиться глобальным правилом для всех viewers.
+
+### Next task package
+
+- T37A — точки входа Graph Lite / Time Machine / Legacy Graph
+- T37B — Graph Lite
+- T37C — Time Machine
+- T37D — privacy note / backlog item
+
+## Update: T40 — bilingual landing (RU/EN) + waitlist polish
+
+Date: 2026-04-25
+
+### Structural change
+
+Yes
+
+### Schema change
+
+No
+
+### Changes
+
+- Лендинг переведён на локали `landing` (RU/EN): `locales/ru/landing.yml`, `locales/en/landing.yml`.
+- В шаблон `app/web/templates/site/landing.html` прокинут словарь `t` (секция `landing`) для выбранной локали.
+- Весь контент лендинга переведён на использование ключей `landing.*` через `t.*` (без хардкода текста в шаблоне).
+- Добавлена статическая сборка лендинга:
+  - `python3 scripts/build_landing.py ru` → `index.html`
+  - `python3 scripts/build_landing.py en` → `en/index.html`
+- Production static scheme зафиксирована и проверена:
+  - `/` → RU (`/var/www/timewoven/index.html`)
+  - `/en/` → EN (`/var/www/timewoven/en/index.html`)
+- EN copy polished (marketing-facing тексты переписаны на “native landing English” без SaaS-клише).
+- Визуальный polish лендинга (без редизайна): header/hero/cards/footer; улучшены микро-интеракции, вертикальный ритм и типографика.
+- Mobile header fix: на `<=420px` header разрешает перенос actions на вторую строку, CTA не сжимается; language switch выглядит аккуратнее.
+- Waitlist form fix (CTA modal): добавлено отдельное email-поле `type="email"` + поле для Telegram, без ломания API payload (`contact_value` остаётся единым полем отправки).
+
+## LANDING-TEXT-AUDIT-1 — landing texts comparison table (old vs new)
+
+Date: 2026-04-25
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Result
+
+- Blocks: 99
+- only_new: 6
+- only_old: 0
+- anglicisms_after_whitelist: 2
+- Report: `docs/legal/audits/landing_text_audit_2026-04-25.md`
+
+## Update: TW-THEME-3-COVERAGE — reply/transcriptions/early-access moved to shared theme tokens
+
+Date: 2026-04-25
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- Дотянут theme‑coverage для ключевых экранов, которые ранее жили на локальном `:root` и хардкодных палитрах.
+- Шаблоны переведены на общий слой темы через `extends "base.html"` и CSS‑tokens из `app/web/static/site/theme.css`.
+- Экранные цели coverage:
+  - `family/reply` (ответы семьи на воспоминание)
+  - `/admin/transcriptions`
+  - `/admin/early-access`
+- Результат: страницы уважают пресеты тем, включая `voice_premium`, без старого “золотого” оформления.
+
+### Validation
+
+- `python3 -m py_compile app/main.py app/core/theme.py app/api/routes/admin.py`
+- Browser check: `/family/reply/{memory_id}?person_id=...`, `/admin/transcriptions`, `/admin/early-access` (в обоих presets: `current_dark`, `voice_premium`).
+
+## Update: TW-THEME-2-VOICE — voice_premium tuned for long reading + voice context
+
+Date: 2026-04-25
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- Обновлён preset `voice_premium` в `app/web/static/site/theme.css` как тема “вечернего радио” для длинного чтения семейных историй и будущего audio‑friendly сценария.
+- Ключевые смысловые изменения токенов (без привязки к конкретным hex):
+  - глубокий, но не чёрный фон;
+  - более различимые `surface / surface-2` (слои карточек и вложенные блоки);
+  - мягкий светлый основной текст для длинных абзацев;
+  - читаемый muted‑текст для мета‑информации и подписей;
+  - спокойный, “premium/voice” акцент без кислотности;
+  - нейтральные границы и тени для читаемой глубины;
+  - совместимость с admin UI (рабочий инструмент, без визуального разрыва с family).
+
+### Validation
+
+- `python3 -m py_compile app/main.py app/core/theme.py app/api/routes/admin.py`
+- Browser check: `/family/welcome`, `/family/timeline`, `/family/profile`, `/family/tree` в `voice_premium`.
+
+## Update: TW-THEME-1 — admin theme switch hardening (routing + base safety)
+
+Date: 2026-04-25
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Changes
+
+- Введена система theme‑presets (baseline + future‑preset) на базе CSS variables и data‑атрибута на `<html>`.
+- Добавлен admin‑only UI выбора темы и persisted сохранение активного preset без schema change.
+- Стабилизирован flow:
+  - базовый layout не зависит от необязательных Jinja helpers (язык берётся из `request.state`);
+  - сохранение темы из админки возвращает на `/admin/` без Not Found на окружениях, где redirect slashes не включён.
+- Тема применяется глобально к основным HTML‑экранам приложения.
+
+### Validation
+
+- `python3 -m py_compile app/main.py app/core/theme.py app/api/routes/admin.py`
+- Browser check: `/admin/login`, `/admin/`, переключение `current_dark` ↔ `voice_premium`, затем проверка ключевых family/admin экранов.
+
+## Decision: Claude / Anthropic removed from active contour
+
+Date: 2026-04-24
+
+### Structural change
+
+No
+
+### Schema change
+
+No
+
+### Decision / Changes
+
+- Принято решение: **Claude / Anthropic API выведен из активного контура проекта** (не рассматривается как текущий рабочий путь).
+- Актуальный рабочий стек для AI:
+  - **Текстовый анализ:** `local_llm` (localhost-only сервис на VPS).
+  - **Транскрибация аудио:** `local Whisper small` (localhost-only сервис на VPS).
+- Legacy-поддержка Anthropic/Claude в коде оставлена как опциональная, но **не является default** и **не рекомендуется** как текущий путь.
+
 ## Update: T25.4 — edit flow для memory (author-only)
 
 Date: 2026-04-24

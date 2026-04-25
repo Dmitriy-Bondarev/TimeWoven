@@ -20,6 +20,85 @@
 
 ---
 
+## T40 — Bilingual Landing (RU/EN) + Waitlist Polish
+
+**Status:** Done
+
+### Goal
+Сделать лендинг bilingual (RU/EN) на локалях, собрать статические версии для `/` и `/en/`, и довести waitlist/early-access UX до polished v1.
+
+### Result (2026-04-25)
+- Лендинг переведён на локали `landing` (RU/EN) и шаблон использует `t` (секция `landing`) вместо хардкода.
+- Добавлена сборка статических версий:
+  - `python3 scripts/build_landing.py ru` → `index.html`
+  - `python3 scripts/build_landing.py en` → `en/index.html`
+- Production static scheme: `/` = RU, `/en/` = EN.
+- EN marketing copy polished.
+- Визуальный polish (header/hero/cards/footer) + mobile header fix на очень узких экранах.
+- Waitlist/early-access: отдельное email-поле `type="email"` + Telegram field, без изменения API payload.
+
+### References
+- `PROJECT_LOG.md` — Update: T40 (2026-04-25)
+- `CHANGELOG.md` — v1.22.40 (2026-04-25)
+
+---
+
+## T37A — Family Graph entry points split
+
+**Priority:** P1  
+**Status:** Planned
+
+### Scope
+- Развести family graph на три точки входа:
+  - Graph Lite
+  - Time Machine
+  - Legacy Graph (admin-only / experimental)
+
+---
+
+## T37B — Graph Lite
+
+**Priority:** P1  
+**Status:** Planned
+
+### Scope
+- Новый основной семейный граф.
+- Focus на выбранном человеке.
+- Группировка по союзам.
+- Дети не смешиваются между союзами.
+- Визуальные границы/контуры союзов.
+- Нижняя панель.
+- Переход в профиль.
+- Компактное управление глубиной.
+
+---
+
+## T37C — Time Machine
+
+**Priority:** P1  
+**Status:** Planned
+
+### Scope
+- Отдельная temporal‑поверхность семьи.
+- Просмотр состояния семьи по годам.
+- Использовать существующие temporal/keyframe наработки.
+- Family-facing UX.
+
+---
+
+## T37D — Graph / Time privacy model note
+
+**Priority:** P1  
+**Status:** Planned
+
+### Scope
+- Отдельный эпик на privacy/visibility для graph и temporal views.
+- Важно зафиксировать, что запрос на скрытие может исходить от одного участника семьи.
+- Это не должно автоматически трактоваться как глобальное ограничение для всех.
+- Пока без реализации, только design/backlog note.
+
+---
+
 ## P1.10 — Admin-only Person Creation Form
 
 **Status:** Done

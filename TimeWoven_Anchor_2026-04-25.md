@@ -6,6 +6,20 @@
 
 ---
 
+## Product decision — family graph split: Graph Lite / Time Machine / Legacy Graph (T37)
+
+- Family graph больше не рассматривается как один общий перегруженный интерфейс.
+- Принято решение развивать **три отдельные поверхности**:
+  1. **Graph Lite**
+  2. **Time Machine**
+  3. **Legacy Graph**
+- **Graph Lite** и **Time Machine** — family-facing.
+- **Legacy Graph** — только admin/personal use, experimental / version 1.0.
+- `personal timeline` уже считается story-board отдельного человека.
+- Поэтому отдельный Story Mode в графе пока не выносится в приоритет.
+- Privacy для graph/time views — отдельный будущий эпик.
+- Будущая visibility model должна учитывать: запрос на скрытие может исходить от **одного** участника семьи и **не обязан** быть глобальным правилом для всех viewers.
+
 ## 1. Архитектура сейчас
 
 **Веб-приложение**
