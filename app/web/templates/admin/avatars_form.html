@@ -2,86 +2,146 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Аватары семьи</title>
+  <link rel="stylesheet" href="/static/site/theme.css" />
   <style>
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #020617;
-      color: #e5e7eb;
-      padding: 24px;
+    :root {
+      color-scheme: dark;
+      --bg: #020617;
+      --card: #0f172a;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --line: #1e293b;
+      --input-bg: #020617;
+      --input-line: #334155;
     }
-    h1 { font-size: 24px; margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.3); }
-    th { text-align: left; color: #9ca3af; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
-    tr:hover { background: rgba(15,23,42,0.8); }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 32px 24px;
+    }
+    .back {
+      color: var(--muted);
+      font-size: 13px;
+      text-decoration: none;
+      display: inline-block;
+      margin-bottom: 20px;
+    }
+    .back:hover { color: var(--text); }
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent);
+    }
+    .admin-surface {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card);
+      padding: 20px 22px;
+      max-width: 960px;
+    }
+    .admin-surface p.lead { color: var(--muted); font-size: 14px; margin-bottom: 16px; line-height: 1.45; }
+    .upload-form {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 14px 20px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .upload-form label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+    .upload-form select,
+    .upload-form input[type="file"] {
+      background: var(--input-bg);
+      border: 1px solid var(--input-line);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      font-size: 14px;
+      min-width: 12rem;
+    }
+    .upload-form input[type="file"] { padding: 6px; min-width: 14rem; }
+    .upload-form select:focus,
+    .upload-form input[type="file"]:focus { outline: none; border-color: rgba(245, 158, 11, 0.45); }
+    .btn-primary {
+      background: var(--accent);
+      color: #020617;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary:hover { filter: brightness(1.05); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); color: var(--muted); }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+    tbody tr:hover td { background: rgba(15, 23, 42, 0.65); }
+    td strong { color: var(--text); font-weight: 500; }
+    .cell-muted { color: var(--muted); }
     img {
       width: 48px;
       height: 48px;
       border-radius: 999px;
       object-fit: cover;
-      border: 1px solid rgba(148,163,184,0.5);
-    }
-    form { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
-    select, input[type="file"] { font: inherit; font-size: 14px; }
-    button {
-      background: #f97316;
-      color: #020617;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
+      border: 1px solid var(--line);
     }
   </style>
 </head>
 <body>
-  <a href="/admin" style="color: #94a3b8; font-size: 13px; text-decoration: none; display: inline-block; margin-bottom: 20px;">&larr; Назад в панель</a>
+  <a href="/admin" class="back">&larr; Назад в панель</a>
   <h1>Загрузка аватаров</h1>
-
-  <form action="/admin/avatars" method="post" enctype="multipart/form-data">
-    <label>
-      Человек:
-      <select name="person_id">
+  <div class="admin-surface">
+    <p class="lead">Выбор человека и файла; таблица ниже — текущее состояние в базе.</p>
+    <form class="upload-form" action="/admin/avatars" method="post" enctype="multipart/form-data">
+      <label>
+        Человек
+        <select name="person_id">
+          {% for person in people %}
+            <option value="{{ person.id }}">{{ person.id }} — {{ person.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Фото
+        <input type="file" name="file" accept="image/*" required>
+      </label>
+      <button type="submit" class="btn-primary">Загрузить</button>
+    </form>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Имя</th>
+          <th>Текущий аватар</th>
+          <th>Путь в базе</th>
+        </tr>
+      </thead>
+      <tbody>
         {% for person in people %}
-          <option value="{{ person.id }}">{{ person.id }} — {{ person.name }}</option>
+        <tr>
+          <td>{{ person.id }}</td>
+          <td><strong>{{ person.name }}</strong></td>
+          <td>
+            {% if person.avatar_url %}
+              <img src="{{ person.avatar_url }}" alt="{{ person.name }}">
+            {% else %}
+              <span class="cell-muted">—</span>
+            {% endif %}
+          </td>
+          <td style="word-break: break-all;">{{ person.avatar_url or "—" }}</td>
+        </tr>
         {% endfor %}
-      </select>
-    </label>
-    <label>
-      Фото:
-      <input type="file" name="file" accept="image/*" required>
-    </label>
-    <button type="submit">Загрузить</button>
-  </form>
-
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Имя</th>
-        <th>Текущий аватар</th>
-        <th>Путь в базе</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for person in people %}
-      <tr>
-        <td>{{ person.id }}</td>
-        <td>{{ person.name }}</td>
-        <td>
-          {% if person.avatar_url %}
-            <img src="{{ person.avatar_url }}" alt="{{ person.name }}">
-          {% else %}
-            нет
-          {% endif %}
-        </td>
-        <td>{{ person.avatar_url or "—" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </tbody>
+    </table>
+  </div>
 </body>
 </html>
