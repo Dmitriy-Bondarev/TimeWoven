@@ -1,3 +1,15 @@
+family_access:
+  whoami_title: "Who are you?"
+  whoami_subtitle: "Choose who you are in TimeWoven"
+  whoami_select: "Select a person"
+  whoami_empty: "No available people"
+
+common:
+  continue: "Continue"
+
+nav:
+  back_impulse: "← Back to impulse"
+
 family:
   nav:
     back_impulse: "← Daily impulse"

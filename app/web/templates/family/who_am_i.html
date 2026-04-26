@@ -35,25 +35,25 @@
 
   <div class="wrap">
   <section class="tw-card card">
-    <h1>{{ ts('app.family_access.whoami_title', default='Who are you?') }}</h1>
-    <p>{{ ts('app.family_access.whoami_subtitle', default='Choose yourself to sign replies.') }}</p>
+    <h1>{{ ts('family_access.whoami_title', default='Who are you?') }}</h1>
+    <p>{{ ts('family_access.whoami_subtitle', default='Choose who you are in TimeWoven') }}</p>
 
     <form method="post">
       <input type="hidden" name="next" value="{{ next or '/' }}">
       <select name="person_id" required>
         {% if people %}
-          <option value="" disabled selected>{{ ts('app.family_access.whoami_select', default='Select a person') }}</option>
+          <option value="" disabled selected>{{ ts('family_access.whoami_select', default='Select a person') }}</option>
           {% for person in people %}
             <option value="{{ person.person_id }}">{{ person.name }}</option>
           {% endfor %}
         {% else %}
-          <option value="" disabled>{{ ts('app.family_access.whoami_empty', default='No available people') }}</option>
+          <option value="" disabled>{{ ts('family_access.whoami_empty', default='No available people') }}</option>
         {% endif %}
       </select>
-      <button type="submit">{{ ts('app.common.continue', default='Continue') }}</button>
+      <button type="submit">{{ ts('common.continue', default='Continue') }}</button>
     </form>
 
-    <a href="/" class="back-link">{{ ts('family.nav.back_impulse', default='← Back') }}</a>
+    <a href="/" class="back-link">{{ ts('nav.back_impulse', default='← Back') }}</a>
   </section>
   </div>
 {% endblock %}

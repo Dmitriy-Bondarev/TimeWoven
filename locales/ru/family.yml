@@ -1,3 +1,15 @@
+family_access:
+  whoami_title: "Кто вы?"
+  whoami_subtitle: "Выберите, кем вы входите в TimeWoven"
+  whoami_select: "Выберите человека"
+  whoami_empty: "Нет доступных людей"
+
+common:
+  continue: "Продолжить"
+
+nav:
+  back_impulse: "← К импульсу дня"
+
 family:
   nav:
     back_impulse: "← Импульс дня"
