@@ -8,10 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.services.timeline_service import get_timeline, create_event
+from app.core.i18n import install_jinja_i18n
 
 router = APIRouter(prefix="/timeline", tags=["timeline"])
 BASE_DIR = Path(__file__).resolve().parents[1]
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
+install_jinja_i18n(templates)
 logger = logging.getLogger(__name__)
 
 

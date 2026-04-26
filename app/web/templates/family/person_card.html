@@ -1,27 +1,10 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <title>{{ name }} — TimeWoven</title>
+{% extends "base.html" %}
+
+{% block title %}{{ name }} — TimeWoven{% endblock %}
+
+{% block content %}
   <style>
-    :root {
-      --bg: #020617;
-      --card: #0f172a;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --accent: #f59e0b;
-      --border: rgba(148,163,184,0.2);
-      --ok: #22c55e;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #0f172a, var(--bg));
-      color: var(--text);
-      min-height: 100vh;
-      padding: 32px 24px;
-    }
-    .container { max-width: 680px; margin: 0 auto; }
+    .container { max-width: 820px; margin: 0 auto; }
 
     /* Шапка */
     .header {
@@ -57,7 +40,7 @@
       padding: 9px 13px;
       border-radius: 999px;
       border: 1px solid var(--border);
-      background: rgba(255,255,255,0.05);
+      background: rgba(255,255,255,0.03);
       color: var(--text);
       text-decoration: none;
       font-size: 13px;
@@ -65,8 +48,8 @@
       transition: background .2s, border-color .2s, transform .2s;
     }
     .graph-chip:hover {
-      background: rgba(245,158,11,0.12);
-      border-color: rgba(245,158,11,0.45);
+      background: var(--hover-bg);
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
       transform: translateY(-1px);
     }
     .graph-chip svg {
@@ -77,7 +60,7 @@
 
     /* Биография */
     .bio {
-      background: rgba(15,23,42,0.8);
+      background: rgba(255,255,255,0.02);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 16px 18px;
@@ -99,7 +82,7 @@
 
     /* Карточка воспоминания */
     .memory-card {
-      background: rgba(15,23,42,0.88);
+      background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 16px;
@@ -119,7 +102,7 @@
 
     /* Цитата */
     .quote-card {
-      background: rgba(15,23,42,0.88);
+      background: var(--card-bg);
       border-left: 3px solid var(--accent);
       border-radius: 0 12px 12px 0;
       padding: 14px 16px;
@@ -139,10 +122,9 @@
     }
     .back-link:hover { color: var(--text); }
   </style>
-</head>
-<body>
+
   <div class="container">
-    <a href="/" class="back-link">← Импульс дня</a>
+    <a href="/" class="back-link">{{ ts('family.nav.back_impulse', default='← Back') }}</a>
 
     <div class="header">
       {% if person.avatar_url %}
@@ -170,12 +152,12 @@
             <span style="color: var(--muted);">{{ person.role }}</span>
           {% endif %}
         </div>
-        <div class="header-actions">
+        <div class="header-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
           <a
             href="/family/tree?root_person_id={{ person.person_id }}"
             class="graph-chip"
-            title="Показать в семейном дереве"
-            aria-label="Показать в семейном дереве"
+            title="{{ ts('family.person.in_tree', default='View in tree') }}"
+            aria-label="{{ ts('family.person.in_tree', default='View in tree') }}"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 5v5"></path>
@@ -185,8 +167,9 @@
               <circle cx="6" cy="20" r="2"></circle>
               <circle cx="18" cy="20" r="2"></circle>
             </svg>
-            <span>Показать в дереве</span>
+            <span>{{ ts('family.person.in_tree', default='View in tree') }}</span>
           </a>
+          <a class="tw-btn tw-btn-primary" href="/family/memory/new?author_id={{ person.person_id }}">{{ ts('family.person.add_memory', default='Add memory') }}</a>
         </div>
       </div>
     </div>
@@ -196,7 +179,7 @@
     {% endif %}
 
     <div class="section">
-      <div class="section-title">Воспоминания ({{ memories|length }})</div>
+      <div class="section-title">{{ ts('family.person.memories', default='Memories') }} ({{ memories|length }})</div>
       {% if memories %}
         {% for m in memories %}
           <div class="memory-card">
@@ -210,20 +193,19 @@
           </div>
         {% endfor %}
       {% else %}
-        <div class="empty">Воспоминаний пока нет.</div>
+        <div class="empty">{{ ts('family.person.no_memories', default='No memories yet.') }}</div>
       {% endif %}
     </div>
 
     <div class="section">
-      <div class="section-title">Цитаты ({{ quotes|length }})</div>
+      <div class="section-title">{{ ts('family.person.quotes', default='Quotes') }} ({{ quotes|length }})</div>
       {% if quotes %}
         {% for q in quotes %}
           <div class="quote-card">«{{ q.text }}»</div>
         {% endfor %}
       {% else %}
-        <div class="empty">Цитат пока нет.</div>
+        <div class="empty">{{ ts('family.person.no_quotes', default='No quotes yet.') }}</div>
       {% endif %}
     </div>
   </div>
-</body>
-</html>
+{% endblock %}

@@ -3,6 +3,8 @@ import re
 from pathlib import Path
 from uuid import uuid4
 from urllib.parse import quote, unquote, urlparse
+import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, Query, HTTPException, Request, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,9 +16,11 @@ from app.db.session import get_db
 from app.models import Memory, Person, PersonI18n, Quote
 from app.schemas.family_graph import FamilyGraph
 from app.services.family_graph import build_family_graph
+from app.core.i18n import install_jinja_i18n
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
+install_jinja_i18n(templates)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,24 @@ def _looks_like_technical_blob(text: str) -> bool:
 
     return False
 
+
+def _memory_audio_src(memory: Memory) -> str | None:
+    """
+    Unified 'has audio' logic for family UI.
+    Priority:
+      1) transcript_verbatim JSON metadata.local_audio_path
+      2) Memory.audio_url
+    """
+    try:
+        payload = json.loads(memory.transcript_verbatim) if (memory.transcript_verbatim or "").strip() else {}
+    except Exception:
+        payload = {}
+    if isinstance(payload, dict):
+        cand = payload.get("local_audio_path")
+        if isinstance(cand, str) and cand.strip():
+            return cand.strip()
+    cand2 = (memory.audio_url or "").strip()
+    return cand2 or None
 
 def _is_live_visible_person(model):
     return model.record_status == "active"
@@ -173,7 +195,7 @@ async def family_person(
     quotes_count = session.query(Quote).filter(Quote.author_id == person_id).count()
 
     return templates.TemplateResponse(
-        "family/profile.html",
+        "family/person_card.html",
         {
             "request": request,
             "person": person,
@@ -182,6 +204,43 @@ async def family_person(
             "quotes_count": quotes_count,
             "message": None,
             "person_i18n": person_i18n,
+            "birth_date": person.birth_date,
+            "death_date": person.death_date,
+            "biography": (person_i18n.biography if person_i18n else None),
+            "memories": [
+                {
+                    "text": (
+                        (m.transcript_readable or m.transcript_verbatim or m.content_text or "").strip()
+                    ),
+                    "created_at": m.created_at,
+                    "audio_url": _memory_audio_src(m),
+                }
+                for m in (
+                    session.query(Memory)
+                    .filter(
+                        Memory.author_id == person_id,
+                        Memory.is_archived == False,
+                        Memory.transcription_status == "published",
+                    )
+                    .order_by(Memory.id.desc())
+                    .limit(30)
+                    .all()
+                )
+                if not _looks_like_technical_blob(
+                    (m.transcript_readable or m.transcript_verbatim or m.content_text or "").strip()
+                )
+            ],
+            "quotes": [
+                {"text": (q.content_text or "").strip()}
+                for q in (
+                    session.query(Quote)
+                    .filter(Quote.author_id == person_id)
+                    .order_by(Quote.id.desc())
+                    .limit(30)
+                    .all()
+                )
+                if (q.content_text or "").strip()
+            ],
         },
     )
 
@@ -381,6 +440,7 @@ async def family_timeline(
         if _looks_like_technical_blob(text):
             continue
 
+        audio_src = _memory_audio_src(memory)
         items.append(
             {
                 "date": memory.created_at or "",
@@ -392,6 +452,7 @@ async def family_timeline(
                 "avatar_url": memory.author.avatar_url if memory.author else None,
                 "source": "people",
                 "type": "memory_recording",
+                "has_audio": bool(audio_src),
             }
         )
 
@@ -658,6 +719,7 @@ async def family_reply(
         or memory.content_text
         or ""
     )
+    audio_src = _memory_audio_src(memory)
 
     responses = []
     quotes = (
@@ -699,11 +761,135 @@ async def family_reply(
             "memory_id": memory_id,
             "author_name": author_name,
             "memory_text": memory_text,
+            "audio_src": audio_src,
             "responses": responses,
             "message": message,
             "person_id": person_id or 1,
         },
     )
+
+
+@router.get("/family/memory/new", response_class=HTMLResponse)
+async def family_memory_new(
+    request: Request,
+    author_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    redirect = _require_family_session(request)
+    if redirect:
+        return redirect
+    person = db.query(Person).filter(Person.person_id == author_id, _is_live_visible_person(Person)).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    return templates.TemplateResponse(
+        "family/memory_new.html",
+        {
+            "request": request,
+            "author_id": author_id,
+            "text": "",
+            "error": None,
+            "cancel_url": f"/family/person/{author_id}",
+        },
+    )
+
+
+@router.post("/family/memory/new", response_class=HTMLResponse)
+async def family_memory_new_submit(
+    request: Request,
+    author_id: int = Form(...),
+    text: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _require_family_session(request)
+    if redirect:
+        return redirect
+    person = db.query(Person).filter(Person.person_id == author_id, _is_live_visible_person(Person)).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return templates.TemplateResponse(
+            "family/memory_new.html",
+            {
+                "request": request,
+                "author_id": author_id,
+                "text": text,
+                "error": "empty",
+                "cancel_url": f"/family/person/{author_id}",
+            },
+            status_code=400,
+        )
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    row = Memory(
+        author_id=author_id,
+        created_by=author_id,
+        created_at=now,
+        content_text=cleaned,
+        source_type="family_ui",
+        transcription_status="published",
+        is_archived=False,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return RedirectResponse(url=f"/family/reply/{row.id}", status_code=303)
+
+
+@router.get("/family/memory/{memory_id}/edit", response_class=HTMLResponse)
+async def family_memory_edit(
+    request: Request,
+    memory_id: int,
+    db: Session = Depends(get_db),
+):
+    redirect = _require_family_session(request)
+    if redirect:
+        return redirect
+    memory = db.query(Memory).filter(Memory.id == memory_id, Memory.is_archived == False).first()
+    if not memory:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return templates.TemplateResponse(
+        "family/memory_edit.html",
+        {
+            "request": request,
+            "memory_id": memory_id,
+            "author_id": memory.author_id,
+            "text": memory.content_text or "",
+            "error": None,
+            "cancel_url": f"/family/reply/{memory_id}",
+        },
+    )
+
+
+@router.post("/family/memory/{memory_id}/edit", response_class=HTMLResponse)
+async def family_memory_edit_submit(
+    request: Request,
+    memory_id: int,
+    text: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _require_family_session(request)
+    if redirect:
+        return redirect
+    memory = db.query(Memory).filter(Memory.id == memory_id, Memory.is_archived == False).first()
+    if not memory:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return templates.TemplateResponse(
+            "family/memory_edit.html",
+            {
+                "request": request,
+                "memory_id": memory_id,
+                "author_id": memory.author_id,
+                "text": text,
+                "error": "empty",
+                "cancel_url": f"/family/reply/{memory_id}",
+            },
+            status_code=400,
+        )
+    memory.content_text = cleaned
+    db.commit()
+    return RedirectResponse(url=f"/family/reply/{memory_id}", status_code=303)
 
 
 @router.post("/family/reply/{memory_id}", response_class=HTMLResponse)

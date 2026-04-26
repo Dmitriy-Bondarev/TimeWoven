@@ -1,9 +1,40 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ current_lang() }}" data-tw-theme="{{ request.state.active_theme if request and request.state and request.state.active_theme else 'current_dark' }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}TimeWoven{% endblock %}</title>
+  <link rel="stylesheet" href="/static/site/theme.css" />
+  <style>
+    header{
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: color-mix(in srgb, var(--bg) 86%, transparent);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+    }
+    nav{
+      width: min(calc(100% - 48px), var(--tw-max));
+      margin: 0 auto;
+      min-height: 56px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 14px;
+    }
+    nav a{
+      display:inline-flex;
+      align-items:center;
+      gap: 10px;
+      text-decoration:none;
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+    }
+    nav a:hover{ background: var(--hover-bg); }
+    main{ padding: 24px 0; }
+  </style>
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -15,13 +46,19 @@
 <body>
   <header>
     <nav>
-      <a href="/family/tree" aria-label="Древо" title="Древо">
+      <a href="/family/welcome" aria-label="TimeWoven" title="TimeWoven">
+        <i class="fa-solid fa-heart"></i>
+        <span>TimeWoven</span>
+      </a>
+      <a href="/family/tree" aria-label="{{ ts('family.person.in_tree', default='Дерево') }}" title="{{ ts('family.person.in_tree', default='Дерево') }}">
         <i class="fa-solid fa-tree"></i>
       </a>
     </nav>
   </header>
   <main>
-    {% block content %}{% endblock %}
+    <div class="tw-container">
+      {% block content %}{% endblock %}
+    </div>
   </main>
 </body>
 </html>

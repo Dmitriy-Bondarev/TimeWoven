@@ -1,0 +1,56 @@
+family:
+  nav:
+    back_impulse: "← Daily impulse"
+    back_timeline: "← Timeline"
+
+  welcome:
+    title: "Golden memory"
+    subtitle: "A living memory from your family archive to start the day with warmth and connection."
+    view_timeline: "View the full timeline"
+    open_discussion: "Open discussion"
+
+  timeline:
+    title: "Family timeline"
+    empty: "No timeline data yet. Please come back later or make sure there are published stories in the archive."
+    listen_reply: "Listen and reply →"
+    view_reply: "View and reply →"
+    card: "Profile →"
+
+  reply:
+    title: "Reply"
+    subtitle: "to a message from {author}"
+    original_title: "Original message"
+    original_missing: "Original memory text is missing."
+    placeholder: "Write your reply…"
+    save: "Save reply"
+    family_responses: "Family replies"
+    no_responses: "No replies yet."
+    not_found: "Memory not found"
+
+  audio:
+    label: "Audio"
+    unavailable: "Audio is unavailable."
+
+  reply_sent:
+    title: "Reply sent"
+    subtitle: "Your words are saved and will become part of the family memory.\nFuture generations will read them years later."
+    signed: "Signed: {author}"
+    back: "← Back to daily impulse"
+    view_all: "View all replies"
+
+  person:
+    in_tree: "View in family tree"
+    memories: "Memories"
+    quotes: "Quotes"
+    no_photo: "No photo"
+    no_memories: "No memories yet."
+    no_quotes: "No quotes yet."
+    add_memory: "Add memory"
+
+  memory_form:
+    new_title: "New memory"
+    edit_title: "Edit memory"
+    text_label: "Text"
+    text_placeholder: "Write a memory…"
+    save: "Save"
+    cancel: "Cancel"

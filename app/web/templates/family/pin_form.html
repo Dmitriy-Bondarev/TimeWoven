@@ -1,36 +1,11 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <title>Введите PIN — TimeWoven</title>
+{% extends "base.html" %}
+
+{% block title %}TimeWoven — PIN{% endblock %}
+
+{% block content %}
   <style>
-    :root {
-      --bg: #020617;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --accent: #f59e0b;
-      --border: rgba(148,163,184,0.2);
-      --error: #ef4444;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #0f172a, var(--bg));
-      color: var(--text);
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-    }
-    .card {
-      width: min(100%, 380px);
-      background: rgba(15,23,42,0.96);
-      border-radius: 24px;
-      border: 1px solid var(--border);
-      padding: 36px 28px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-      text-align: center;
-    }
+    .wrap{max-width: 420px; margin: 0 auto;}
+    .card{padding: 30px 22px; text-align:center;}
     .avatar {
       width: 80px; height: 80px;
       border-radius: 999px;
@@ -91,20 +66,20 @@
     }
     .back-link:hover { color: var(--text); }
   </style>
-</head>
-<body>
-  <div class="card">
+
+  <div class="wrap">
+  <div class="tw-card card">
     {% if avatar_url %}
       <img class="avatar" src="{{ avatar_url }}" alt="{{ name }}">
     {% else %}
-      <div class="avatar-fallback">Нет фото</div>
+      <div class="avatar-fallback">{{ ts('family.person.no_photo', default='No photo') }}</div>
     {% endif %}
 
     <h1>{{ name }}</h1>
-    <p class="subtitle">Введите ваш PIN-код</p>
+    <p class="subtitle">{{ ts('app.family_access.pin_title', default='Enter your PIN') }}</p>
 
     {% if error %}
-      <div class="error">Неверный PIN-код</div>
+      <div class="error">{{ ts('app.family_access.pin_invalid', default='Invalid PIN') }}</div>
     {% endif %}
 
     <form method="post" action="/who-am-i/pin">
@@ -121,10 +96,10 @@
         placeholder="••••"
         required
       >
-      <button class="btn" type="submit">Войти</button>
+      <button class="btn" type="submit">{{ ts('app.family_access.pin_submit', default='Continue') }}</button>
     </form>
 
-    <a href="/who-am-i" class="back-link">← Выбрать другого участника</a>
+    <a href="/who-am-i" class="back-link">← {{ ts('app.family_access.pin_back', default='Choose another person') }}</a>
   </div>
-</body>
-</html>
+  </div>
+{% endblock %}
