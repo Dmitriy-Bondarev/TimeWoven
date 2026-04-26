@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ts('family.memory_form.edit_title', default='Edit memory') }} — TimeWoven{% endblock %}
+
+{% block content %}
+<style>
+  .tw-page{max-width: 720px; margin: 0 auto;}
+  .card{padding: 22px;}
+  h1{margin: 0 0 6px; font-size: 22px;}
+  .hint{margin: 0 0 18px; color: var(--text-muted); font-size: 14px;}
+  label{display:block; margin: 0 0 8px; font-weight: 650;}
+  textarea{
+    width: 100%;
+    min-height: 180px;
+    resize: vertical;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    padding: 12px 14px;
+    font-family: inherit;
+    font-size: 14px;
+  }
+  .error{margin-top: 10px; color: color-mix(in srgb, #ef4444 78%, white); font-size: 13px;}
+  .actions{display:flex; gap: 10px; flex-wrap:wrap; margin-top: 14px;}
+  .tw-btn{flex: 1 1 180px;}
+</style>
+
+<div class="tw-page">
+  <div class="tw-card card">
+    <h1>{{ ts('family.memory_form.edit_title', default='Edit memory') }}</h1>
+    <p class="hint">#{{ memory_id }}</p>
+
+    <form method="post">
+      <label for="text">{{ ts('family.memory_form.text_label', default='Text') }}</label>
+      <textarea id="text" name="text" required placeholder="{{ ts('family.memory_form.text_placeholder', default='Write a memory…') }}">{{ text or '' }}</textarea>
+      {% if error == 'empty' %}
+        <div class="error">{{ ts('app.form.required', default='Please fill in the field.') }}</div>
+      {% endif %}
+      <div class="actions">
+        <button class="tw-btn tw-btn-primary" type="submit">{{ ts('family.memory_form.save', default='Save') }}</button>
+        <a class="tw-btn tw-btn-secondary" href="{{ cancel_url }}">{{ ts('family.memory_form.cancel', default='Cancel') }}</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ t("app.memory_edit.title") }} — {{ t("app.nav.brand") }}</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #f59e0b;
+      --border: rgba(148,163,184,0.2);
+      --danger: #f87171;
+      --card: rgba(15,23,42,0.96);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0f172a, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+    .container { max-width: 560px; margin: 0 auto; }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--text); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 24px;
+    }
+    h1 { font-size: 18px; font-weight: 800; margin-bottom: 10px; }
+    .sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      color: var(--text);
+      padding: 14px;
+      font-size: 14px;
+      line-height: 1.6;
+      outline: none;
+    }
+    textarea:focus { border-color: rgba(245,158,11,0.6); }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+    .error {
+      margin-top: 14px;
+      border: 1px solid rgba(248,113,113,0.35);
+      background: rgba(248,113,113,0.10);
+      color: var(--danger);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+    }
+    .actions { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+    .btn {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: #111827; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border: 1px solid var(--border);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back-link" href="/family/reply/{{ memory_id }}">← Назад к воспоминанию</a>
+
+    <div class="card">
+      <h1>{{ t("app.memory_edit.title") }}</h1>
+      <div class="sub">Изменения сразу отобразятся в профиле и в ленте.</div>
+
+      <form method="post" action="/family/memory/{{ memory_id }}/edit">
+        <textarea name="text" placeholder="Текст воспоминания..." required>{{ text or "" }}</textarea>
+        <div class="hint">Подсказка: лучше сохранять исходный смысл, но можно поправить стиль или ошибки.</div>
+        {% if error %}
+          <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">{{ t("app.buttons.save") }}</button>
+          <a class="btn btn-secondary" href="/family/reply/{{ memory_id }}">{{ t("app.buttons.cancel") }}</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
+
