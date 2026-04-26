@@ -4,27 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TW Explorer</title>
+  <link rel="stylesheet" href="/static/site/theme.css" />
   <style>
     :root {
-      --bg: #0b1220;
-      --card: #121a2b;
-      --line: #25304a;
-      --text: #e6edf7;
-      --muted: #9aa9c2;
-      --accent: #38bdf8;
+      color-scheme: dark;
+      --bg: #020617;
+      --card: #0f172a;
+      --line: #1e293b;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
       --warn: #f97316;
+      --input-bg: #020617;
+      --input-line: #334155;
+      --pre-bg: #0a1120;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Segoe UI", sans-serif; background: radial-gradient(circle at top right, #111f3d 0%, var(--bg) 55%); color: var(--text); min-height: 100vh; padding: 28px 20px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: linear-gradient(160deg, #0b1424 0%, var(--bg) 45%); color: var(--text); min-height: 100vh; padding: 28px 20px; }
     .wrap { max-width: 1300px; margin: 0 auto; }
-    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
-    .title { font-size: 28px; font-weight: 700; }
-    .back { color: var(--muted); text-decoration: none; }
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .title { font-size: 28px; font-weight: 700; color: var(--accent); }
+    .back { color: var(--muted); text-decoration: none; font-size: 14px; }
     .back:hover { color: var(--text); }
-    .card { border: 1px solid var(--line); background: rgba(18, 26, 43, 0.92); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    .card { border: 1px solid var(--line); background: linear-gradient(145deg, var(--card) 0%, #0c1522 100%); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
     .auth-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .auth-form input { background: #0d1526; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 8px 10px; min-width: 220px; }
-    .btn { background: var(--accent); color: #071018; border: none; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; }
+    .auth-form input { background: var(--input-bg); border: 1px solid var(--input-line); color: var(--text); border-radius: 8px; padding: 8px 10px; min-width: 220px; font: inherit; }
+    .auth-form input:focus { outline: none; border-color: rgba(245, 158, 11, 0.45); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2); }
+    .btn { background: var(--accent); color: #020617; border: none; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; font: inherit; }
+    .btn:hover { filter: brightness(1.05); }
     .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .section-title { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
     .tree { list-style: none; padding-left: 0; }
@@ -34,7 +41,7 @@
     .node-path { color: var(--muted); font-size: 12px; }
     .preview-link { color: var(--accent); font-size: 12px; text-decoration: none; }
     .preview-link:hover { text-decoration: underline; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #0a1120; border: 1px solid var(--line); border-radius: 10px; padding: 12px; max-height: 420px; overflow: auto; }
+    pre { white-space: pre-wrap; word-break: break-word; background: var(--pre-bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; max-height: 420px; overflow: auto; color: var(--text); }
     .notice { color: var(--muted); font-size: 13px; }
     .error { color: var(--warn); font-weight: 600; }
     @media (max-width: 960px) {

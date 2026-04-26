@@ -2,60 +2,149 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Контроль данных — люди</title>
   <link rel="stylesheet" href="/static/site/theme.css" />
   <style>
     :root { color-scheme: dark; --bg: #020617; --card: #0f172a; --text: #e5e7eb; --muted: #94a3b8; --accent: #f59e0b; --ok: #22c55e; --warn: #ef4444; --line: #1e293b; --input-bg: #020617; --input-line: #334155; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; padding: 32px 24px; }
-    h1 { font-size: 22px; font-weight: 700; margin-bottom: 16px; color: var(--accent); }
-    .people-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin-bottom: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 32px 24px; }
+    .page-hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; margin-bottom: 18px; max-width: 1200px; }
+    .page-hero h1 {
+      font-size: clamp(1.05rem, 2.1vw, 1.4rem);
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--accent);
+      margin: 0;
+      max-width: min(100%, 48rem);
+      letter-spacing: 0.01em;
+    }
+    .title-ico { margin-right: 0.35em; }
+    @media (min-width: 900px) {
+      .page-hero h1 { white-space: nowrap; }
+    }
+    .page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+    .back { color: var(--muted); font-size: 13px; text-decoration: none; display: inline-block; }
+    .back:hover { color: var(--text); }
+    .btn-new {
+      color: #020617;
+      background: var(--accent);
+      font-size: 13px;
+      text-decoration: none;
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+    }
+    .people-filters { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); max-width: 100%; }
+    .people-filters-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
     .people-filters label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
-    .people-filters input[type="number"],
-    .people-filters input[type="text"],
-    .people-filters input[type="search"] {
+    .people-filters input[type="search"],
+    .people-filters select {
       background: var(--input-bg);
       border: 1px solid var(--input-line);
       color: var(--text);
       border-radius: 8px;
       padding: 8px 10px;
       min-width: 8rem;
+      font: inherit;
       -webkit-appearance: none;
       appearance: none;
     }
     .people-filters input[type="search"]::-webkit-search-decoration,
     .people-filters input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
     .people-filters input[type="search"]::placeholder { color: #64748b; }
-    .people-filters input[type="search"]:focus { outline: none; border-color: rgba(245, 158, 11, 0.45); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2); }
-    .people-search-input { min-width: 14rem; }
+    .people-filters input[type="search"]:focus,
+    .people-filters select:focus { outline: none; border-color: rgba(245, 158, 11, 0.45); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2); }
+    .people-search-input { min-width: min(100%, 14rem); }
     .people-filters button, .btn-reset-filters { color: #020617; background: var(--accent); font-size: 13px; text-decoration: none; display: inline-block; padding: 8px 14px; border-radius: 8px; font-weight: 700; border: none; cursor: pointer; }
     .btn-reset-filters { background: #334155; color: var(--text); }
     .btn-reset-filters:hover { opacity: 0.92; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .filter-meta { font-size: 12px; color: var(--muted); margin: 0; }
+    .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1100px; }
     th { text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); white-space: nowrap; }
-    td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-    tr:hover td { background: #0f172a; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr[data-person-row] td { vertical-align: middle; }
+    tbody tr:hover td { background: #0f172a; }
+    tr[data-person-row].is-hidden { display: none; }
     .avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
     .no-avatar { width: 36px; height: 36px; border-radius: 50%; background: #1e293b; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--warn); }
+    .avatar-meta { display: block; font-size: 10px; color: var(--muted); margin-top: 4px; max-width: 6.5rem; line-height: 1.2; }
     .badge-ok { color: var(--ok); font-weight: 600; }
     .badge-warn { color: var(--warn); font-weight: 600; }
     .muted { color: var(--muted); }
     .upload-link { color: var(--accent); text-decoration: none; font-size: 12px; }
     .upload-link:hover { text-decoration: underline; }
     .count { font-weight: 600; }
+    .col-actions { min-width: 7.5rem; }
+    .col-actions a { display: block; line-height: 1.35; }
+    .col-actions a + a { margin-top: 4px; }
   </style>
 </head>
 <body>
-  <a href="/admin" class="back" style="color: var(--muted); font-size: 13px; text-decoration: none; display: inline-block; margin-bottom: 20px;">&larr; Назад в панель</a>
-  <a href="/admin/people/new" style="color: #020617; background: var(--accent); font-size: 13px; text-decoration: none; display: inline-block; margin-left: 10px; margin-bottom: 20px; padding: 8px 12px; border-radius: 8px; font-weight: 700;">+ Новая персона</a>
-  <h1>👥 Контроль качества данных — люди</h1>
-  <form method="get" class="people-filters" id="people-search" action="/admin/people">
-    <label>Поиск (ID или имя):
-      <input type="search" name="q" class="people-search-input" value="{{ (request.query_params.get('q') or '')|e }}" placeholder="ID или фрагмент имени" autocomplete="off">
-    </label>
-    <button type="submit">Применить</button>
-    <a href="/admin/people" class="btn-reset-filters">Сбросить</a>
+  <div class="page-hero">
+    <h1><span class="title-ico" aria-hidden="true">👥</span>Контроль качества данных — люди</h1>
+    <div class="page-actions">
+      <a href="/admin" class="back">&larr; Назад в панель</a>
+      <a href="/admin/people/new" class="btn-new">+ Новая персона</a>
+    </div>
+  </div>
+
+  <form class="people-filters" id="people-filters-form" action="/admin/people" method="get">
+    <div class="people-filters-row">
+      <label>Поиск (id или имя)
+        <input type="search" name="q" id="f-q" class="people-search-input" value="{{ (request.query_params.get('q') or '')|e }}" placeholder="ID или фрагмент имени" autocomplete="off" inputmode="search">
+      </label>
+      <label>Роль
+        <select name="pf_role" id="f-role">
+          <option value="all">Все</option>
+          <option value="placeholder">placeholder</option>
+          <option value="relative">relative</option>
+          <option value="familyadmin">family_admin</option>
+          <option value="botonly">bot_only</option>
+        </select>
+      </label>
+      <label>Статус записи
+        <select name="pf_status" id="f-status">
+          <option value="all">Все</option>
+          <option value="active">active</option>
+          <option value="archived">archived</option>
+          <option value="testarchived">test_archived</option>
+        </select>
+      </label>
+      <label>Канал
+        <select name="pf_ch" id="f-ch">
+          <option value="all">Все</option>
+          <option value="max">max</option>
+          <option value="tg">tg</option>
+          <option value="email">email</option>
+          <option value="push">push</option>
+          <option value="none">нет / none</option>
+        </select>
+      </label>
+      <label>Жив
+        <select name="pf_alive" id="f-alive">
+          <option value="all">Все</option>
+          <option value="yes">да</option>
+          <option value="no">нет</option>
+        </select>
+      </label>
+      <label>Аватар (QC)
+        <select name="pf_av" id="f-av">
+          <option value="all">Все</option>
+          <option value="no_avatar">Нет аватара</option>
+          <option value="expired_avatar">Истёк</option>
+          <option value="actual_avatar">Актуален</option>
+        </select>
+      </label>
+      <button type="submit" id="f-apply">Применить</button>
+      <a href="/admin/people" class="btn-reset-filters" id="f-reset">Сбросить</a>
+    </div>
+    <p class="filter-meta" id="filter-meta" aria-live="polite"></p>
   </form>
+
+  <div class="table-wrap">
   <table>
     <thead>
       <tr>
@@ -64,7 +153,7 @@
         <th>Имя</th>
         <th>Роль</th>
         <th>Статус</th>
-        <th>✎ Ред.</th>
+        <th>✎ Ред. / алиасы</th>
         <th>Телефон</th>
         <th>Канал</th>
         <th>Max ID</th>
@@ -78,7 +167,15 @@
     </thead>
     <tbody>
       {% for r in rows %}
-      <tr>
+      <tr
+        data-person-row
+        data-pid="{{ r.person_id }}"
+        data-name="{{ r.name|e }}"
+        data-role-key="{{ r.role_key }}"
+        data-status-key="{{ r.record_status_key }}"
+        data-channel-key="{{ r.preferred_ch_key }}"
+        data-alive-key="{{ r.is_alive_key }}"
+        data-avatar-state="{{ r.avatar_state }}">
         <td class="muted">{{ r.person_id }}</td>
         <td>
           {% if r.avatar_url %}
@@ -86,6 +183,7 @@
           {% else %}
             <div class="no-avatar">нет</div>
           {% endif %}
+          <span class="avatar-meta" title="Состояние аватара (QC)">{{ r.avatar_state_label }}</span>
         </td>
         <td>
           <a href="/family/person/{{ r.person_id }}" style="color: inherit; text-decoration: none;">{{ r.name }}</a>
@@ -95,8 +193,9 @@
         </td>
         <td class="muted">{{ r.role }}</td>
         <td class="muted">{{ r.record_status }}</td>
-        <td>
+        <td class="col-actions">
           <a href="/admin/people/{{ r.person_id }}/edit" class="upload-link">Редактировать</a>
+          <a href="/admin/people/{{ r.person_id }}/aliases" class="upload-link">Алиасы</a>
         </td>
         <td class="{% if r.phone == '—' %}badge-warn{% else %}badge-ok{% endif %}">{{ r.phone }}</td>
         <td class="{% if r.preferred_ch == '—' %}badge-warn{% else %}badge-ok{% endif %}">{{ r.preferred_ch }}</td>
@@ -107,8 +206,8 @@
           {% if r.aliases %}
             {% for a in r.aliases %}
               <div class="muted" style="margin-bottom: 4px;">
-                {{ a.alias_text }}
-                <span style="opacity: 0.75;">({{ a.alias_kind }}{% if a.used_by_generation %}, {{ a.used_by_generation }}{% endif %})</span>
+                {{ a.label }}
+                <span style="opacity: 0.75;">({{ a.alias_type }}{% if a.used_by_generation %}, {{ a.used_by_generation }}{% endif %})</span>
               </div>
             {% endfor %}
           {% else %}
@@ -124,5 +223,92 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
+
+  <script>
+    (function () {
+      const rows = Array.from(document.querySelectorAll('tr[data-person-row]'));
+      const form = document.getElementById('people-filters-form');
+      const elQ = document.getElementById('f-q');
+      const elRole = document.getElementById('f-role');
+      const elStatus = document.getElementById('f-status');
+      const elCh = document.getElementById('f-ch');
+      const elAlive = document.getElementById('f-alive');
+      const elAv = document.getElementById('f-av');
+      const meta = document.getElementById('filter-meta');
+
+      function readUrlParams() {
+        const p = new URLSearchParams(window.location.search);
+        if (p.get('q')) elQ.value = p.get('q');
+        if (p.get('pf_role')) elRole.value = p.get('pf_role');
+        if (p.get('pf_status')) elStatus.value = p.get('pf_status');
+        if (p.get('pf_ch')) elCh.value = p.get('pf_ch');
+        if (p.get('pf_alive')) elAlive.value = p.get('pf_alive');
+        if (p.get('pf_av')) elAv.value = p.get('pf_av');
+      }
+
+      function writeUrl() {
+        const p = new URLSearchParams();
+        const qv = (elQ.value || '').trim();
+        if (qv) p.set('q', qv);
+        if (elRole.value !== 'all') p.set('pf_role', elRole.value);
+        if (elStatus.value !== 'all') p.set('pf_status', elStatus.value);
+        if (elCh.value !== 'all') p.set('pf_ch', elCh.value);
+        if (elAlive.value !== 'all') p.set('pf_alive', elAlive.value);
+        if (elAv.value !== 'all') p.set('pf_av', elAv.value);
+        const s = p.toString();
+        const next = s ? (window.location.pathname + '?' + s) : window.location.pathname;
+        window.history.replaceState({}, '', next);
+      }
+
+      function rowMatchesSearch(tr) {
+        const raw = (elQ.value || '').trim();
+        if (!raw) return true;
+        const pid = tr.getAttribute('data-pid') || '';
+        const name = (tr.getAttribute('data-name') || '').toLowerCase();
+        if (/^\d+$/.test(raw)) return pid === raw;
+        return name.indexOf(raw.toLowerCase()) !== -1;
+      }
+
+      function rowMatchesSelect(tr) {
+        if (elRole.value !== 'all' && tr.getAttribute('data-role-key') !== elRole.value) return false;
+        if (elStatus.value !== 'all' && tr.getAttribute('data-status-key') !== elStatus.value) return false;
+        if (elCh.value !== 'all' && tr.getAttribute('data-channel-key') !== elCh.value) return false;
+        if (elAlive.value !== 'all' && tr.getAttribute('data-alive-key') !== elAlive.value) return false;
+        if (elAv.value !== 'all' && tr.getAttribute('data-avatar-state') !== elAv.value) return false;
+        return true;
+      }
+
+      function apply() {
+        let n = 0;
+        for (const tr of rows) {
+          const ok = rowMatchesSearch(tr) && rowMatchesSelect(tr);
+          tr.classList.toggle('is-hidden', !ok);
+          if (ok) n += 1;
+        }
+        if (meta) {
+          const total = rows.length;
+          meta.textContent = total
+            ? 'Показано ' + n + ' из ' + total
+            : '';
+        }
+        writeUrl();
+      }
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        apply();
+      });
+      [elQ, elRole, elStatus, elCh, elAlive, elAv].forEach(function (el) {
+        el.addEventListener('change', apply);
+        el.addEventListener('input', function () {
+          if (el === elQ) apply();
+        });
+      });
+
+      readUrlParams();
+      apply();
+    })();
+  </script>
 </body>
 </html>

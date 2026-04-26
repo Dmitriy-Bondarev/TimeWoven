@@ -29,14 +29,27 @@
       font-size: 13px;
       text-decoration: none;
       display: inline-block;
-      margin-bottom: 20px;
+      flex-shrink: 0;
     }
     .back:hover { color: var(--text); }
-    h1 {
-      font-size: 24px;
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px 20px;
+      margin-bottom: 16px;
+      max-width: 960px;
+    }
+    .page-header h1 {
+      font-size: clamp(1.1rem, 2vw, 1.5rem);
       font-weight: 700;
-      margin-bottom: 8px;
+      margin: 0;
       color: var(--accent);
+      line-height: 1.2;
+    }
+    @media (min-width: 720px) {
+      .page-header h1 { white-space: nowrap; }
     }
     .admin-surface {
       border: 1px solid var(--line);
@@ -97,8 +110,10 @@
   </style>
 </head>
 <body>
-  <a href="/admin" class="back">&larr; Назад в панель</a>
-  <h1>Загрузка аватаров</h1>
+  <div class="page-header">
+    <h1>Загрузка аватаров</h1>
+    <a href="/admin" class="back">&larr; Назад в панель</a>
+  </div>
   <div class="admin-surface">
     <p class="lead">Выбор человека и файла; таблица ниже — текущее состояние в базе.</p>
     <form class="upload-form" action="/admin/avatars" method="post" enctype="multipart/form-data">
