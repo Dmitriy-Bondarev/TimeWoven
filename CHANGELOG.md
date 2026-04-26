@@ -1,5 +1,14 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.42-family-i18n-theme-audio-t30] — 2026-04-26
+
+### Fix | Family UI | i18n + Theme consistency + Audio
+
+- **Family i18n**: family‑экраны переведены на безопасные i18n‑лейблы (`ts(...)`) с RU/EN словарями (`locales/*/family.yml`) без показа сырых ключей.
+- **Theme consistency**: базовый layout теперь подключает `theme.css` и применяет активный preset через `data-tw-theme` (включая `voice_premium`) для family‑страниц.
+- **Audio logic**: timeline CTA и детальная страница воспоминания используют единое условие наличия аудио (metadata `local_audio_path` или `Memory.audio_url`), а в деталке отображается HTML5 audio‑плеер при наличии.
+- **Memory UI**: добавлены страницы создания/редактирования воспоминания (`/family/memory/new`, `/family/memory/{id}/edit`) в общем voice‑стиле.
+
 ## [v1.22.41-admin-login-hardening-p1-20] — 2026-04-26
 
 ### Security | Admin | Login hardening

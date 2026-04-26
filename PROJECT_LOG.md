@@ -1,5 +1,23 @@
 # PROJECT LOG — TimeWoven
 
+## TITLE PROJECT LOG TimeWoven - Update T30 family i18n & theme fixes (timeline/profile/memory)
+
+Date: 2026-04-26
+
+### Structural change
+
+Yes
+
+### Schema change
+
+No
+
+### Changes
+
+- T30.A: family‑экраны переведены на i18n‑механику с безопасным helper `ts(...)` (не показывает сырые ключи), добавлены локали `family` (RU/EN).
+- T30.B: синхронизирована логика наличия аудио между timeline и детальной страницей воспоминания; в деталке добавлен HTML5 `<audio>` плеер при наличии аудио.
+- T30.C: добавлены страницы `memory_new`/`memory_edit` в общем voice‑стиле и i18n; кнопка добавления воспоминания добавлена в карточку персоны.
+
 ## Decision: T37 — family graph split into Graph Lite / Time Machine / Legacy Graph
 
 Date: 2026-04-25
