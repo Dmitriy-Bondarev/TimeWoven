@@ -103,6 +103,7 @@ class Memory(Base):
     audio_url = Column(String)
     transcript_verbatim = Column(Text)
     transcript_readable = Column(Text)
+    essence_text = Column(Text)
     emotional_tone = Column(String)
     intimacy_level = Column(Integer)
     sensitivity_flag = Column(Integer)

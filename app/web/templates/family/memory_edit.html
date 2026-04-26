@@ -25,15 +25,41 @@
     .back { display: inline-block; margin-bottom: 20px; font-size: 13px; color: var(--muted); text-decoration: none; }
     .back:hover { color: var(--text); }
     h1 { margin: 0 0 8px; font-size: 1.4rem; font-weight: 700; }
-    .sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+    .sub { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+    .page-hint {
+      margin: 0 0 20px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(245, 158, 11, 0.28);
+      background: rgba(245, 158, 11, 0.08);
+      color: #fde68a;
+      font-size: 14px;
+      line-height: 1.45;
+    }
     .card {
       border: 1px solid var(--line);
       border-radius: 20px;
       padding: 20px 20px 18px;
       background: rgba(15, 23, 42, 0.78);
     }
+    .layer { margin-bottom: 20px; }
+    .layer:last-of-type { margin-bottom: 0; }
+    .layer-title {
+      margin: 0 0 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #fef3c7;
+    }
+    .layer-sub {
+      margin: 0 0 10px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
     label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
-    .field { margin-bottom: 16px; }
+    .field { margin-bottom: 0; }
     textarea {
       width: 100%;
       min-height: 100px;
@@ -46,9 +72,39 @@
       font-family: inherit;
       resize: vertical;
     }
-    textarea:focus { outline: none; border-color: rgba(245, 158, 11, 0.45); }
-    .actions { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 8px; }
-    button {
+    textarea.essence { min-height: 72px; max-height: 200px; }
+    textarea.locked {
+      background: rgba(2, 6, 23, 0.72);
+      color: #cbd5e1;
+      border-color: rgba(100, 116, 139, 0.35);
+      cursor: not-allowed;
+    }
+    textarea:focus:not(.locked) { outline: none; border-color: rgba(245, 158, 11, 0.45); }
+    .read-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+      margin-top: 8px;
+    }
+    .btn-para {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.85);
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+    .btn-para:hover { border-color: rgba(245, 158, 11, 0.45); color: #f8fafc; }
+    .btn-para:disabled { opacity: 0.45; cursor: not-allowed; }
+    .read-tools-hint { font-size: 12px; color: #64748b; margin: 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 20px; }
+    .actions button[type="submit"] {
       background: var(--accent);
       color: #111827;
       border: none;
@@ -57,7 +113,7 @@
       font-size: 15px; font-weight: 600;
       cursor: pointer;
     }
-    button:hover { filter: brightness(1.04); }
+    .actions button[type="submit"]:hover { filter: brightness(1.04); }
     a.cancel { font-size: 14px; color: #94a3b8; text-decoration: none; font-weight: 500; }
     a.cancel:hover { color: #cbd5e1; text-decoration: underline; }
   </style>
@@ -66,17 +122,33 @@
   <div class="wrap">
     <a class="back" href="/family/person/{{ person_id }}">← К карточке</a>
     <h1>Редактирование текста</h1>
-    <p class="sub">Запись #{{ memory_id }}: текст сохраняется в той же записи; статус публикации не меняется.</p>
+    <p class="sub">Запись #{{ memory_id }}: статус публикации не меняется.</p>
+    <p class="page-hint" role="note">Оригинал всегда сохраняется. Вы редактируете только улучшенную версию для чтения.</p>
     <div class="card">
       <form method="post" action="/family/memory/{{ memory_id }}/edit">
         <input type="hidden" name="return_person_id" value="{{ person_id }}">
-        <div class="field">
-          <label for="t_verbatim">Дословно (verbatim)</label>
-          <textarea id="t_verbatim" name="transcript_verbatim" rows="4">{{ transcript_verbatim|e }}</textarea>
+        <div class="field layer">
+          <div class="layer-title">Оригинал</div>
+          <p class="layer-sub">как было рассказано</p>
+          <label for="t_verbatim" class="visually-skip" style="position:absolute;left:-9999px;">Оригинал</label>
+          <textarea id="t_verbatim" class="locked" rows="4" readonly
+            title="Семейный редактор не меняет оригинал" aria-readonly="true">{{ transcript_verbatim|e }}</textarea>
         </div>
-        <div class="field">
-          <label for="t_read">Читаемый текст (readable)</label>
+        <div class="field layer">
+          <div class="layer-title">Пересказ</div>
+          <p class="layer-sub">понятная версия, оригинал не меняется</p>
+          <label for="t_read" class="visually-skip" style="position:absolute;left:-9999px;">Пересказ</label>
           <textarea id="t_read" name="transcript_readable" rows="6">{{ transcript_readable|e }}</textarea>
+          <div class="read-tools">
+            <button type="button" class="btn-para" id="btn-split-paragraphs" title="Сгруппировать предложения в абзацы (без переписывания)">Разбить на абзацы</button>
+            <p class="read-tools-hint">По клику вставляются пустые строки между смысловыми кусками; смысл и слова не «переформулируются».</p>
+          </div>
+        </div>
+        <div class="field layer">
+          <div class="layer-title">Суть воспоминания</div>
+          <p class="layer-sub">краткое резюме на 2–3 строки (по желанию)</p>
+          <label for="t_essence" class="visually-skip" style="position:absolute;left:-9999px;">Суть</label>
+          <textarea id="t_essence" class="essence" name="essence_text" rows="3" placeholder="Например, о чём эта запись в двух фразах…">{{ essence_text|e }}</textarea>
         </div>
         <div class="actions">
           <button type="submit">Сохранить</button>
@@ -85,5 +157,36 @@
       </form>
     </div>
   </div>
+  <script>
+  (function () {
+    var btn = document.getElementById("btn-split-paragraphs");
+    var ta = document.getElementById("t_read");
+    if (!btn || !ta) return;
+    function splitIntoParagraphs(input) {
+      var t = String(input || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (!t) return t;
+      var blocks = t.split(/\n\n+/);
+      if (blocks.length > 1) {
+        return blocks
+          .map(function (b) { return b.replace(/\n/g, " ").replace(/\s+/g, " ").trim(); })
+          .filter(Boolean)
+          .join("\n\n");
+      }
+      var one = blocks[0].replace(/\n/g, " ").replace(/\s+/g, " ");
+      var parts = one.split(/(?<=[.!?…])\s+/);
+      if (parts.length <= 1) return t;
+      var out = [];
+      for (var i = 0; i < parts.length; i += 2) {
+        out.push(parts.slice(i, i + 2).join(" ").trim());
+      }
+      return out.join("\n\n");
+    }
+    btn.addEventListener("click", function () {
+      ta.value = splitIntoParagraphs(ta.value);
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+      ta.focus();
+    });
+  })();
+  </script>
 </body>
 </html>

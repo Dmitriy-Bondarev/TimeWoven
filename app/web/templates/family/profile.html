@@ -221,23 +221,63 @@
     }
     .card-list { display: flex; flex-direction: column; gap: 10px; }
 
+    .timeline {
+      position: relative;
+      margin-top: 4px;
+      padding-left: 44px;
+    }
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 24px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(226, 232, 240, 0.35);
+      border-radius: 1px;
+    }
+    .timeline .time-group { position: relative; z-index: 0; }
+    .timeline .time-year { padding-left: 0; }
+    .timeline .card-list { gap: 12px; }
+
     .m-card, .own-card {
       border: 1px solid rgba(148, 163, 184, 0.14);
       border-radius: 16px;
       padding: 14px 16px 12px;
       background: rgba(2, 6, 23, 0.38);
     }
-    .own-card-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; width: 100%; }
+    .own-card.timeline-item {
+      position: relative;
+      z-index: 1;
+    }
+    .own-card.timeline-item::after {
+      content: "";
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      left: -23.5px;
+      top: 2.55rem;
+      transform: translateY(-50%);
+      background: var(--accent);
+      box-shadow: 0 0 0 2px rgba(2, 6, 23, 0.95);
+    }
+    .own-card-top {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px;
+      margin-bottom: 6px; width: 100%;
+    }
     .own-kind {
       font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
       color: #fbbf24; background: rgba(245, 158, 11, 0.1); border-radius: 6px; padding: 3px 7px;
     }
+    .own-meta-sep { font-size: 12px; color: #64748b; user-select: none; }
+    .own-date-integrated { font-size: 12px; color: #94a3b8; font-variant-numeric: tabular-nums; }
     .own-title {
       font-size: 16px; font-weight: 700; color: #f1f5f9; margin: 0; line-height: 1.35;
       flex: 1; min-width: 0;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
-    .own-date { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; margin-left: auto; }
+    .own-audio-hint { font-size: 12px; color: #64748b; }
     .own-preview {
       font-size: 14px; line-height: 1.45; color: #94a3b8;
       display: -webkit-box;
@@ -247,6 +287,7 @@
       margin: 8px 0 0 0;
     }
     .own-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 0 0; align-items: center; }
+    .own-actions .own-audio-hint { margin-left: 4px; }
     .own-actions-sep { color: #64748b; user-select: none; padding: 0 6px; font-weight: 500; }
     .own-actions a.own-link--primary { font-size: 14px; font-weight: 600; text-decoration: none; color: var(--accent); }
     .own-actions a.own-link--primary:hover { text-decoration: underline; }
@@ -405,15 +446,19 @@
       <h2 id="h-own">Свои истории</h2>
       <p class="lead">Записи, которые публикует эта персона.</p>
       {% if own_memories_by_year and own_memories_by_year|length > 0 %}
+        <div class="timeline">
         {% for year, items in own_memories_by_year %}
           <div class="time-group">
+            {% if own_memories_by_year|length > 1 %}
             <div class="time-year">{% if year and year != '—' %}{{ year }}{% else %}без года в записи{% endif %}</div>
+            {% endif %}
             <div class="card-list">
               {% for m in items %}
-                <article class="own-card">
+                <article class="own-card timeline-item">
                   <div class="own-card-top">
                     <span class="own-kind">{{ m.kind_label|e }}</span>
-                    <span class="own-date">{% if m.date_display and m.date_display != '—' %}{{ m.date_display|e }}{% else %}дата уточняется{% endif %}</span>
+                    <span class="own-meta-sep" aria-hidden="true">·</span>
+                    <span class="own-date-integrated">{% if m.date_line and m.date_line != '—' %}{{ m.date_line|e }}{% elif m.date_display and m.date_display != '—' %}{{ m.date_display|e }}{% else %}дата уточняется{% endif %}</span>
                   </div>
                   <h3 class="own-title">{{ m.title|e }}</h3>
                   {% if m.preview %}
@@ -428,7 +473,7 @@
                     <a class="own-link--secondary" href="/family/memory/{{ m.id }}/edit?person_id={{ person.person_id }}">Редактировать</a>
                     {% endif %}
                     {% if m.has_audio %}
-                      <span class="own-date" style="margin-left:8px;">· есть аудио</span>
+                      <span class="own-audio-hint" aria-label="есть аудио">· есть аудио</span>
                     {% endif %}
                   </div>
                 </article>
@@ -436,6 +481,7 @@
             </div>
           </div>
         {% endfor %}
+        </div>
       {% else %}
         <p class="empty">Собственных опубликованных фрагментов пока нет. Можно открыть ленту или ответить в чужой истории.</p>
       {% endif %}

@@ -476,6 +476,48 @@ def _own_memory_date_display(created: object) -> str:
     return raw[:10] if len(raw) >= 8 else "—"
 
 
+_RU_MONTHS_SHORT_3 = (
+    "янв",
+    "фев",
+    "мар",
+    "апр",
+    "май",
+    "июн",
+    "июл",
+    "авг",
+    "сен",
+    "окт",
+    "ноя",
+    "дек",
+)
+
+
+def _own_memory_date_line_for_card(created: object) -> str:
+    """
+    Одна строка для мини‑таймлайна: «24 апр 2026»; год — если только год; иначе как _own_memory_date_display.
+    """
+    raw = (created or "") if isinstance(created, str) else (str(created) if created is not None else "")
+    raw = (raw or "").strip()
+    if not raw:
+        return "—"
+    if len(raw) >= 10:
+        ds = raw[:10]
+        m0 = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", ds)
+        if m0:
+            y, mo, d = int(m0.group(1)), int(m0.group(2)), int(m0.group(3))
+            if 1 <= mo <= 12 and 1 <= d <= 31:
+                return f"{d} {_RU_MONTHS_SHORT_3[mo - 1]} {y}"
+    m1 = re.match(r"^(\d{1,2})\.(\d{1,2})\.(\d{4})$", raw[:10] if len(raw) >= 10 else raw)
+    if m1:
+        d, mo, y = int(m1.group(1)), int(m1.group(2)), int(m1.group(3))
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            return f"{d} {_RU_MONTHS_SHORT_3[mo - 1]} {y}"
+    m2 = re.match(r"^(\d{4})$", raw)
+    if m2:
+        return m2.group(1)
+    return _own_memory_date_display(created)
+
+
 def _family_own_memory_card(session: Session, m: Memory) -> dict:
     text = _memory_display_text(m)
     if not text or _looks_like_technical_blob(text):
@@ -492,6 +534,7 @@ def _family_own_memory_card(session: Session, m: Memory) -> dict:
         "title": display_title,
         "preview": preview,
         "date_display": _own_memory_date_display(m.created_at),
+        "date_line": _own_memory_date_line_for_card(m.created_at),
         "year_key": yk,
         "kind_label": _memory_kind_label(m),
         "has_audio": _memory_has_audio(m),
@@ -1571,6 +1614,7 @@ async def family_memory_edit_get(
             "person_id": return_pid,
             "transcript_readable": memory.transcript_readable or "",
             "transcript_verbatim": memory.transcript_verbatim or "",
+            "essence_text": memory.essence_text or "",
         },
     )
 
@@ -1580,8 +1624,8 @@ async def family_memory_edit_post(
     request: Request,
     memory_id: int,
     return_person_id: int = Form(...),
-    transcript_verbatim: str = Form(""),
     transcript_readable: str = Form(""),
+    essence_text: str = Form(""),
     db: Session = Depends(get_db),
 ):
     red = _require_family_session(request, db)
@@ -1595,8 +1639,9 @@ async def family_memory_edit_post(
         raise HTTPException(status_code=404, detail="Memory not found")
     if memory.author_id is None or viewer.person_id != memory.author_id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    memory.transcript_verbatim = transcript_verbatim
+    # Оригинал (transcript_verbatim) не меняется с family-редактора
     memory.transcript_readable = transcript_readable
+    memory.essence_text = essence_text
     db.commit()
     return RedirectResponse(url=f"/family/person/{return_person_id}", status_code=303)
 

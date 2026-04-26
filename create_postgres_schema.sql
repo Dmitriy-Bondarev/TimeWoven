@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS "Memories" (
     audio_url           VARCHAR,
     transcript_verbatim TEXT,
     transcript_readable TEXT,
+    essence_text        TEXT,
     emotional_tone      VARCHAR,
     intimacy_level      INTEGER DEFAULT 1,
     sensitivity_flag    INTEGER DEFAULT 0,
