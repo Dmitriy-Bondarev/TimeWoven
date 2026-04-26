@@ -418,6 +418,13 @@ systemctl status timewoven.service --no-pager
 curl -s https://app.timewoven.ru/health
 ```
 
+**Обертки в репозитории:** в корне проекта `deploy.sh` (по сути `git pull origin main` + `systemctl restart timewoven` / `timewoven.service`) и `deploy_landing.sh` — сборка/копирование лендинга в `/var/www/timewoven` и reload nginx (см. скрипт).
+
+### 5.5.1 Admin UI / front-stabilization (срез 2026-04-26)
+
+- **`/admin/people`:** поиск (id/имя) и клиентские фильтры живут **во второй строке `<thead>`** таблицы; над таблицей — счётчик «Показано n из m». Ссылка **«Алиасы»** ведёт на `/admin/people/{id}/aliases`; в колонке алиасов используются поля **`label` и `alias_type`** (v2-модель в бэкенде), не устаревшие имена полей.
+- **`/explorer/`**, **`/admin/avatars`:** приведены к **gold**-токенам (тёмный фон, акцент `#f59e0b`, согласованные surface/input), без смены маршрутов и бизнес-логики.
+
 ### 5.6 Резервное копирование (срез 2026-04-25)
 
 **База данных**

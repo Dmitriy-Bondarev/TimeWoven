@@ -103,6 +103,20 @@
 
 ---
 
+## OP-2026-04-26 — Admin people list: table-header filters + aliases + gold explorer/avatars
+
+**Status:** Done  
+**ID:** OP-ADMIN-PEOPLE-UX-2026-04-26 (операционная подзадача контура admin UI, не смешивать с T42)
+
+### Scope
+- `/admin/people`: интерактивные фильтры и поиск **в строке заголовка таблицы**; корректное отображение алиасов (`label`, `alias_type`); вход к редактированию алиасов.
+- `/explorer/`, `/admin/avatars`: визуальное выравнивание с gold-темой админки.
+
+### Result
+- Реализовано в шаблонах; выкат: `deploy.sh` + `deploy_landing.sh`, коммиты `5f4185e`, `05493eb` на `main` (см. `PROJECT_LOG.md`).
+
+---
+
 ## T37A — Family Graph entry points split
 
 **Priority:** P1  

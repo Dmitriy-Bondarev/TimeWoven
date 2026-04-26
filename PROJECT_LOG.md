@@ -1,5 +1,18 @@
 # PROJECT LOG — TimeWoven
 
+## Deploy: ADMIN-PEOPLE-FILTERS + gold theme (explorer / avatars) — 2026-04-26
+
+**Commits (main):** `5f4185e` (restore filters, gold explorer/avatars), `05493eb` (filters moved into table header row).  
+**Deploy:** `sudo ./deploy.sh` (app: `git pull origin main` + `systemctl restart timewoven.service`), `sudo ./deploy_landing.sh` (статика `landing.html` / `landing_en.html` → `/var/www/timewoven/`, nginx reload).  
+**Проверки:** `systemctl status timewoven.service`, `curl https://app.timewoven.ru/health` → `{"status":"ok"}`; лендинг `https://timewoven.ru/`, `https://timewoven.ru/en/` → HTTP 200.
+
+### Before / after (admin `/admin/people`)
+
+- **Before:** отдельный блок поиска; риск несоответствия полей алиасов в шаблоне; explorer в «левом» акценте, аватары без выровненной шапки.
+- **After:** поиск и фильтры **во второй строке thead** таблицы, счётчик «Показано n из m» над таблицей; колонка алиасов читает **`label` / `alias_type`**; ссылка **«Алиасы»** на `/admin/people/{id}/aliases`; `/explorer/` и `/admin/avatars` приведены к **gold**-теме (см. `TECH_PASSPORT` §5.5.1).
+
+---
+
 ## Decision: T42 — meaning / events layer for the main family timeline
 
 Date: 2026-04-26
