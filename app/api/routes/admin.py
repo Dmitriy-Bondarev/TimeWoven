@@ -6,13 +6,14 @@ from datetime import datetime, timedelta, timezone
 
 import base64
 import io
+import logging
 from pathlib import Path
 from uuid import uuid4
 
 import pyotp
 import qrcode
 from fastapi import APIRouter, Depends, Request, Form, File, UploadFile, HTTPException, Query
-from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 import time
 import httpx
@@ -36,8 +37,15 @@ from app.models import (
 )
 from app.services import create_person_with_i18n, update_person_with_i18n
 from app.services.person_alias_service import ALIAS_STATUS, ALIAS_TYPES
+from app.core.i18n import install_jinja_i18n
 from app.security import get_daily_password, require_admin, make_admin_token, ADMIN_COOKIE_NAME
+from app.security import (
+    admin_session_cookie_max_age_seconds,
+    check_admin_login_rate_limit,
+    get_client_ip,
+)
 from app.services.ai_analyzer import ProviderAgnosticAnalyzer
+from app.core.theme import THEME_PRESETS, set_active_theme_preset
 from app.services.family_access_service import (
     clear_backup_codes,
     decrypt_totp_secret,
@@ -58,7 +66,9 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
+install_jinja_i18n(templates)
 ALLOWED_ROLES = {"placeholder", "relative", "family_admin", "bot_only"}
+logger = logging.getLogger(__name__)
 
 
 def _clean_optional_text(value: object) -> str | None:
@@ -321,8 +331,23 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "explorer_url": "/explorer/",
             "local_llm_check_url": "/admin/ai/local-llm-check",
+            "theme_presets": list(THEME_PRESETS),
         },
     )
+
+
+@router.post("/theme")
+async def admin_set_theme(
+    request: Request,
+    theme_preset: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    set_active_theme_preset(db, theme_preset)
+    return RedirectResponse(url="/admin/", status_code=303)
 
 
 @router.get("/explorer/password", response_class=JSONResponse)
@@ -820,10 +845,26 @@ async def admin_login_submit(
     password: str = Form(...),
     next: str = Form("/admin"),
 ):
+    ip = get_client_ip(request)
+    decision = check_admin_login_rate_limit(request)
+    if not decision.allowed:
+        logger.info(
+            "admin_login_attempt ip=%s outcome=rate_limited reason=too_many_attempts",
+            ip,
+        )
+        resp = PlainTextResponse(
+            "Too many login attempts, please try later",
+            status_code=429,
+        )
+        if decision.retry_after_seconds:
+            resp.headers["Retry-After"] = str(decision.retry_after_seconds)
+        return resp
+
     expected_username = os.getenv("ADMIN_USERNAME", "admin")
     expected_password = os.getenv("ADMIN_PASSWORD", "")
 
     if username == expected_username and password == expected_password:
+        logger.info("admin_login_attempt ip=%s outcome=success", ip)
         # Validate next to prevent open redirect: only relative internal paths allowed
         safe_next = (
             next
@@ -834,13 +875,14 @@ async def admin_login_submit(
         response.set_cookie(
             key=ADMIN_COOKIE_NAME,
             value=make_admin_token(),
-            max_age=60 * 60 * 8,  # 8 hours
+            max_age=admin_session_cookie_max_age_seconds(),
             path="/",
             httponly=True,
             samesite="lax",
         )
         return response
 
+    logger.info("admin_login_attempt ip=%s outcome=failure reason=bad_credentials", ip)
     return templates.TemplateResponse(
         "admin/admin_login.html",
         {"request": request, "next": next, "error": "Неверные учётные данные"},
