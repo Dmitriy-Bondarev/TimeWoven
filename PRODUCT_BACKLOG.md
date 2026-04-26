@@ -43,6 +43,8 @@
 
 ---
 
+## TITLE PRODUCT BACKLOG TimeWoven - T30 I18N theme consistency pass
+
 ## T30 — Family UI i18n & Theme Fixes (Timeline / Profile / Memory)
 
 **Status:** Done
@@ -51,13 +53,14 @@
 Довести family‑экраны до рабочего состояния по i18n и theme consistency: убрать сырые технические подписи, выровнять voice‑preset, и синхронизировать аудио‑логику timeline/detail.
 
 ### Result (2026-04-26)
-- **T30.A**: все ключевые CTA на family‑страницах переведены на i18n (`ts(...)`) с безопасным fallback; добавлены локали `locales/ru/family.yml`, `locales/en/family.yml`.
-- **T30.B**: timeline и детальная страница воспоминания используют единое условие “есть аудио”, а в деталке показывается `<audio>` плеер при наличии.
-- **T30.C**: добавлены `memory_new`/`memory_edit` страницы в voice‑стиле и i18n; на карточке персоны есть кнопка добавления воспоминания.
+- safe i18n для family UI, без сырых ключей.
+- единая логика аудио между timeline и детальной страницей с HTML5 аудиоплеером.
+- `memory_new` / `memory_edit` на общем voice theme через `base.html`.
+- документы обновлены: `PROJECT_LOG.md` (Update T30 family i18n & theme fixes) и `CHANGELOG.md` (`v1.22.42-family-i18n-theme-audio-t30`).
 
 ### References
-- `PROJECT_LOG.md` — T30 (2026-04-26)
-- `CHANGELOG.md` — v1.22.42 (2026-04-26)
+- `PROJECT_LOG.md` — Update T30 family i18n & theme fixes (2026-04-26)
+- `CHANGELOG.md` — `v1.22.42-family-i18n-theme-audio-t30` (2026-04-26)
 
 ---
 
