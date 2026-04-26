@@ -36,34 +36,38 @@
       border-radius: 8px;
       font-weight: 700;
     }
-    .people-filters { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); max-width: 100%; }
-    .people-filters-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
-    .people-filters label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
-    .people-filters input[type="search"],
-    .people-filters select {
-      background: var(--input-bg);
-      border: 1px solid var(--input-line);
-      color: var(--text);
-      border-radius: 8px;
-      padding: 8px 10px;
-      min-width: 8rem;
-      font: inherit;
-      -webkit-appearance: none;
-      appearance: none;
-    }
-    .people-filters input[type="search"]::-webkit-search-decoration,
-    .people-filters input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
-    .people-filters input[type="search"]::placeholder { color: #64748b; }
-    .people-filters input[type="search"]:focus,
-    .people-filters select:focus { outline: none; border-color: rgba(245, 158, 11, 0.45); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2); }
-    .people-search-input { min-width: min(100%, 14rem); }
-    .people-filters button, .btn-reset-filters { color: #020617; background: var(--accent); font-size: 13px; text-decoration: none; display: inline-block; padding: 8px 14px; border-radius: 8px; font-weight: 700; border: none; cursor: pointer; }
-    .btn-reset-filters { background: #334155; color: var(--text); }
-    .btn-reset-filters:hover { opacity: 0.92; }
+    .table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; max-width: 100%; }
     .filter-meta { font-size: 12px; color: var(--muted); margin: 0; }
     .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1100px; }
+    thead tr:first-child th { border-bottom: 1px solid var(--line); }
+    thead tr.thead-filters th { font-weight: 400; border-top: 1px solid #0f172a; border-bottom: 1px solid var(--line); background: var(--card); }
     th { text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    .th-filter { vertical-align: bottom; }
+    .th-filter input[type="search"],
+    .th-filter select {
+      width: 100%;
+      max-width: 11rem;
+      min-width: 4.5rem;
+      background: var(--input-bg);
+      border: 1px solid var(--input-line);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 7px;
+      font: inherit;
+      font-size: 12px;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .th-filter input[type="search"]::-webkit-search-decoration,
+    .th-filter input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+    .th-filter input::placeholder { color: #64748b; }
+    .th-filter input:focus,
+    .th-filter select:focus { outline: none; border-color: rgba(245, 158, 11, 0.45); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2); }
+    .th-filter--name input { max-width: 12rem; }
+    .th-filter--actions { white-space: normal; }
+    .btn-reset-filters { color: var(--text); background: #334155; font-size: 12px; padding: 6px 10px; border-radius: 6px; font-weight: 600; border: none; cursor: pointer; }
+    .btn-reset-filters:hover { opacity: 0.92; }
     td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
     tr[data-person-row] td { vertical-align: middle; }
     tbody tr:hover td { background: #0f172a; }
@@ -91,61 +95,12 @@
     </div>
   </div>
 
-  <form class="people-filters" id="people-filters-form" action="/admin/people" method="get">
-    <div class="people-filters-row">
-      <label>Поиск (id или имя)
-        <input type="search" name="q" id="f-q" class="people-search-input" value="{{ (request.query_params.get('q') or '')|e }}" placeholder="ID или фрагмент имени" autocomplete="off" inputmode="search">
-      </label>
-      <label>Роль
-        <select name="pf_role" id="f-role">
-          <option value="all">Все</option>
-          <option value="placeholder">placeholder</option>
-          <option value="relative">relative</option>
-          <option value="familyadmin">family_admin</option>
-          <option value="botonly">bot_only</option>
-        </select>
-      </label>
-      <label>Статус записи
-        <select name="pf_status" id="f-status">
-          <option value="all">Все</option>
-          <option value="active">active</option>
-          <option value="archived">archived</option>
-          <option value="testarchived">test_archived</option>
-        </select>
-      </label>
-      <label>Канал
-        <select name="pf_ch" id="f-ch">
-          <option value="all">Все</option>
-          <option value="max">max</option>
-          <option value="tg">tg</option>
-          <option value="email">email</option>
-          <option value="push">push</option>
-          <option value="none">нет / none</option>
-        </select>
-      </label>
-      <label>Жив
-        <select name="pf_alive" id="f-alive">
-          <option value="all">Все</option>
-          <option value="yes">да</option>
-          <option value="no">нет</option>
-        </select>
-      </label>
-      <label>Аватар (QC)
-        <select name="pf_av" id="f-av">
-          <option value="all">Все</option>
-          <option value="no_avatar">Нет аватара</option>
-          <option value="expired_avatar">Истёк</option>
-          <option value="actual_avatar">Актуален</option>
-        </select>
-      </label>
-      <button type="submit" id="f-apply">Применить</button>
-      <a href="/admin/people" class="btn-reset-filters" id="f-reset">Сбросить</a>
-    </div>
+  <div class="table-toolbar">
     <p class="filter-meta" id="filter-meta" aria-live="polite"></p>
-  </form>
+  </div>
 
   <div class="table-wrap">
-  <table>
+  <table id="people-table" aria-describedby="filter-meta">
     <thead>
       <tr>
         <th>ID</th>
@@ -163,6 +118,64 @@
         <th>Жив</th>
         <th>Воспом.</th>
         <th>Цитаты</th>
+      </tr>
+      <tr class="thead-filters">
+        <th class="th-filter" aria-label="ID"></th>
+        <th class="th-filter">
+          <select id="f-av" title="Аватар (QC)" aria-label="Фильтр по аватару">
+            <option value="all">все</option>
+            <option value="no_avatar">нет</option>
+            <option value="expired_avatar">истёк</option>
+            <option value="actual_avatar">ок</option>
+          </select>
+        </th>
+        <th class="th-filter th-filter--name">
+          <input type="search" id="f-q" name="q" value="{{ (request.query_params.get('q') or '')|e }}" placeholder="id или имя" autocomplete="off" inputmode="search" title="Поиск: id или имя">
+        </th>
+        <th class="th-filter">
+          <select id="f-role" title="Роль" aria-label="Фильтр по роли">
+            <option value="all">все</option>
+            <option value="placeholder">placeholder</option>
+            <option value="relative">relative</option>
+            <option value="familyadmin">family_admin</option>
+            <option value="botonly">bot_only</option>
+          </select>
+        </th>
+        <th class="th-filter">
+          <select id="f-status" title="Статус записи" aria-label="Фильтр по статусу">
+            <option value="all">все</option>
+            <option value="active">active</option>
+            <option value="archived">archived</option>
+            <option value="testarchived">test_archived</option>
+          </select>
+        </th>
+        <th class="th-filter th-filter--actions">
+          <button type="button" class="btn-reset-filters" id="f-reset" title="Сбросить фильтры">Сбросить</button>
+        </th>
+        <th class="th-filter" aria-hidden="true"></th>
+        <th class="th-filter">
+          <select id="f-ch" title="Канал" aria-label="Фильтр по каналу">
+            <option value="all">все</option>
+            <option value="max">max</option>
+            <option value="tg">tg</option>
+            <option value="email">email</option>
+            <option value="push">push</option>
+            <option value="none">нет</option>
+          </select>
+        </th>
+        <th class="th-filter" aria-hidden="true"></th>
+        <th class="th-filter" aria-hidden="true"></th>
+        <th class="th-filter" aria-hidden="true"></th>
+        <th class="th-filter" aria-hidden="true"></th>
+        <th class="th-filter">
+          <select id="f-alive" title="Жив" aria-label="Фильтр: жив / нет">
+            <option value="all">все</option>
+            <option value="yes">да</option>
+            <option value="no">нет</option>
+          </select>
+        </th>
+        <th class="th-filter" aria-hidden="true"></th>
+        <th class="th-filter" aria-hidden="true"></th>
       </tr>
     </thead>
     <tbody>
@@ -228,13 +241,13 @@
   <script>
     (function () {
       const rows = Array.from(document.querySelectorAll('tr[data-person-row]'));
-      const form = document.getElementById('people-filters-form');
       const elQ = document.getElementById('f-q');
       const elRole = document.getElementById('f-role');
       const elStatus = document.getElementById('f-status');
       const elCh = document.getElementById('f-ch');
       const elAlive = document.getElementById('f-alive');
       const elAv = document.getElementById('f-av');
+      const btnReset = document.getElementById('f-reset');
       const meta = document.getElementById('filter-meta');
 
       function readUrlParams() {
@@ -288,18 +301,25 @@
         }
         if (meta) {
           const total = rows.length;
-          meta.textContent = total
-            ? 'Показано ' + n + ' из ' + total
-            : '';
+          meta.textContent = total ? 'Показано ' + n + ' из ' + total : '';
         }
         writeUrl();
       }
 
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
+      function resetFilters() {
+        elQ.value = '';
+        elRole.value = 'all';
+        elStatus.value = 'all';
+        elCh.value = 'all';
+        elAlive.value = 'all';
+        elAv.value = 'all';
         apply();
-      });
+      }
+
+      if (btnReset) btnReset.addEventListener('click', resetFilters);
+
       [elQ, elRole, elStatus, elCh, elAlive, elAv].forEach(function (el) {
+        if (!el) return;
         el.addEventListener('change', apply);
         el.addEventListener('input', function () {
           if (el === elQ) apply();
