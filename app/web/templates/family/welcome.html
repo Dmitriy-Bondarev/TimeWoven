@@ -142,10 +142,16 @@
           <span>• {{ memory_date }}</span>
         {% endif %}
       </div>
+      {% if memory_audio_url %}
+        <div class="listen-wrap" style="margin-top:18px;">
+          <p style="margin:0 0 8px; font-size:14px; font-weight:600; color:var(--accent);">Послушать воспоминание</p>
+          <audio controls src="{{ memory_audio_url }}" style="width:100%;" aria-label="Послушать воспоминание"></audio>
+        </div>
+      {% endif %}
     </article>
 
     <div class="actions">
-      <a class="btn btn-primary" href="/family/timeline">Посмотреть весь Таймлайн</a>
+      <a class="btn btn-primary" href="/family/timeline">Посмотреть всю семейную ленту</a>
       {% if memory_id %}
         <a class="btn btn-secondary" href="/family/reply/{{ memory_id }}{% if person_id %}?person_id={{ person_id }}{% endif %}">Открыть обсуждение</a>
       {% endif %}

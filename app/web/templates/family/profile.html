@@ -2,249 +2,501 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Мой профиль — TimeWoven</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ name|e }} — TimeWoven</title>
   <style>
     :root {
-      --bg: #020617;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
+      --bg-0: #0f172a;
+      --bg-1: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
       --accent: #f59e0b;
-      --border: rgba(148,163,184,0.2);
-      --ok: #22c55e;
-      --card: rgba(15,23,42,0.96);
+      --card: rgba(15, 23, 42, 0.78);
+      --line: rgba(148, 163, 184, 0.22);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #0f172a, var(--bg));
-      color: var(--text);
+      margin: 0;
       min-height: 100vh;
-      padding: 32px 24px;
+      font-family: "Segoe UI", "Helvetica Neue", -apple-system, system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 500px at 8% -8%, rgba(245, 158, 11, 0.18), transparent 58%),
+        radial-gradient(900px 420px at 95% 0%, rgba(14, 165, 233, 0.1), transparent 55%),
+        linear-gradient(155deg, var(--bg-0) 0%, var(--bg-1) 100%);
+      padding: 24px 18px 48px;
     }
-    .container { max-width: 480px; margin: 0 auto; }
+    a { color: var(--accent); }
+    .wrap { max-width: 880px; margin: 0 auto; }
     .back-link {
       display: inline-block;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       font-size: 13px;
       color: var(--muted);
       text-decoration: none;
     }
     .back-link:hover { color: var(--text); }
-
-    /* Шапка */
-    .header {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 28px;
+    .message {
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      color: #86efac;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      margin-bottom: 20px;
       text-align: center;
-      margin-bottom: 16px;
     }
-    .avatar-wrap { position: relative; display: inline-block; margin-bottom: 16px; }
+
+    .person-header {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 26px 22px 24px;
+      background: var(--card);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 20px 48px rgba(2, 6, 23, 0.42);
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 0;
+      overflow: visible;
+    }
+    .person-head {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 14px;
+    }
+    @media (min-width: 640px) {
+      .person-head { flex-direction: row; align-items: flex-start; text-align: left; }
+    }
+    .avatar-wrap { flex-shrink: 0; }
     .avatar {
-      width: 96px; height: 96px;
-      border-radius: 999px;
-      object-fit: cover;
-      border: 2px solid rgba(255,255,255,0.15);
+      width: 96px; height: 96px; border-radius: 999px; object-fit: cover;
+      border: 2px solid rgba(245, 158, 11, 0.38);
       display: block;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     }
     .avatar-fallback {
-      width: 96px; height: 96px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.07);
-      display: grid; place-items: center;
-      color: var(--muted); font-size: 12px;
-      margin: 0 auto;
+      width: 96px; height: 96px; border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      display: grid; place-items: center; color: var(--muted); font-size: 12px;
     }
-    h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-    .role { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
-    .header-actions {
+    .hero-text { flex: 1; min-width: 0; }
+    h1 {
+      margin: 0 0 4px;
+      font-size: clamp(28px, 4.2vw, 42px);
+      line-height: 1.08;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .hero-sub {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 15px;
+      line-height: 1.5;
+      max-width: 50ch;
+      font-weight: 400;
+    }
+    .hero-text > .hero-sub { margin-top: 8px; }
+
+    .hero-metrics-hint {
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin: 18px 0 0 0;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+    @media (min-width: 640px) {
+      .hero-metrics-hint { text-align: left; }
+    }
+    .hero-stats {
+      list-style: none;
+      margin: 10px 0 0 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px 12px;
+    }
+    @media (min-width: 480px) {
+      .hero-stats { grid-template-columns: repeat(3, 1fr); gap: 8px 12px; }
+    }
+    .hero-stat {
+      text-align: center;
+      padding: 10px 10px 12px;
+      border-radius: 14px;
+      background: rgba(2, 6, 23, 0.42);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+    }
+    @media (min-width: 640px) {
+      .hero-stat { text-align: left; padding: 10px 12px; }
+    }
+    .hero-stat-line {
+      font-size: 15px;
+      font-weight: 600;
+      color: #e2e8f0;
+      line-height: 1.3;
+    }
+
+    .person-cta {
       display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+      padding-top: 4px;
       justify-content: center;
-      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
     }
-    .graph-chip {
+    .person-cta a {
+      position: relative;
+      z-index: 2;
+      pointer-events: auto;
+    }
+    @media (min-width: 480px) {
+      .person-cta { flex-direction: row; flex-wrap: wrap; }
+    }
+    @media (min-width: 640px) {
+      .person-cta { justify-content: flex-start; }
+    }
+    .btn {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
-      transition: background .2s, border-color .2s, transform .2s;
-    }
-    .graph-chip:hover {
-      background: rgba(245,158,11,0.12);
-      border-color: rgba(245,158,11,0.45);
-      transform: translateY(-1px);
-    }
-    .graph-chip svg {
-      width: 16px;
-      height: 16px;
-      flex-shrink: 0;
-    }
-
-    /* Статистика */
-    .stats {
-      display: flex;
-      gap: 16px;
       justify-content: center;
-      margin-bottom: 24px;
-    }
-    .stat {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      border-radius: 14px;
       padding: 12px 20px;
-      text-align: center;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      cursor: pointer;
+      transition: background .2s, border-color .2s, transform .15s;
     }
-    .stat-value { font-size: 24px; font-weight: 700; color: var(--accent); }
-    .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .btn-primary {
+      background: var(--accent);
+      color: #111827;
+      border-color: rgba(245, 158, 11, 0.8);
+    }
+    .btn-primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
+    .btn-ghost {
+      background: rgba(15, 23, 42, 0.65);
+      color: #f1f5f9;
+    }
+    .btn-ghost:hover { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); }
 
-    /* Загрузка фото */
-    .upload-section {
-      background: var(--card);
-      border: 1px solid var(--border);
+    .section {
+      border: 1px solid var(--line);
       border-radius: 20px;
-      padding: 20px;
+      background: var(--card);
+      padding: 20px 20px 18px;
       margin-bottom: 16px;
     }
-    .section-title {
-      font-size: 13px;
-      color: var(--muted);
+    .section h2 {
+      margin: 0 0 4px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fef3c7;
+    }
+    .section p.lead { margin: 0 0 14px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+    .empty-box {
+      border-radius: 16px;
+      padding: 20px 18px;
+      background: rgba(2, 6, 23, 0.35);
+      border: 1px dashed rgba(148, 163, 184, 0.25);
+    }
+    .empty-box h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #e2e8f0; }
+    .empty-box p { margin: 0; font-size: 14px; line-height: 1.5; color: #94a3b8; }
+
+    .time-group { margin-top: 16px; }
+    .time-group:first-child { margin-top: 0; }
+    .time-year {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      letter-spacing: .06em;
-      margin-bottom: 14px;
+      margin: 0 0 10px 2px;
     }
-    .file-label {
-      display: block;
-      border: 1px dashed var(--border);
-      border-radius: 12px;
-      padding: 14px;
+    .card-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .m-card, .own-card {
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 16px;
+      padding: 14px 16px 12px;
+      background: rgba(2, 6, 23, 0.38);
+    }
+    .own-card-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; width: 100%; }
+    .own-kind {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #fbbf24; background: rgba(245, 158, 11, 0.1); border-radius: 6px; padding: 3px 7px;
+    }
+    .own-title {
+      font-size: 16px; font-weight: 700; color: #f1f5f9; margin: 0; line-height: 1.35;
+      flex: 1; min-width: 0;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .own-date { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; margin-left: auto; }
+    .own-preview {
+      font-size: 14px; line-height: 1.45; color: #94a3b8;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin: 8px 0 0 0;
+    }
+    .own-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 0 0; align-items: center; }
+    .own-actions-sep { color: #64748b; user-select: none; padding: 0 6px; font-weight: 500; }
+    .own-actions a.own-link--primary { font-size: 14px; font-weight: 600; text-decoration: none; color: var(--accent); }
+    .own-actions a.own-link--primary:hover { text-decoration: underline; }
+    .own-actions a.own-link--secondary { font-size: 14px; font-weight: 500; text-decoration: none; color: #94a3b8; }
+    .own-actions a.own-link--secondary:hover { text-decoration: underline; color: #cbd5e1; }
+
+    .m-card .excerpt { font-size: 14px; line-height: 1.5; color: #e2e8f0; }
+    .m-meta { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+    .m-meta a { text-decoration: none; font-weight: 600; }
+    .m-meta a:hover { text-decoration: underline; }
+
+    .empty { color: #94a3b8; font-size: 14px; line-height: 1.5; padding: 4px 0; }
+
+    .photo-panel {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--card);
+      padding: 20px 20px 18px;
+      margin-top: 8px;
+    }
+    .photo-panel h3 { margin: 0 0 4px; font-size: 17px; font-weight: 700; color: #fef3c7; }
+    .photo-panel .lead { margin: 0 0 16px; font-size: 14px; color: #94a3b8; line-height: 1.45; }
+    .photo-pair {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (min-width: 520px) {
+      .photo-pair { flex-direction: row; align-items: flex-start; }
+    }
+    .photo-current {
+      width: 88px; height: 88px; border-radius: 16px; object-fit: cover;
+      border: 2px solid rgba(245, 158, 11, 0.35);
+      background: rgba(0,0,0,0.2);
+    }
+    .photo-preview-hint { font-size: 12px; color: #64748b; margin: 0 0 6px; }
+    #avatar-preview-crop { width: 88px; height: 88px; border-radius: 16px; overflow: hidden; border: 1px dashed var(--line); display: none; background: rgba(0,0,0,0.15); }
+    #avatar-preview-crop.has-img { display: block; border-style: solid; }
+    #avatar-preview-crop img { width: 100%; height: 100%; object-fit: cover; }
+    .dropzone {
+      flex: 1; min-width: 0;
+      border: 1px dashed rgba(148, 163, 184, 0.45);
+      border-radius: 14px;
+      padding: 16px 14px;
       text-align: center;
-      color: var(--muted);
-      font-size: 13px;
       cursor: pointer;
-      margin-bottom: 12px;
-      transition: border-color .2s;
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.45;
+      transition: border-color .2s, color .2s, background .2s;
     }
-    .file-label:hover { border-color: var(--accent); color: var(--text); }
+    .dropzone:hover { border-color: rgba(245, 158, 11, 0.5); color: #e2e8f0; background: rgba(245, 158, 11, 0.05); }
+    .dropzone strong { color: #fde68a; }
     input[type="file"] { display: none; }
-    .btn {
+    .btn-block {
       width: 100%;
       background: var(--accent);
       color: #111827;
       border: none;
       border-radius: 12px;
-      padding: 12px;
-      font-size: 14px;
+      padding: 12px 16px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
     }
-
-    /* Сообщение */
-    .message {
-      background: rgba(34,197,94,0.1);
-      border: 1px solid rgba(34,197,94,0.3);
-      color: var(--ok);
-      border-radius: 12px;
-      padding: 12px 16px;
-      font-size: 14px;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-
-    /* Ссылки */
-    .links { display: flex; flex-direction: column; gap: 10px; }
+    .btn-block:hover { filter: brightness(1.04); }
+    .links { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
     .link-btn {
-      display: block;
-      text-align: center;
-      text-decoration: none;
+      display: block; text-align: center; text-decoration: none;
       background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px;
-      font-size: 14px;
-      color: var(--text);
-      transition: background .2s;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px; color: var(--text);
     }
-    .link-btn:hover { background: rgba(255,255,255,0.08); }
+    .link-btn:hover { background: rgba(245, 158, 11, 0.1); }
+    .link-btn[href] {
+      position: relative;
+      z-index: 1;
+      pointer-events: auto;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <a href="/" class="back-link">← Импульс дня</a>
+  <div class="wrap">
+    <a href="/family/welcome" class="back-link">← Импульс дня</a>
 
     {% if message %}
       <div class="message">✓ {{ message }}</div>
     {% endif %}
 
-    <div class="header">
-      <div class="avatar-wrap">
-        {% if person.avatar_url %}
-          <img class="avatar" src="{{ person.avatar_url }}" alt="{{ name }}">
-        {% else %}
-          <div class="avatar-fallback">Нет фото</div>
-        {% endif %}
+    <header class="person-header" aria-label="Профиль">
+      <div class="person-head">
+        <div class="avatar-wrap">
+          {% if person.avatar_url %}
+            <img class="avatar" src="{{ person.avatar_url|e }}" alt="">
+          {% else %}
+            <div class="avatar-fallback">Нет фото</div>
+          {% endif %}
+        </div>
+        <div class="hero-text">
+          <h1>{{ name|e }}</h1>
+          {% if hero_subtitle %}
+            {% set _hs = (hero_subtitle|string|trim) %}
+            {% if _hs and (_hs|lower) not in ('none', 'null', 'undefined') %}
+              <p class="hero-sub">{{ hero_subtitle }}</p>
+            {% endif %}
+          {% endif %}
+        </div>
       </div>
-      {% set maiden = (person.maiden_name or '').strip() %}
-      {% set current_last = (person_i18n.last_name or '').strip() if person_i18n else '' %}
-      <h1>{{ name }}</h1>
-      {% if maiden and maiden != current_last %}
-        <p style="font-size: 13px; color: var(--muted); margin: 0 0 4px;">урождённая {{ maiden }}</p>
+      <p class="hero-metrics-hint">След человека в семейной памяти</p>
+      <ul class="hero-stats" aria-label="Статистика">
+        <li class="hero-stat">
+          <span class="hero-stat-line">{{ metric_mentions|e }}</span>
+        </li>
+        <li class="hero-stat">
+          <span class="hero-stat-line">{{ metric_memories|e }}</span>
+        </li>
+        <li class="hero-stat">
+          <span class="hero-stat-line">{{ metric_quotes|e }}</span>
+        </li>
+      </ul>
+      <nav class="person-cta" aria-label="Действия">
+        <a class="btn btn-primary" href="{{ add_memory_href|e }}">Добавить воспоминание</a>
+        <a class="btn btn-ghost" href="{{ (person_timeline_href|default('/family/timeline?person_id=' ~ person.person_id, true))|e }}">Смотреть свою ленту</a>
+        <a class="btn btn-ghost" href="{{ (family_timeline_href|default('/family/timeline', true))|e }}">Семейная лента воспоминаний</a>
+        <a class="btn btn-ghost" href="/family/tree?root_person_id={{ person.person_id }}">Открыть дерево</a>
+      </nav>
+    </header>
+
+    <section class="section" aria-labelledby="h-mentions">
+      <h2 id="h-mentions">Упоминания в рассказах</h2>
+      <p class="lead">Когда другие участники семьи пишут истории и вспоминают вас, эти фрагменты появляются ниже.</p>
+      {% if mention_memories and mention_memories|length > 0 %}
+        <div class="card-list">
+          {% for m in mention_memories %}
+            <article class="m-card">
+              <div class="excerpt">{{ m.excerpt|e }}</div>
+              <div class="m-meta">
+                {{ m.date_display|e }} · {{ m.author_name|e }} ·
+                <a href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Открыть запись →</a>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-box" role="status">
+          <h3>Пока нет упоминаний</h3>
+          <p>Когда другие участники семьи будут писать истории, где вы упоминаетесь, они появятся здесь. Пока можно прослушать семейные записи в ленте — возможно, совпадения по имени появятся позже.</p>
+        </div>
       {% endif %}
-      <div class="role">{{ person.role }}</div>
+    </section>
 
-      <div class="header-actions">
-        <a
-          href="/family/tree?root_person_id={{ person.person_id }}"
-          class="graph-chip"
-          title="Показать в семейном дереве"
-          aria-label="Показать в семейном дереве"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 5v5"></path>
-            <path d="M6 19v-4h12v4"></path>
-            <path d="M6 11h12"></path>
-            <circle cx="12" cy="4" r="2"></circle>
-            <circle cx="6" cy="20" r="2"></circle>
-            <circle cx="18" cy="20" r="2"></circle>
-          </svg>
-          <span>Показать в дереве</span>
-        </a>
-      </div>
+    <section class="section" aria-labelledby="h-own">
+      <h2 id="h-own">Свои истории</h2>
+      <p class="lead">Записи, которые публикует эта персона.</p>
+      {% if own_memories_by_year and own_memories_by_year|length > 0 %}
+        {% for year, items in own_memories_by_year %}
+          <div class="time-group">
+            <div class="time-year">{% if year and year != '—' %}{{ year }}{% else %}без года в записи{% endif %}</div>
+            <div class="card-list">
+              {% for m in items %}
+                <article class="own-card">
+                  <div class="own-card-top">
+                    <span class="own-kind">{{ m.kind_label|e }}</span>
+                    <span class="own-date">{% if m.date_display and m.date_display != '—' %}{{ m.date_display|e }}{% else %}дата уточняется{% endif %}</span>
+                  </div>
+                  <h3 class="own-title">{{ m.title|e }}</h3>
+                  {% if m.preview %}
+                    <p class="own-preview">{{ m.preview|e }}</p>
+                  {% endif %}
+                  <div class="own-actions">
+                    <a class="own-link--primary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Читать</a>
+                    <span class="own-actions-sep" aria-hidden="true">·</span>
+                    <a class="own-link--secondary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Ответить</a>
+                    {% if m.can_edit %}
+                    <span class="own-actions-sep" aria-hidden="true">·</span>
+                    <a class="own-link--secondary" href="/family/memory/{{ m.id }}/edit?person_id={{ person.person_id }}">Редактировать</a>
+                    {% endif %}
+                    {% if m.has_audio %}
+                      <span class="own-date" style="margin-left:8px;">· есть аудио</span>
+                    {% endif %}
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty">Собственных опубликованных фрагментов пока нет. Можно открыть ленту или ответить в чужой истории.</p>
+      {% endif %}
+    </section>
 
-      <div class="stats">
-        <div class="stat">
-          <div class="stat-value">{{ memories_count }}</div>
-          <div class="stat-label">воспоминаний</div>
+    <div class="photo-panel" aria-labelledby="h-photo">
+      <h3 id="h-photo">{% if person.avatar_url %}Фото в профиле{% else %}Добавьте фотографию{% endif %}</h3>
+      <p class="lead">
+        {% if profile_is_living %}
+          Пусть близкие сразу видят, кого читают. Фотография отображается в семье рядом с этой страницей.
+        {% elif photo_possessive_name %}
+          Вы можете выбрать самое тёплое фото {{ photo_possessive_name|e }} — его будут видеть близкие рядом с этой страницей.
+        {% else %}
+          Вы можете выбрать самое тёплое фото — его увидят близкие рядом с этой страницей.
+        {% endif %}
+      </p>
+      <div class="photo-pair">
+        {% if person.avatar_url %}
+          <div>
+            <p class="photo-preview-hint">Сейчас</p>
+            <img class="photo-current" src="{{ person.avatar_url|e }}" alt="Текущее фото профиля">
+          </div>
+        {% endif %}
+        <div style="flex:1; min-width:0;">
+          <p class="photo-preview-hint" id="pv-label">Новый снимок</p>
+          <div id="avatar-preview-crop" aria-hidden="true">
+            <img id="avatar-preview-img" alt="">
+          </div>
+          <div id="file-drop" class="dropzone" role="button" tabindex="0" onclick="document.getElementById('avatar-file').click()"
+               onkeydown="if(event.key==='Enter'||event.key===' '){ event.preventDefault(); document.getElementById('avatar-file').click(); }">
+            <strong>Выберите файл</strong> с устройства или сделайте снимок — превью появится выше, затем нажмите «Сохранить».
+          </div>
         </div>
-        <div class="stat">
-          <div class="stat-value">{{ quotes_count }}</div>
-          <div class="stat-label">цитат</div>
-        </div>
       </div>
-    </div>
-
-    <div class="upload-section">
-      <div class="section-title">Обновить фото профиля</div>
       <form action="/profile/avatar" method="post" enctype="multipart/form-data" id="avatar-form">
         <input type="hidden" name="person_id" value="{{ person.person_id }}">
-        <div id="file-drop" onclick="document.getElementById('avatar-file').click()" style="border:1px dashed rgba(148,163,184,0.3); border-radius:12px; padding:20px; text-align:center; color:#9ca3af; font-size:14px; cursor:pointer; margin-bottom:12px;">
-          📷 Нажмите чтобы выбрать фото
-        </div>
-        <input type="file" id="avatar-file" name="file" accept="image/*" required style="display:none;" onchange="document.getElementById('file-drop').textContent = this.files[0].name">
-        <button class="btn" type="submit">Сохранить фото</button>
+        <input type="file" id="avatar-file" name="file" accept="image/*">
+        <button class="btn-block" type="submit">Сохранить фото</button>
       </form>
-    </div>
-    <div class="links">
-      <a href="/family/person/{{ person.person_id }}" class="link-btn">Моя карточка в архиве →</a>
-      <a href="/who-am-i" class="link-btn">Сменить пользователя →</a>
+      <div class="links">
+        <a class="link-btn" href="{{ (family_timeline_href|default('/family/timeline', true))|e }}">Семейная лента воспоминаний →</a>
+      </div>
     </div>
   </div>
+  <script>
+  (function () {
+    var input = document.getElementById("avatar-file");
+    if (!input) return;
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      var c = document.getElementById("avatar-preview-crop");
+      var img = document.getElementById("avatar-preview-img");
+      var z = document.getElementById("file-drop");
+      if (!file || !file.type.match(/^image\//) || !c || !img || !z) return;
+      var u = URL.createObjectURL(file);
+      img.onload = function () { try { URL.revokeObjectURL(u); } catch (e) {} };
+      img.src = u;
+      c.className = "has-img";
+      z.innerHTML = "<strong>Файл:</strong> " + (file.name || "изображение");
+    });
+  })();
+  </script>
 </body>
 </html>

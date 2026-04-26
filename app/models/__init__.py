@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Text, Float, DateTime, text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -27,26 +28,55 @@ class Person(Base):
     avatar_url = Column(String)
     pin = Column(String)
     record_status = Column(String, nullable=False, default="active", server_default=text("'active'"))
+    public_uuid = Column(
+        UUID(as_uuid=True), nullable=False, unique=True, index=True
+    )
+    family_access_enabled = Column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    totp_secret_encrypted = Column(Text, nullable=True)
+    totp_enabled_at = Column(DateTime(timezone=True), nullable=True)
+    totp_last_used_at = Column(DateTime(timezone=True), nullable=True)
+    family_access_revoked_at = Column(DateTime(timezone=True), nullable=True)
 
     translations = relationship("PersonI18n", back_populates="person")
-    aliases = relationship("PersonAlias", back_populates="person", cascade="all, delete-orphan")
+    aliases = relationship(
+        "PersonAlias",
+        back_populates="person",
+        foreign_keys="PersonAlias.person_id",
+        cascade="all, delete-orphan",
+    )
     quotes = relationship("Quote", back_populates="author")
     memories_authored = relationship("Memory", foreign_keys="Memory.author_id", back_populates="author")
     memories_created = relationship("Memory", foreign_keys="Memory.created_by", back_populates="creator")
 
 
 class PersonAlias(Base):
+    """Соответствует продовой таблице `personaliases` (v2, без legacy alias_text/alias_kind)."""
+
     __tablename__ = "personaliases"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     person_id = Column(Integer, ForeignKey("People.person_id", ondelete="CASCADE"), nullable=False, index=True)
-    alias_text = Column(String, nullable=False)
-    alias_kind = Column(String, nullable=False)
+    label = Column(String, nullable=False)
+    alias_type = Column(String, nullable=False)
     used_by_generation = Column(String, nullable=True)
     note = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
+    spoken_by_person_id = Column(Integer, ForeignKey("People.person_id"), nullable=True, index=True)
+    source = Column(String, nullable=False, server_default=text("'manual'"))
+    status = Column(String, nullable=False, server_default=text("'active'"))
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-    person = relationship("Person", back_populates="aliases")
+    person = relationship(
+        "Person",
+        back_populates="aliases",
+        foreign_keys=[person_id],
+    )
+    spoken_by_person = relationship(
+        "Person",
+        foreign_keys=[spoken_by_person_id],
+    )
 
 
 class PersonI18n(Base):
@@ -202,3 +232,40 @@ class MaxChatSession(Base):
 
     person = relationship("Person", foreign_keys=[person_id])
     memory = relationship("Memory", foreign_keys=[memory_id])
+
+
+class EarlyAccessRequest(Base):
+    __tablename__ = "EarlyAccessRequests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=True)
+    preferred_channel = Column(String, nullable=False)
+    contact_value = Column(String, nullable=False)
+    about = Column(Text, nullable=True)
+    source = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+
+
+class FamilyAccessSession(Base):
+    __tablename__ = "family_access_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    person_id = Column(Integer, ForeignKey("People.person_id"), nullable=False, index=True)
+    session_token_hash = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime, nullable=True, index=True)
+    created_ip = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+
+
+class PersonAccessBackupCode(Base):
+    __tablename__ = "person_access_backup_codes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    person_id = Column(Integer, ForeignKey("People.person_id"), nullable=False, index=True)
+    code_hash = Column(String, nullable=False, index=True)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TimeWoven — семейный доступ</title>
+  <style>
+    :root {
+      --bg-0: #0f172a;
+      --bg-1: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --line: rgba(148, 163, 184, 0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 500px at 10% 0%, rgba(245, 158, 11, 0.2), transparent 55%),
+        linear-gradient(150deg, var(--bg-0) 0%, var(--bg-1) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 520px;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 28px;
+      background: rgba(15, 23, 42, 0.85);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+    h1 {
+      font-size: 1.35rem;
+      margin: 0 0 12px;
+      color: var(--accent);
+    }
+    p { margin: 0 0 14px; line-height: 1.55; color: var(--text); }
+    .hint { color: var(--muted); font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Семейная зона</h1>
+    <p>Чтобы открыть семейное дерево, таймлайн и ленту, войдите по <strong>персональной семейной ссылке</strong> и коду (TOTP), которые вы настроили заранее.</p>
+    <p class="hint">Ссылка приходит в семью отдельно; вход без этой пары в продакшене сейчас не предлагается.</p>
+  </div>
+</body>
+</html>

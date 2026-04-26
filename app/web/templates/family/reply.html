@@ -136,6 +136,12 @@
         <div class="original-text">
           {{ memory_text or "Текст исходного воспоминания отсутствует." }}
         </div>
+        {% if original_audio_url %}
+          <div style="margin-top: 14px;">
+            <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px;">Послушать воспоминание</div>
+            <audio controls src="{{ original_audio_url }}" style="width: 100%;"></audio>
+          </div>
+        {% endif %}
       </div>
 
       <form method="post">

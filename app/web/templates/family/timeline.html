@@ -87,7 +87,7 @@
               <div class="tl-text">{{ item.text }}</div>
             {% endif %}
             {% if item.memory_id %}
-              <a href="/family/reply/{{ item.memory_id }}" class="tl-link">Послушать и ответить →</a>
+              <a href="/family/reply/{{ item.memory_id }}" class="tl-link">{% if item.has_audio %}Послушать и ответить →{% else %}Ответить →{% endif %}</a>
             {% endif %}
             {% if item.person_id and item.source == "people" %}
               <a href="/family/person/{{ item.person_id }}" class="tl-link">Карточка →</a>
