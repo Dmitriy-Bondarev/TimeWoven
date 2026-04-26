@@ -401,6 +401,7 @@
     }
     .tw-events-prep__title { font-size: 14px; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
     .tw-events-prep__hint { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
+    .tw-events-prep--profile .tw-events-prep__hint + .tw-events-prep__hint { margin-top: 8px; }
     .tw-events-prep__placeholders { margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
     .tw-events-prep__placeholders > div { display: flex; gap: 8px; justify-content: space-between; padding: 4px 0; border-top: 1px solid rgba(148,163,184,0.15); }
     .tw-events-prep__placeholders > div:first-child { border-top: none; }
@@ -431,10 +432,17 @@
           {% if hero_subtitle %}
             {% set _hs = (hero_subtitle|string|trim) %}
             {% if _hs and (_hs|lower) not in ('none', 'null', 'undefined') %}
-              {% set _hs2 = _hs|replace("Годы жизни", "Жизнь", 1) %}
-              {% set _hs2 = _hs2|replace("Дата рождения", "Когда родился(ась)", 1) %}
-              {% set _hs2 = _hs2|replace("Дата смерти", "Когда ушёл(ла)", 1) %}
-              <p class="hero-sub">{{ _hs2 }}</p>
+              {# Согласованный вид: даты как в данных бэка; maiden («урожд. …») в hero не показываем (только шаблон). #}
+              {% set ns = namespace(parts=[]) %}
+              {% for p in _hs.split(' · ') %}
+                {% set t = p|trim %}
+                {% if t and not (t|lower).startswith('урожд') %}
+                  {% set _ = ns.parts.append(t) %}
+                {% endif %}
+              {% endfor %}
+              {% if ns.parts|length > 0 %}
+                <p class="hero-sub">{{ ns.parts|join(' · ') }}</p>
+              {% endif %}
             {% endif %}
           {% endif %}
         </div>
@@ -465,12 +473,8 @@
       </nav>
       <div class="tw-events-prep--profile" role="region" aria-label="События (скоро)">
         <p class="tw-events-prep__title">События (скоро)</p>
-        <p class="tw-events-prep__hint">Здесь появятся важные жизненные моменты, к которым можно будет привязать несколько историй сразу.</p>
-        <dl class="tw-events-prep__placeholders" aria-label="Что планируется в событиях">
-          <div><dt>Коротко о смысле</dt><dd>—</dd></div>
-          <div><dt>Кому видно</dt><dd>—</dd></div>
-          <div><dt>Статус</dt><dd>—</dd></div>
-        </dl>
+        <p class="tw-events-prep__hint">Сюда лягут важные жизненные моменты — свадьба, переезд, рождение ребёнка, юбилей: то, вокруг чего хочется собрать несколько разных семейных историй в одну понятную опору.</p>
+        <p class="tw-events-prep__hint">Пока это только намёк на будущую функцию, без списка и настроек — ничего заполнять не нужно.</p>
       </div>
     </header>
 
