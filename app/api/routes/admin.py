@@ -1468,6 +1468,15 @@ async def admin_person_new_submit(request: Request, db: Session = Depends(get_db
     return RedirectResponse(url="/admin/people", status_code=302)
 
 
+@router.get("/people/{person_id}", response_class=RedirectResponse)
+async def admin_person_redirect_to_edit(request: Request, person_id: int):
+    """Канонический URL карточки — /edit; короткий /people/{id} ведёт туда же (без 404)."""
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    return RedirectResponse(url=f"/admin/people/{person_id}/edit", status_code=303)
+
+
 @router.get("/people/{person_id}/edit", response_class=HTMLResponse)
 async def admin_person_edit_form(person_id: int, request: Request, db: Session = Depends(get_db)):
     redirect = require_admin(request)
