@@ -40,6 +40,9 @@ itsdangerous==2.2.0          # Подпись и верификация cookies/
 starlette-session==0.4.3     # Сессии для Starlette/FastAPI
 
 
+# --- i18n (YAML) ---
+PyYAML==6.0.2                # Загрузка locale-файлов (T33 I18N-1)
+
 # --- Валидация и сериализация ---
 pydantic==2.12.5             # Валидация данных, схемы запросов/ответов
 pydantic_core==2.41.5        # Ядро pydantic v2
@@ -61,9 +64,8 @@ typing-inspection==0.4.2     # Инспекция типов (вспомогат
 annotated-doc==0.0.4         # Работа с аннотированной документацией
 
 
-# --- Тестирование (dev only, TODO) ---
-# pytest==8.1.1              # Тестовый фреймворк
-# pytest-cov==5.0.0          # Покрытие кода тестами
+# --- Тестирование (dev only) ---
+pytest==9.0.3                # Тестовый фреймворк
 
 
 # --- Линтинг и форматирование (dev only, TODO) ---
@@ -71,7 +73,11 @@ annotated-doc==0.0.4         # Работа с аннотированной до
 
 
 # --- AI / ML и интеграции (опционально, TODO) ---
-anthropic==0.96.0            # Claude API (Anthropic) для NLP-анализа воспоминаний
+anthropic==0.96.0            # legacy/optional: Claude API (Anthropic) — не в active contour с 2026-04-24
+pyotp==2.9.0                 # TOTP (RFC 6238) for family access
+qrcode==7.4.2                 # QR images for TOTP enrollment
+Pillow==10.4.0                # image backend for qrcode
+cryptography==42.0.0          # Fernet encryption for TOTP secrets at rest
 # openai-whisper==20231117   # Транскрибация аудио (Whisper pipeline)
 # torch>=2.0,<3.0            # PyTorch — зависимость Whisper
 # python-telegram-bot==21.1  # Telegram Bot (Импульс дня)
