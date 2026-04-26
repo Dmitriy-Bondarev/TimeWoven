@@ -1,5 +1,35 @@
 # PROJECT LOG — TimeWoven
 
+## Decision: T42 — meaning / events layer for the main family timeline
+
+Date: 2026-04-26
+
+### Structural change
+
+Yes (planned): новый производный слой **`MemoryEvent` / `MemoryEventPerson`** поверх `Memories`; основной `/family/timeline` в перспективе переводится на чтение событий, а не только сырого текста.
+
+### Schema change
+
+Planned: миграции PostgreSQL для таблиц событий (детали — в `PRODUCT_BACKLOG` → T42).
+
+### Decision / Notes
+
+- **Контекст:** недавние локальные улучшения family (`/family/person` мини-timeline, дата в карточке, `/family/memory/.../edit` с оригинал / пересказ / суть + `essence_text`) **закрыты отдельно**; они дают фундамент (первоисточник vs пересказ vs краткое резюме), но **не** заменяют продуктовый эпик по структурированным событиям.
+- **Принято:** следующим **большим** продуктовым блоком (после фиксации ТЗ в docs и отдельного коммита) считается **T42** — слой смысла и событий, извлекаемых из текста воспоминаний, для **основного** семейного timeline и согласованного отображения на персоне.
+- **T42 не смешивается** в одной реализации с отложенным operational слоем **`admin / i18n / deploy`**: тот пласт остаётся следующим незакрытым **операционным** контуром; T42 — отдельный **продуктовый** track (schema + extraction + family UI + admin lite).
+- **Первоисточник:** `Memories` (в т.ч. неизменяемый в family-редакторе оригинал) остаётся source of truth; события — derived, с фрагментом-источником и ручной/полуавтоматической верификацией.
+- **Границы v1:** без `MemoryPeriod`, без тяжёлой дедупликации и карты мест — см. Non-goals в `PRODUCT_BACKLOG` (T42).
+
+### Next task package
+
+- Реализация T42 по фазам в `PRODUCT_BACKLOG` (schema → extraction → admin lite → timeline switch → fallback).
+- Отдельно: operational backlog `admin / i18n / deploy` — не блокирует старт дизайна T42, но **не** сливается в один PR с T42.
+
+### References
+
+- `PRODUCT_BACKLOG.md` — T42
+- `TECH_PASSPORT.md` — §4.2.1 roadmap note
+
 ## Decision: T37 — family graph split into Graph Lite / Time Machine / Legacy Graph
 
 Date: 2026-04-25

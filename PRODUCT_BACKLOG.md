@@ -20,6 +20,66 @@
 
 ---
 
+## T42 — Meaning and Events Layer for Main Timeline
+
+**Priority:** P1  
+**Status:** Planned
+
+### Goal
+Сделать так, чтобы **основной** `/family/timeline` строился не только из длинного неструктурированного текста воспоминаний, а из **выделенных смысловых единиц** (событий): короткие карточки с датой/периодом, местом, ролями участников, уверенностью и ссылкой на исходный фрагмент текста. Первоисточник — поля `Memories` (оригинал, пересказ, суть); события — **производный, проверяемый** слой.
+
+### Why now
+- Уже есть family-facing timeline, профиль персоны (story-board), published-only, audience/visibility, недавно — `essence_text` в family memory edit. Новый слой логично строить **над** существующими `Memories` и family UI, а не с нуля.
+- Отдельно от T30 (инфра/деплой) и от операционного контура `admin / i18n / deploy` в части **реализации** — в backlog этот эпик фиксируется как **следующий крупный продуктовый** блок после docs-freeze; operational слой остаётся параллельным незакрытым пластом.
+- T37B/C (Graph Lite, Time Machine) и будущие temporal-сценарии смогут опираться на **структурированные** события, а не только на сырой текст.
+
+### Scope v1 (функциональный)
+**Backend (черновик)**
+- ORM (через миграции PostgreSQL) для `MemoryEvent`, `MemoryEventPerson`.
+- Сервис извлечения/обновления событий из текста memory (readability + при необходимости essence, verbatim по политике качества).
+- Хелперы нормализации дат (в т.ч. неточных) и sortable-поля.
+- API/маршруты: генерация событий по memory, список/деталь, скрытие/подтверждение, **основной** aggregate timeline из `MemoryEvent` (а не напрямую из сырого текста).
+
+**Family UI**
+- `/family/timeline` в итоге **читает** событийный слой; карточка: краткое событие, дата/период, место, участники при наличии; ссылка на memory/персону без потери контекста.
+- **Fallback:** если у memory ещё нет событий — мягкий откат к текущему режиму или явное «события ещё не подготовлены», без ломки страницы.
+
+**Admin (минимум)**
+- regenerate events для memory; список событий; hide/show; mark verified; ручная правка коротких title/summary/date/place.
+
+### Data model (черновик v1)
+**`MemoryEvent`:** `id`, `memory_id`, `event_type`, `title`, `summary`, `description`, `start_date_text`, `end_date_text`, `start_date_sort`, `end_date_sort`, `date_precision`, `place_text`, `confidence`, `source_fragment`, `is_ai_generated`, `is_human_verified`, `is_hidden`, `sort_order`, `created_at`, `updated_at`.
+
+**`MemoryEventPerson`:** `event_id`, `person_id`, `role_code`, `is_primary` (+ PK/уникальность по дизайн-ревью).
+
+**`MemoryPeriod`** — **не** в v1; отложить (phase 2 / отдельная задача).
+
+**Входы для извлечения (с учётом кода):** `content_text`, `transcript_readable`, `transcript_verbatim`, `essence_text`, `MemoryPeople`, контекст персон/дат из текущей модели.
+
+### Non-goals (v1)
+- Сложная временная онтология, auto-merge дублей между memories, глобальная дедупликация фактов, богатая карта мест, **полноэкранный** moderation workflow.
+- Замена или авто-перезапись **оригинального** текста memory событием; AI **не** стирает смысл без явной ручной линии (см. правила качества в PROJECT_LOG / техдизайне реализации).
+
+### Phases (предлагаемая очередь)
+1. **Docs / freeze** — этот epик зафиксирован в `PRODUCT_BACKLOG`, `PROJECT_LOG`, `TECH_PASSPORT` (текущий шаг).
+2. **Schema** — модели, миграции, пустой/тестовый `MemoryEvent`.
+3. **Extraction** — сервис выделения событий из текста/essence.
+4. **Admin moderation lite** — ручные правки и подтверждение.
+5. **Timeline switch** — family timeline читает `MemoryEvent` с fallback.
+6. **Fallback & QA** — деградация при плохом extraction.
+
+### Event quality (продуктовые правила)
+- Событие короче и яснее исходного потока; **одна** основная мысль на событие.
+- Неточная дата: человекочитаемая строка + sortable-поле с пониженной точностью.
+- Обязательная привязка к **фрагменту** исходного текста; оригинал memory не заменяется.
+
+### References
+- `PROJECT_LOG.md` — Decision T42 (2026-04-26)
+- `TECH_PASSPORT.md` — roadmap note §4.2.1
+- `app/models` — `Memories`, `essence_text` (миграция 007)
+
+---
+
 ## T40 — Bilingual Landing (RU/EN) + Waitlist Polish
 
 **Status:** Done
