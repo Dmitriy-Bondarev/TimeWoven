@@ -99,13 +99,23 @@
     }
     .hero-text > .hero-sub { margin-top: 8px; }
 
+    .hero-kicker {
+      text-align: center;
+      font-size: 15px;
+      color: #e2e8f0;
+      line-height: 1.45;
+      margin: 6px 0 0 0;
+      max-width: 52ch;
+    }
+    @media (min-width: 640px) {
+      .hero-kicker { text-align: left; }
+    }
     .hero-metrics-hint {
       text-align: center;
       font-size: 12px;
-      color: #64748b;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      margin: 18px 0 0 0;
+      color: #94a3b8;
+      line-height: 1.4;
+      margin: 16px 0 0 0;
       padding-top: 16px;
       border-top: 1px solid var(--line);
     }
@@ -138,6 +148,18 @@
       font-weight: 600;
       color: #e2e8f0;
       line-height: 1.3;
+    }
+    .hero-stat-kicker {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.3;
+      margin: 0 0 4px 0;
+    }
+    .hero-stat-hint {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.35;
+      margin: 6px 0 0 0;
     }
 
     .person-cta {
@@ -370,17 +392,31 @@
       z-index: 1;
       pointer-events: auto;
     }
+    .tw-events-prep--profile {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+      background: rgba(15, 23, 42, 0.45);
+    }
+    .tw-events-prep__title { font-size: 14px; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
+    .tw-events-prep__hint { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
+    .tw-events-prep__placeholders { margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
+    .tw-events-prep__placeholders > div { display: flex; gap: 8px; justify-content: space-between; padding: 4px 0; border-top: 1px solid rgba(148,163,184,0.15); }
+    .tw-events-prep__placeholders > div:first-child { border-top: none; }
+    .tw-events-prep__placeholders dt { font-weight: 500; color: #cbd5e1; }
+    .tw-events-prep__placeholders dd { margin: 0; font-family: ui-monospace, system-ui, sans-serif; color: #64748b; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <a href="/family/welcome" class="back-link">← Импульс дня</a>
+    <a href="/family/timeline" class="back-link">← К семейной ленте</a>
 
     {% if message %}
       <div class="message">✓ {{ message }}</div>
     {% endif %}
 
-    <header class="person-header" aria-label="Профиль">
+    <header class="person-header" aria-label="Семейная страница">
       <div class="person-head">
         <div class="avatar-wrap">
           {% if person.avatar_url %}
@@ -391,37 +427,56 @@
         </div>
         <div class="hero-text">
           <h1>{{ name|e }}</h1>
+          <p class="hero-kicker">Семейная страница: кто этот человек в общей истории и что о нём уже сказано.</p>
           {% if hero_subtitle %}
             {% set _hs = (hero_subtitle|string|trim) %}
             {% if _hs and (_hs|lower) not in ('none', 'null', 'undefined') %}
-              <p class="hero-sub">{{ hero_subtitle }}</p>
+              {% set _hs2 = _hs|replace("Годы жизни", "Жизнь", 1) %}
+              {% set _hs2 = _hs2|replace("Дата рождения", "Когда родился(ась)", 1) %}
+              {% set _hs2 = _hs2|replace("Дата смерти", "Когда ушёл(ла)", 1) %}
+              <p class="hero-sub">{{ _hs2 }}</p>
             {% endif %}
           {% endif %}
         </div>
       </div>
-      <p class="hero-metrics-hint">След человека в семейной памяти</p>
-      <ul class="hero-stats" aria-label="Статистика">
+      <p class="hero-metrics-hint">Коротко: как этот человек присутствует в рассказах, историях и обсуждениях</p>
+      <ul class="hero-stats" aria-label="Сводка по странице">
         <li class="hero-stat">
+          <div class="hero-stat-kicker">В чужих историях</div>
           <span class="hero-stat-line">{{ metric_mentions|e }}</span>
+          <div class="hero-stat-hint">Когда в тексте встречается имя</div>
         </li>
         <li class="hero-stat">
+          <div class="hero-stat-kicker">Свои истории</div>
           <span class="hero-stat-line">{{ metric_memories|e }}</span>
+          <div class="hero-stat-hint">Воспоминания, записанные от имени этого человека</div>
         </li>
         <li class="hero-stat">
+          <div class="hero-stat-kicker">Семейные отклики</div>
           <span class="hero-stat-line">{{ metric_quotes|e }}</span>
+          <div class="hero-stat-hint">Короткие ответы рядом с историями (в обсуждениях)</div>
         </li>
       </ul>
       <nav class="person-cta" aria-label="Действия">
-        <a class="btn btn-primary" href="{{ add_memory_href|e }}">Добавить воспоминание</a>
-        <a class="btn btn-ghost" href="{{ (person_timeline_href|default('/family/timeline?person_id=' ~ person.person_id, true))|e }}">Смотреть свою ленту</a>
-        <a class="btn btn-ghost" href="{{ (family_timeline_href|default('/family/timeline', true))|e }}">Семейная лента воспоминаний</a>
-        <a class="btn btn-ghost" href="/family/tree?root_person_id={{ person.person_id }}">Открыть дерево</a>
+        <a class="btn btn-primary" href="/family/memory/new?person_id={{ person.person_id|e }}">Добавить воспоминание</a>
+        <a class="btn btn-ghost" href="{{ (person_timeline_href|default('/family/timeline?person_id=' ~ person.person_id, true))|e }}">Лента вокруг: {{ name|e }}</a>
+        <a class="btn btn-ghost" href="{{ (family_timeline_href|default('/family/timeline', true))|e }}">Общая семейная лента</a>
+        <a class="btn btn-ghost" href="/family/tree?root_person_id={{ person.person_id }}">Семейное дерево</a>
       </nav>
+      <div class="tw-events-prep--profile" role="region" aria-label="События (скоро)">
+        <p class="tw-events-prep__title">События (скоро)</p>
+        <p class="tw-events-prep__hint">Здесь появятся важные жизненные моменты, к которым можно будет привязать несколько историй сразу.</p>
+        <dl class="tw-events-prep__placeholders" aria-label="Что планируется в событиях">
+          <div><dt>Коротко о смысле</dt><dd>—</dd></div>
+          <div><dt>Кому видно</dt><dd>—</dd></div>
+          <div><dt>Статус</dt><dd>—</dd></div>
+        </dl>
+      </div>
     </header>
 
     <section class="section" aria-labelledby="h-mentions">
-      <h2 id="h-mentions">Упоминания в рассказах</h2>
-      <p class="lead">Когда другие участники семьи пишут истории и вспоминают вас, эти фрагменты появляются ниже.</p>
+      <h2 id="h-mentions">Когда имя появляется в чужих историях</h2>
+      <p class="lead">Когда в семье пишут истории и вспоминают этого человека, сюда попадают короткие фрагменты — с датой и автором, чтобы было понятно, «где в тексте зазвучало имя».</p>
       {% if mention_memories and mention_memories|length > 0 %}
         <div class="card-list">
           {% for m in mention_memories %}
@@ -429,22 +484,29 @@
               <div class="excerpt">{{ m.excerpt|e }}</div>
               <div class="m-meta">
                 {{ m.date_display|e }} · {{ m.author_name|e }} ·
-                <a href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Открыть запись →</a>
+                <a href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Открыть и откликнуться →</a>
               </div>
             </article>
           {% endfor %}
         </div>
       {% else %}
         <div class="empty-box" role="status">
-          <h3>Пока нет упоминаний</h3>
-          <p>Когда другие участники семьи будут писать истории, где вы упоминаетесь, они появятся здесь. Пока можно прослушать семейные записи в ленте — возможно, совпадения по имени появятся позже.</p>
+          <h3>Пока нет таких фрагментов</h3>
+          <p>Это нормально: не в каждой семейной истории имя произносится вслух. Когда вспоминания и рассказы начнут встречаться чаще, сюда начнут собираться короткие «врезки» — как след чужой памяти.</p>
         </div>
       {% endif %}
     </section>
 
     <section class="section" aria-labelledby="h-own">
       <h2 id="h-own">Свои истории</h2>
-      <p class="lead">Записи, которые публикует эта персона.</p>
+      <p class="lead">
+        {% set _n = (name|string|trim) if name else "" %}
+        {% if _n %}
+          {{ t("profile.own_stories_lead", namespace="family", name=_n) }}
+        {% else %}
+          {{ t("profile.own_stories_lead_neutral", namespace="family") }}
+        {% endif %}
+      </p>
       {% if own_memories_by_year and own_memories_by_year|length > 0 %}
         <div class="timeline">
         {% for year, items in own_memories_by_year %}
@@ -465,9 +527,9 @@
                     <p class="own-preview">{{ m.preview|e }}</p>
                   {% endif %}
                   <div class="own-actions">
-                    <a class="own-link--primary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Читать</a>
+                    <a class="own-link--primary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Открыть</a>
                     <span class="own-actions-sep" aria-hidden="true">·</span>
-                    <a class="own-link--secondary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Ответить</a>
+                    <a class="own-link--secondary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Добавить отклик</a>
                     {% if m.can_edit %}
                     <span class="own-actions-sep" aria-hidden="true">·</span>
                     <a class="own-link--secondary" href="/family/memory/{{ m.id }}/edit?person_id={{ person.person_id }}">Редактировать</a>
@@ -483,7 +545,7 @@
         {% endfor %}
         </div>
       {% else %}
-        <p class="empty">Собственных опубликованных фрагментов пока нет. Можно открыть ленту или ответить в чужой истории.</p>
+        <p class="empty">Пока нет опубликованных историй, записанных от имени этого человека. Можно начать с ленты: посмотреть семейные воспоминания и вписать отклик там, где откликается сердцем.</p>
       {% endif %}
     </section>
 
@@ -522,7 +584,7 @@
         <button class="btn-block" type="submit">Сохранить фото</button>
       </form>
       <div class="links">
-        <a class="link-btn" href="{{ (family_timeline_href|default('/family/timeline', true))|e }}">Семейная лента воспоминаний →</a>
+        <a class="link-btn" href="{{ (family_timeline_href|default('/family/timeline', true))|e }}">Перейти к семейной ленте →</a>
       </div>
     </div>
   </div>

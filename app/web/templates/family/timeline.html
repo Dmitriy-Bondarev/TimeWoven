@@ -54,12 +54,95 @@
     .tl-link:hover { text-decoration: underline; }
     .year-marker { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .08em; margin-bottom: 16px; margin-top: 8px; position: relative; left: -32px; padding-left: 8px; }
     .empty-state { color: var(--muted); padding: 20px 0; font-size: 14px; }
+    .tw-events-prep {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      background: rgba(15,23,42,0.55);
+    }
+    .tw-events-prep__label { font-size: 13px; font-weight: 600; color: var(--accent); margin: 0 0 6px; }
+    .tw-events-prep__hint { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 0; }
+    .tw-event-view-list { margin-bottom: 24px; display: flex; flex-direction: column; gap: 12px; }
+    .tw-event-view {
+      background: rgba(15,23,42,0.88);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .tw-event-view__date { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .tw-event-view__author {
+      font-size: 12px; color: var(--muted);
+      margin: 0 0 8px;
+      line-height: 1.45;
+    }
+    .tw-event-view__author .tw-event-view__author-label { color: var(--text); font-weight: 600; }
+    .tw-event-view__author a { color: var(--accent); text-decoration: none; }
+    .tw-event-view__author a:hover { text-decoration: underline; }
+    .tw-event-view__title { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .tw-event-view__meaning { margin: 0 0 6px; color: var(--muted); }
+    .tw-event-view__meaning-label { font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+    .tw-event-view__meaning-text { font-size: 13px; line-height: 1.5; }
+    .tw-event-view__meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      margin-top: 8px;
+    }
+    .tw-event-view__meta-item b { color: var(--text); font-weight: 600; }
   </style>
+  <link rel="stylesheet" href="/static/site/theme.css?v=gold">
 </head>
 <body>
   <div class="container">
     <a href="/" class="back-link">← Импульс дня</a>
     <h1>Семейный <span>Timeline</span></h1>
+    <div class="tw-events-prep" role="note">
+      <p class="tw-events-prep__label">{{ t("family.timeline.event.many", namespace="family") }}</p>
+      <p class="tw-events-prep__hint">{{ t("family.timeline.hint.what_is_event", namespace="family") }}</p>
+    </div>
+    {% if timeline_events|default([]) %}
+    <div class="tw-event-view-list" aria-label="{{ t('family.timeline.event.many', namespace='family') }}">
+      {% for tevent in timeline_events %}
+      <article class="tw-event-view">
+        <div class="tw-event-view__date">{{ tevent.event_date_display }}</div>
+        <p class="tw-event-view__author">
+          <span class="tw-event-view__author-label">{{ ts("family.timeline.field.author", default="Автор", namespace="family") }}:</span>
+          {% if tevent.author_person_href %}
+            <a href="{{ tevent.author_person_href }}">{{ tevent.author_display_name }}</a>
+          {% else %}
+            {{ tevent.author_display_name|default("—", true) }}
+          {% endif %}
+        </p>
+        <div class="tw-event-view__title">{{ tevent.title }}</div>
+        <div class="tw-event-view__meaning" aria-label="{{ t('family.timeline.meaning_layer', namespace='family') }}">
+          <div class="tw-event-view__meaning-text">{{ tevent.meaning_layer }}</div>
+        </div>
+        {# Family timeline: keep meta human; drop technical status/visibility phrasing #}
+        {% set _stories_n = tevent.related_stories_count|int %}
+        {% if (_stories_n % 10 == 1) and (_stories_n % 100 != 11) %}
+          {% set _stories_word = "история" %}
+        {% elif (_stories_n % 10 in [2,3,4]) and (_stories_n % 100 not in [12,13,14]) %}
+          {% set _stories_word = "истории" %}
+        {% else %}
+          {% set _stories_word = "историй" %}
+        {% endif %}
+        {% if _stories_n > 0 %}
+          <div class="tw-event-view__meta" aria-label="{{ t('family.timeline.field.meta', default='Мета', namespace='family') }}">
+            {{ _stories_n }} {{ _stories_word }}
+          </div>
+        {% endif %}
+        {% if tevent.source_memory_id %}
+        <a class="tl-link tw-event-view__action" href="/family/reply/{{ tevent.source_memory_id }}">Открыть обсуждение →</a>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
     <div class="timeline">
       {% if items|length == 0 %}
         <div class="empty-state">{{ empty_message or "Пока нет данных для Timeline. Вернитесь позже или проверьте, что в архиве есть опубликованные рассказы." }}</div>

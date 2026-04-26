@@ -2,7 +2,8 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Ответ на воспоминание</title>
+  <title>Добавить воспоминание</title>
+  <link rel="stylesheet" href="/static/site/theme.css?v=gold">
   <style>
     :root {
       color-scheme: light dark;
@@ -34,7 +35,9 @@
       box-shadow: 0 20px 60px rgba(0,0,0,0.4);
     }
     h1 { font-size: 22px; margin: 0 0 8px; }
-    .subtitle { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+    .original-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+    .original-kicker { font-size: 12px; letter-spacing: 0.02em; color: var(--muted); }
+    .original-author { font-size: 13px; color: var(--text); }
     .original {
       padding: 14px 16px;
       border-radius: 16px;
@@ -43,14 +46,29 @@
       margin-bottom: 20px;
       font-size: 14px;
     }
-    .original-title {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
     .original-text { font-size: 15px; line-height: 1.55; }
+    .original-text.is-collapsed {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+    .original-toggle {
+      margin: 8px 0 0;
+      display: none;
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--accent);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      width: auto !important;
+    }
+    .original-toggle:hover { text-decoration: underline; }
+    .original button.original-toggle { margin-top: 8px; }
     form { display: flex; flex-direction: column; gap: 12px; }
     textarea {
       width: 100%;
@@ -123,35 +141,59 @@
     .response-date { font-size: 12px; color: var(--muted); margin-top: 2px; }
     .response-text { font-size: 14px; line-height: 1.6; color: var(--text); white-space: pre-wrap; }
     .empty-responses { font-size: 14px; color: var(--muted); padding: 8px 0; }
+    .field-label { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; }
+    .field-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 4px 0 0; white-space: pre-line; }
+    .why { margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: var(--text); }
+    .empty-responses p { margin: 0; }
+    .empty-responses .empty-line2 { margin-top: 6px; }
   </style>
 </head>
 <body>
   <section class="card">
     {% if memory %}
-      <h1>Ответ</h1>
-      <p class="subtitle">на послание от {{ author_name }}</p>
+      <h1>Добавить воспоминание</h1>
 
-      <div class="original">
-        <div class="original-title">Исходное послание</div>
-        <div class="original-text">
+      <div class="original" id="original-story">
+        <div class="original-head" aria-label="Исходная история">
+          <div class="original-kicker">История</div>
+          <div class="original-author">Автор: {{ author_name }}</div>
+        </div>
+        <div
+          class="original-text is-collapsed"
+          id="original-story-text"
+          data-text-len="{{ ((memory_text or '') ~ '')|length }}"
+        >
           {{ memory_text or "Текст исходного воспоминания отсутствует." }}
         </div>
+        <button
+          type="button"
+          class="original-toggle"
+          id="original-story-toggle"
+          aria-controls="original-story-text"
+          aria-expanded="false"
+        >Показать полностью</button>
         {% if original_audio_url %}
           <div style="margin-top: 14px;">
-            <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px;">Послушать воспоминание</div>
+            <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px;">Послушать запись</div>
             <audio controls src="{{ original_audio_url }}" style="width: 100%;"></audio>
           </div>
         {% endif %}
       </div>
 
+      <p class="why">Добавьте своё воспоминание об этом моменте.
+Ваш взгляд станет частью семейной истории.</p>
+
       <form method="post">
         <input type="hidden" name="person_id" value="{{ person_id }}">
+        <label class="field-label" for="memory-reply-text">Ваше воспоминание</label>
         <textarea
+          id="memory-reply-text"
           name="text"
           required
-          placeholder="Напишите, что вы хотите ответить..."
+          placeholder="Что вы помните об этом моменте?&#10;&#10;— как это было для вас&#10;— что запомнилось сильнее всего&#10;— какие чувства остались"
         ></textarea>
-        <button type="submit">Сохранить ответ</button>
+        <p class="field-hint" aria-label="Подсказка для ввода">Можно коротко — одной деталью. Можно подробнее — если несёт.</p>
+        <button type="submit">Сохранить воспоминание</button>
       </form>
 
       {% if message %}
@@ -181,7 +223,10 @@
             </div>
           {% endfor %}
         {% else %}
-          <div class="empty-responses">Пока ответов ещё нет.</div>
+          <div class="empty-responses">
+            <p>Пока никто не добавил своё воспоминание.</p>
+            <p class="empty-line2">Ваш взгляд может стать первым в этой истории.</p>
+          </div>
         {% endif %}
       </div>
     {% else %}
@@ -191,7 +236,62 @@
       {% endif %}
     {% endif %}
 
-    <a href="/" class="back-link">← Вернуться к импульсу дня</a>
+    <a href="/family/timeline" class="back-link">← Вернуться к семейной ленте</a>
   </section>
+  <script>
+    (function () {
+      var root = document.getElementById("original-story");
+      var text = document.getElementById("original-story-text");
+      var toggle = document.getElementById("original-story-toggle");
+      if (!root || !text || !toggle) return;
+
+      function isOverflowingCollapsed() {
+        if (!text.classList.contains("is-collapsed")) return false;
+        return text.scrollHeight - text.clientHeight > 1;
+      }
+
+      function shouldShowToggle() {
+        var len = parseInt(text.getAttribute("data-text-len") || "0", 10) || 0;
+        // If the text is plausibly long, keep the affordance even when a wide viewport
+        // makes the clamp "fit" the whole story in ~3-5 lines.
+        if (len >= 360) return true;
+        return isOverflowingCollapsed();
+      }
+
+      function setOpen(nextOpen) {
+        if (nextOpen) {
+          text.classList.remove("is-collapsed");
+          toggle.textContent = "Свернуть";
+          toggle.setAttribute("aria-expanded", "true");
+        } else {
+          text.classList.add("is-collapsed");
+          toggle.textContent = "Показать полностью";
+          toggle.setAttribute("aria-expanded", "false");
+        }
+      }
+
+      function init() {
+        if (!shouldShowToggle()) {
+          toggle.style.display = "none";
+          // If it's short, don't keep a misleading collapsed class.
+          text.classList.remove("is-collapsed");
+          return;
+        }
+        toggle.style.display = "inline";
+        setOpen(false);
+      }
+
+      toggle.addEventListener("click", function () {
+        var open = !text.classList.contains("is-collapsed");
+        setOpen(!open);
+      });
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+    })();
+  </script>
 </body>
 </html>
