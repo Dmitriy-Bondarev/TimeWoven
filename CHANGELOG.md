@@ -1,5 +1,42 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.41-admin-login-hardening-p1-20] — 2026-04-26
+
+### Security | Admin | Login hardening
+
+- **Rate limit**: добавлен in-process rate-limit на `POST /admin/login` по IP (env: `ADMIN_LOGIN_RATE_LIMIT`, `ADMIN_LOGIN_RATE_WINDOW_SECONDS`).
+- **Logging**: логируются все попытки админ-логина (`success` / `failure` / `rate_limited`) без username/пароля.
+- **Idle timeout**: админ-сессия (`tw_admin_session`) теперь содержит `issued_at` и становится недействительной после `ADMIN_SESSION_IDLE_TIMEOUT_MINUTES` (max lifetime).
+- **Docs**: обновлены требования к `.env` и парольной политике для admin-учётных данных.
+
+## [v1.22.40-landing-i18n-static-ru-en-polish-t40] — 2026-04-25
+
+### Feature | Landing | i18n + Static RU/EN + Polish
+
+- **Landing i18n RU/EN**: тексты вынесены в локали `locales/*/landing.yml`, шаблон лендинга использует `t` (секция `landing`) вместо хардкода.
+- **Static build/deploy RU + EN**: сборка `index.html` и `en/index.html` через `scripts/build_landing.py` (аргументы `ru|en`).
+- **Polished EN marketing copy**: английские тексты переписаны под натуральный landing English (спокойный, ясный тон).
+- **Mobile header polish**: на узких экранах header переносит actions на вторую строку, CTA не сжимается, language switch выглядит аккуратнее.
+- **Early access form email field fix**: в CTA-модалке добавлено отдельное поле `type="email"` + Telegram field, payload API не ломается (`contact_value` сохраняется).
+
+## [v1.22.39-themes-presets-voice-premium-coverage] — 2026-04-25
+
+### Feature | UI | Theme System
+
+- **Admin**: стабилизирован переключатель темы (persisted preset selection через `/admin/`).
+- **Voice Premium**: улучшен preset `voice_premium` для длинного чтения семейных историй и voice‑контекста (спокойная тёмная палитра, читаемый текст и мета).
+- **Coverage**: `family/reply`, `admin/transcriptions`, `admin/early-access` переведены на общие theme‑tokens и больше не зависят от локальных “золотых” палитр.
+
+## [v1.22.38-docs-claude-removed-from-active-contour] — 2026-04-24
+
+### Docs | AI | Provider status update
+
+- **Decision (2026-04-24)**: Claude / Anthropic API выведен из активного контура проекта и больше не рассматривается как текущий рабочий путь.
+- **Current stack**:
+  - **Transcription**: local Whisper small (VPS, localhost-only).
+  - **Text analysis**: `local_llm` (VPS, localhost-only).
+- **Legacy**: поддержка Anthropic/Claude может оставаться в коде как опциональная, но не должна быть default или рекомендованным путём.
+
 ## [v1.22.35-family-memory-edit-flow-t25_4] — 2026-04-24
 
 ### Feature | Family Memories | Edit Flow (author-only)

@@ -238,6 +238,44 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 | Static              | `app/web/static/...`       | JS, CSS, логотипы, аватары, аудио               |
 | Family + TOTP       | `app/api/routes/tree.py`, `app/services/family_access_service.py` | Публичные URL `/family/p/{public_uuid}`, `/family/access/...`, сессия `tw_family_access` |
 
+### 3.5 Themes (preset system) — baseline for TW-VOICE-GOLDEN-MEMORY
+
+**Назначение:** единый theme‑layer для family/admin экранов без дублирования шаблонов и без локальных палитр в отдельных страницах.
+
+- **Где живут presets (backend)**
+  - `app/core/theme.py`:
+    - `THEME_PRESETS`: список доступных пресетов (включая `voice_premium`)
+    - persisted active preset: хранится как app‑setting (без schema change), читается на каждый запрос
+- **Где живут tokens (CSS)**
+  - `app/web/static/site/theme.css`:
+    - theme tokens как CSS variables
+    - выбор активного preset через `data-tw-theme="<preset>"` на `<html>`
+- **Подключение в HTML**
+  - `app/web/templates/base.html`:
+    - подключает `theme.css`
+    - выставляет `data-tw-theme` из `request.state.active_theme`
+  - Требование для шаблонов: **опираться на tokens** (`var(--bg)`, `var(--surface)`, `var(--text)`, `var(--accent)`, `var(--border)`, …), а не объявлять локальный `:root` с палитрой.
+
+**Preset `voice_premium`:**
+- специальная тема под **длинное чтение семейных историй** и будущий audio‑friendly сценарий “Золотого воспоминания” (вечернее/радио‑чтение: глубокий фон, различимые поверхности, мягкий читаемый текст, спокойный акцент);
+- админка в этом preset остаётся более нейтральной (рабочий инструмент), но без визуального разрыва с family‑частью.
+
+**Coverage (срез 2026-04-25):**
+- family:
+  - `family/welcome`
+  - `family/timeline`
+  - `family/profile`
+  - `family/reply`
+  - `family_tree`
+- admin:
+  - `admin/transcriptions`
+  - `admin/early-access`
+
+**Operational note:**
+- Theme/i18n изменения часто требуют только reload/restart сервиса, но при изменении зависимостей — стандартный цикл:
+  - `pip install -r requirements.txt`
+  - `systemctl restart timewoven.service`
+
 ### 3.4 Организация документации
 
 Проект использует трёхуровневую иерархию документации:
@@ -447,6 +485,25 @@ curl -s https://app.timewoven.ru/health
   - `/admin/avatars` — форма загрузки аватаров.
   - `/health` — JSON `{"status": "ok"}`.
 
+**Admin auth (актуально):**
+- Вход: `POST /admin/login` (логин/пароль из `.env`).
+- Сессия: cookie `tw_admin_session`, формат `issued_at:sha256(ADMIN_USERNAME:ADMIN_PASSWORD:issued_at)`.
+- Ограничения:
+  - **Rate limit** на `POST /admin/login`: по IP, по умолчанию **10** попыток за **15 минут**.
+  - **Idle timeout (max lifetime)** админ-сессии: по умолчанию **120 минут** (считается от `issued_at`, не продлевается на запросах).
+- Логи: каждая попытка входа логируется одной строкой `admin_login_attempt ip=... outcome=... [reason=...]` без username/пароля.
+
+**Admin .env переменные (новые):**
+- `ADMIN_LOGIN_RATE_LIMIT` — максимум попыток логина с одного IP за окно (default: `10`).
+- `ADMIN_LOGIN_RATE_WINDOW_SECONDS` — длина окна для rate-limit (default: `900`).
+- `ADMIN_SESSION_IDLE_TIMEOUT_MINUTES` — срок жизни админ-сессии (default: `120`).
+
+**Требования к admin-учётным данным:**
+- `ADMIN_USERNAME` и `ADMIN_PASSWORD` обязательны для prod.
+- `ADMIN_PASSWORD`:
+  - длина **≥ 12**,
+  - содержит **цифры** и **хотя бы 1 спецсимвол**.
+
 ### 6.2 Недавние правки (19.04.2026)
 
 Ключевые изменения, которые должны быть отражены в коде и документации: [cite:29]
@@ -464,7 +521,7 @@ curl -s https://app.timewoven.ru/health
 
 - Один из старых ответов Дмитрия сохранён в неверной кодировке (кракозябры); новые записи после фикса client_encoding → UTF‑8 должны сохраняться корректно, старые требуют ручной правки. [cite:33]
 - `POST /profile/avatar` ещё не реализован.
-- Admin‑login пока не даёт реальной авторизации; `require_admin()` временно пропускает всех.
+- Admin‑login: механизм простой (cookie на основе env-секретов, in-process rate-limit), не “enterprise auth” (нет ролей/пользователей/2FA).
 - Таймлайн выводит только те события (рождения, смерти, свадьбы), которые реально присутствуют в БД.
 
 ---

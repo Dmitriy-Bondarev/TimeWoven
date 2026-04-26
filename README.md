@@ -28,6 +28,32 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 Приложение будет доступно по адресу: `http://localhost:8000`  
 Интерактивная документация FastAPI: `http://localhost:8000/docs` и `http://localhost:8000/redoc`.
 
+### Сборка статического лендинга (`index.html`) для GitHub Pages
+
+Лендинг рендерится из Jinja-шаблона `app/web/templates/site/landing.html` и локалей `locales/*/landing.yml`.
+
+```bash
+python3 scripts/build_landing.py ru
+python3 scripts/build_landing.py en
+```
+
+Файлы результата:
+
+- `index.html` — RU версия (для `/`)
+- `en/index.html` — EN версия (для `/en/`)
+
+Проверка перед деплоем (быстро):
+
+```bash
+grep -n '<html lang="ru"' index.html
+grep -n '<html lang="en"' en/index.html
+```
+
+Кратко про прод-схему:
+
+- `/` = RU
+- `/en/` = EN
+
 ---
 
 ## 🏗 Архитектура и структура проекта
@@ -49,7 +75,7 @@ TimeWoven/
 │   │       └── ...                   # прочие роутеры (healthcheck и т.д.)
 │   ├── services/                     # Бизнес-логика (family_graph, вспомогательные сервисы)
 │   │   └── family_graph.py           # Сборка графа семьи, преобразование Person → GraphNode
-│   ├── security.py                   # Механизмы авторизации (require_admin() пока пропускает всех)
+│   ├── security.py                   # Механизмы авторизации (admin routes защищены require_admin)
 │   └── web/
 │       ├── templates/                # Jinja2-шаблоны интерфейса
 │       │   ├── family/
@@ -72,6 +98,10 @@ TimeWoven/
 ├── tech-docs/                        # Живущая рядом документация проекта
 │   ├── adr/                          # Architecture Decision Records (ADR-001, ADR-002, ...)
 │   └── README.md                     # Описание набора шаблонов и структуры docs
+├── docs/                             # Пакет проектной документации (ссылки из README)
+│   ├── legal/                        # Аудиты терминологии и соответствия языковым требованиям
+│   ├── research/                     # Исследования (генеалогия, стратегия)
+│   └── project/                      # Опорные проектные документы (паспорт, логи, якоря)
 ├── TECH_PASSPORT.md                  # Технический паспорт (high-level техническая карта)
 ├── DB_CHANGELOG.md                   # Журнал изменений схемы и данных БД
 ├── CHANGELOG.md                      # Релизный changelog продукта
@@ -81,6 +111,16 @@ TimeWoven/
 ```
 
 Подробная архитектура и temporal‑модель связей описаны в [TECH_PASSPORT.md](TECH_PASSPORT.md).
+
+---
+
+## 📚 Документация (`docs/`)
+
+- **`docs/project/`**: опорные документы проекта (например, `TECH_PASSPORT.md`, `PROJECT_LOG.md`, `TimeWoven_Anchor_*.md`, `TIMEWOVEN_WORKFLOW_ROLES.md`).
+- **`docs/legal/`**: аудит языка/терминологии и юридические заметки.
+- **`docs/research/`**: исследовательские материалы (генеалогия/стратегия), включая PDF при наличии.
+
+Примечание: на этапе DOCS-1 часть документов **продублирована** в корне репозитория, чтобы не сломать существующие ссылки. Позже можно убрать дубли после обновления ссылок на `docs/...`.
 
 ---
 
@@ -113,6 +153,11 @@ TimeWoven/
 | `DATABASE_URL`  | Подключение к БД (PostgreSQL)        |
 | `SECRET_KEY`    | Секрет для сессий/подписей           |
 | `DEBUG`         | Режим отладки FastAPI (`true/false`) |
+| `ADMIN_USERNAME` | Логин админки (обязателен в prod)    |
+| `ADMIN_PASSWORD` | Пароль админки (обязателен в prod; ≥12, цифры + спецсимвол) |
+| `ADMIN_LOGIN_RATE_LIMIT` | Rate limit `POST /admin/login` по IP (default: `10`) |
+| `ADMIN_LOGIN_RATE_WINDOW_SECONDS` | Окно rate limit (default: `900`) |
+| `ADMIN_SESSION_IDLE_TIMEOUT_MINUTES` | Max lifetime админ-сессии (default: `120`) |
 
 `.env` загружается в `app/main.py` до инициализации подключения к БД и роутеров, чтобы и локально, и в проде использовать PostgreSQL.
 
