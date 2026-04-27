@@ -31,12 +31,22 @@ def _is_admin_authenticated(request: Request) -> bool:
 
 
 def require_admin(request: Request):
-    """Return a RedirectResponse to /admin/login if not authenticated, else None."""
+    """Return a RedirectResponse to /admin/login if not authenticated or idle, else None."""
     if not _is_admin_authenticated(request):
         next_path = request.url.path
         if request.url.query:
             next_path = f"{next_path}?{request.url.query}"
         return RedirectResponse(url=f"/admin/login?next={next_path}", status_code=303)
+
+    # Idle timeout check (C1.B)
+    token = request.cookies.get(ADMIN_COOKIE_NAME, "")
+    if token and _admin_token_is_idle(token):
+        next_path = request.url.path
+        if request.url.query:
+            next_path = f"{next_path}?{request.url.query}"
+        resp = RedirectResponse(url=f"/admin/login?next={next_path}", status_code=303)
+        resp.delete_cookie(ADMIN_COOKIE_NAME)
+        return resp
     return None
 
 
@@ -60,6 +70,45 @@ _LOGIN_RATE_LIMITS: tuple[tuple[int, int], ...] = (
     (60, 5),  # 5 attempts per minute
     (3600, 20),  # 20 attempts per hour
 )
+
+
+# --- Admin idle timeout (C1.B) ---
+ADMIN_IDLE_TIMEOUT_SECONDS = int(
+    os.getenv("TW_ADMIN_IDLE_TIMEOUT_SECONDS", str(30 * 60))
+)  # 30 minutes
+_ADMIN_LAST_SEEN: dict[str, float] = {}  # token -> last_seen_ts
+_ADMIN_LAST_SEEN_LOCK = Lock()
+
+
+def _admin_token_is_idle(token: str) -> bool:
+    """Return True if token has been idle longer than ADMIN_IDLE_TIMEOUT_SECONDS.
+
+    Side effect: refreshes last_seen on activity, removes token on idle expiry.
+    """
+    now = time.time()
+    with _ADMIN_LAST_SEEN_LOCK:
+        last_seen = _ADMIN_LAST_SEEN.get(token)
+        if last_seen is None:
+            # First time seeing token (e.g. after service restart).
+            _ADMIN_LAST_SEEN[token] = now
+            return False
+        if now - last_seen > ADMIN_IDLE_TIMEOUT_SECONDS:
+            _ADMIN_LAST_SEEN.pop(token, None)
+            return True
+        _ADMIN_LAST_SEEN[token] = now
+        return False
+
+
+def admin_register_login(token: str) -> None:
+    """Register a fresh admin session token on successful login."""
+    with _ADMIN_LAST_SEEN_LOCK:
+        _ADMIN_LAST_SEEN[token] = time.time()
+
+
+def admin_register_logout(token: str) -> None:
+    """Forget an admin session token on explicit logout."""
+    with _ADMIN_LAST_SEEN_LOCK:
+        _ADMIN_LAST_SEEN.pop(token, None)
 
 
 def get_client_ip(request: Request) -> str:

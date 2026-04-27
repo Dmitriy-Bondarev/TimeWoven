@@ -40,6 +40,8 @@ from app.services import create_person_with_i18n, update_person_with_i18n
 from app.services.person_alias_service import ALIAS_STATUS, ALIAS_TYPES
 from app.security import (
     ADMIN_COOKIE_NAME,
+    admin_register_login,
+    admin_register_logout,
     check_login_rate_limit,
     get_client_ip,
     get_daily_password,
@@ -863,6 +865,7 @@ async def admin_login_submit(
             httponly=True,
             samesite="lax",
         )
+        admin_register_login(make_admin_token())
         return response
 
     log_login_attempt(ip, username, "fail")
@@ -873,14 +876,20 @@ async def admin_login_submit(
 
 
 @router.get("/logout")
-async def admin_logout_get():
+async def admin_logout_get(request: Request):
+    token = request.cookies.get(ADMIN_COOKIE_NAME, "")
+    if token:
+        admin_register_logout(token)
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie(key=ADMIN_COOKIE_NAME, path="/")
     return response
 
 
 @router.post("/logout")
-async def admin_logout_post():
+async def admin_logout_post(request: Request):
+    token = request.cookies.get(ADMIN_COOKIE_NAME, "")
+    if token:
+        admin_register_logout(token)
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie(key=ADMIN_COOKIE_NAME, path="/")
     return response
