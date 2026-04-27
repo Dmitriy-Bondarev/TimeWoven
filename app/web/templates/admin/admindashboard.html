@@ -111,10 +111,22 @@
     .mini-btn.secondary { color: var(--text); background: #334155; }
     .pw-box { margin-top: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 16px; font-weight: 700; color: var(--accent); border: 1px solid #334155; border-radius: 8px; padding: 6px 10px; background: #020617; }
     .muted-note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .tw-timeline-prep { max-width: 720px; margin-bottom: 24px; }
+    .tw-timeline-prep p { margin: 0; line-height: 1.5; }
+    .tw-timeline-prep .tw-timeline-prep__lead { font-size: 14px; color: var(--text); }
+    .tw-timeline-prep .tw-timeline-prep__lead .muted { color: var(--muted); font-weight: 400; }
   </style>
 </head>
 <body>
   <h1>Админ-панель TimeWoven</h1>
+
+  <div class="admin-section tw-timeline-prep" role="region" aria-label="{{ t('admin.timeline.inspect', namespace='app') }}">
+    <h2 class="section-label" style="margin-bottom: 10px;">{{ t("admin.timeline.inspect", namespace="app") }}</h2>
+    <p class="tw-timeline-prep__lead">
+      <strong>{{ t("admin.timeline.meaning_layer", namespace="app") }}</strong>
+      <span class="muted"> — {{ t("admin.timeline.help_meaning_layer", namespace="app") }}</span>
+    </p>
+  </div>
 
   <section class="theme-presets" aria-label="Скоро: выбор темы оформления">
     <h2>Скоро: выбор темы оформления</h2>

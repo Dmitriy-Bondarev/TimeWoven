@@ -1,5 +1,6 @@
 import logging
 import re
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -11,11 +12,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import and_, or_, func, false
 from sqlalchemy.orm import Session
 
+from app.core.i18n import install_jinja_i18n
 from app.core.whoami_experiment import is_whoami_experiment_enabled
 from app.db.session import get_db
 from app.models import Memory, Person, PersonI18n, Quote
 from app.schemas.family_graph import FamilyGraph
 from app.services.family_graph import build_family_graph
+from app.services.timeline_event_view import memory_to_timeline_event_view, TimelineEventView
 from app.services.family_access_service import (
     DEFAULT_SESSION_TTL,
     check_rate_limit,
@@ -32,6 +35,7 @@ from app.services.family_access_service import (
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
+install_jinja_i18n(templates)
 
 logger = logging.getLogger(__name__)
 
@@ -490,6 +494,14 @@ _RU_MONTHS_SHORT_3 = (
     "ноя",
     "дек",
 )
+
+
+def _family_timeline_date_display(value: object) -> str:
+    """
+    Дата в /family/timeline (и тот же шаблон): «24 апр 2026», без времени.
+    Сортировка элементов по полю «date» не использует это поле.
+    """
+    return _own_memory_date_line_for_card(value)
 
 
 def _own_memory_date_line_for_card(created: object) -> str:
@@ -963,22 +975,6 @@ async def family_person(
         other="цитат",
     )
 
-    bridge_memory = (
-        session.query(Memory)
-        .join(Person, Memory.author_id == Person.person_id)
-        .filter(
-            Memory.is_archived == False,
-            Memory.transcription_status == "published",
-            _is_live_visible_person(Person),
-        )
-        .order_by(Memory.id.desc())
-        .first()
-    )
-    if bridge_memory:
-        add_memory_href = f"/family/reply/{bridge_memory.id}?person_id={person_id}"
-    else:
-        add_memory_href = f"/family/timeline?person_id={person_id}"
-
     person_timeline_href = f"/family/timeline?person_id={person_id}"
     family_timeline_href = "/family/timeline"
 
@@ -999,7 +995,6 @@ async def family_person(
             "mention_memories": mention_memories,
             "own_memories": own_memories,
             "own_memories_by_year": own_memories_by_year,
-            "add_memory_href": add_memory_href,
             "person_timeline_href": person_timeline_href,
             "family_timeline_href": family_timeline_href,
             "profile_is_living": profile_is_living,
@@ -1069,7 +1064,7 @@ async def family_timeline(
             items.append(
                 {
                     "date": person.birth_date,
-                    "date_display": person.birth_date or "—",
+                    "date_display": _family_timeline_date_display(person.birth_date),
                     "title": f"Рождение: {name}",
                     "text": "",
                     "person_id": person.person_id,
@@ -1083,7 +1078,7 @@ async def family_timeline(
             items.append(
                 {
                     "date": person.death_date,
-                    "date_display": person.death_date or "—",
+                    "date_display": _family_timeline_date_display(person.death_date),
                     "title": f"Смерть: {name}",
                     "text": "",
                     "person_id": person.person_id,
@@ -1126,7 +1121,7 @@ async def family_timeline(
             items.append(
                 {
                     "date": union.start_date,
-                    "date_display": union.start_date or "—",
+                    "date_display": _family_timeline_date_display(union.start_date),
                     "title": f"Союз: {p1_name} + {p2_name}",
                     "text": "",
                     "person_id": union.partner1_id,
@@ -1140,7 +1135,7 @@ async def family_timeline(
             items.append(
                 {
                     "date": union.end_date,
-                    "date_display": union.end_date or "—",
+                    "date_display": _family_timeline_date_display(union.end_date),
                     "title": f"Окончание союза: {p1_name} + {p2_name}",
                     "text": "",
                     "person_id": union.partner1_id,
@@ -1177,6 +1172,7 @@ async def family_timeline(
             memories_query = memories_query.filter(false())
 
     memories = memories_query.all()
+    timeline_events: list[TimelineEventView] = []
 
     for memory in memories:
         author_i18n = (
@@ -1203,10 +1199,14 @@ async def family_timeline(
         if _looks_like_technical_blob(text):
             continue
 
+        ev = memory_to_timeline_event_view(memory, author_display_name=author_name)
+        if ev is not None:
+            timeline_events.append(ev)
+
         items.append(
             {
                 "date": memory.created_at or "",
-                "date_display": memory.created_at or "—",
+                "date_display": _family_timeline_date_display(memory.created_at),
                 "title": author_name,
                 "text": text[:280],
                 "memory_id": memory.id,
@@ -1219,10 +1219,18 @@ async def family_timeline(
         )
 
     items.sort(key=lambda x: x["date"], reverse=True)
+    timeline_events.sort(key=lambda e: e.event_date, reverse=True)
+    # Явно сериализуем в dict, чтобы Jinja2 всегда видела author_display_name и остальные поля
+    # (датакласс в шаблоне в части окружений отдаёт пустое имя; см. TW-2026-04-26-B3-HOTFIX-AUTHOR-DATA-FLOW)
+    timeline_events_template = [asdict(ev) for ev in timeline_events]
 
     return templates.TemplateResponse(
         "family/timeline.html",
-        {"request": request, "items": items},
+        {
+            "request": request,
+            "items": items,
+            "timeline_events": timeline_events_template,
+        },
     )
 
 
@@ -1257,14 +1265,15 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
     )
 
     memory_text = ""
-    memory_date = ""
+    golden_memory_date_display = ""
     author_name = ""
     author_avatar = ""
     memory_id = None
+    golden_memory = None
 
     if memory:
         memory_id = memory.id
-        memory_date = memory.created_at or ""
+        golden_memory_date_display = _family_timeline_date_display(memory.created_at)
         memory_text = (
             memory.transcript_readable
             or memory.transcript_verbatim
@@ -1288,6 +1297,11 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
             if person and person.avatar_url:
                 author_avatar = person.avatar_url
 
+        golden_memory = {
+            "id": memory_id,
+            "author_display_name": author_name,
+        }
+
     if not memory_text:
         memory_text = "Добро пожаловать в TimeWoven! Напишите боту первую историю."
 
@@ -1302,8 +1316,8 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
             "person_id": person_id,
             "memory_id": memory_id,
             "memory_text": memory_text,
-            "memory_date": memory_date,
-            "author_name": author_name,
+            "golden_memory": golden_memory,
+            "golden_memory_date_display": golden_memory_date_display,
             "author_avatar": author_avatar,
             "memory_audio_url": memory_audio_url,
         },
@@ -1581,6 +1595,72 @@ async def family_reply_submit(
     else:
         redirect_url = f"/family/reply/{memory_id}?saved=1"
     return RedirectResponse(url=redirect_url, status_code=303)
+
+
+@router.get(
+    "/family/memory/new",
+    response_class=HTMLResponse,
+    name="family_memory_new",
+)
+async def family_memory_new_get(
+    request: Request,
+    person_id: int = Query(...),
+    err: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    red = _require_family_session(request, db)
+    if red:
+        return red
+    viewer = resolve_viewer(request, db)
+    if not viewer or viewer.person_id != person_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    empty_hint = err == "empty"
+    return templates.TemplateResponse(
+        "family/memory_new.html",
+        {
+            "request": request,
+            "person_id": person_id,
+            "empty_hint": empty_hint,
+        },
+    )
+
+
+@router.post("/family/memory/new", response_class=HTMLResponse)
+async def family_memory_new_post(
+    request: Request,
+    return_person_id: int = Form(...),
+    transcript_readable: str = Form(""),
+    essence_text: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    red = _require_family_session(request, db)
+    if red:
+        return red
+    viewer = resolve_viewer(request, db)
+    if not viewer or viewer.person_id != return_person_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    body = (transcript_readable or "").strip()
+    if not body:
+        return RedirectResponse(
+            url=f"/family/memory/new?person_id={return_person_id}&err=empty",
+            status_code=303,
+        )
+    ess = (essence_text or "").strip()
+    memory = Memory(
+        author_id=viewer.person_id,
+        created_by=viewer.person_id,
+        content_text=body,
+        transcript_verbatim=body,
+        transcript_readable=body,
+        essence_text=ess or None,
+        source_type="family_web",
+        transcription_status="published",
+        is_archived=False,
+        created_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    )
+    db.add(memory)
+    db.commit()
+    return RedirectResponse(url=f"/family/person/{return_person_id}", status_code=303)
 
 
 @router.get("/family/memory/{memory_id}/edit", response_class=HTMLResponse)

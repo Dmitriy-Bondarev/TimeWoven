@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app.api.routes.tree import _family_timeline_date_display
 from app.db.session import get_db
 from app.services.timeline_service import get_timeline, create_event
 
@@ -26,6 +27,7 @@ def read_timeline(request: Request, family_id: int, db: Session = Depends(get_db
             {
                 "request": request,
                 "items": [],
+                "timeline_events": [],
                 "empty_message": "Воспоминаний пока нет",
             },
             status_code=200,
@@ -34,10 +36,11 @@ def read_timeline(request: Request, family_id: int, db: Session = Depends(get_db
     items = []
     for event in events or []:
         raw_date = getattr(event, "date", None)
-        date_display = raw_date.isoformat() if hasattr(raw_date, "isoformat") else str(raw_date or "")
+        date_sort = raw_date.isoformat() if hasattr(raw_date, "isoformat") else str(raw_date or "")
+        date_display = _family_timeline_date_display(raw_date)
         items.append(
             {
-                "date": date_display,
+                "date": date_sort,
                 "date_display": date_display or "—",
                 "title": getattr(event, "title", "Событие") or "Событие",
                 "text": getattr(event, "description", "") or "",
@@ -54,6 +57,7 @@ def read_timeline(request: Request, family_id: int, db: Session = Depends(get_db
             {
                 "request": request,
                 "items": [],
+                "timeline_events": [],
                 "empty_message": "Воспоминаний пока нет",
             },
             status_code=200,
@@ -64,6 +68,7 @@ def read_timeline(request: Request, family_id: int, db: Session = Depends(get_db
         {
             "request": request,
             "items": items,
+            "timeline_events": [],
             "empty_message": "",
         },
         status_code=200,

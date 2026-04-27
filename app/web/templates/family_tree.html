@@ -1,7 +1,44 @@
 {% extends "base.html" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/site/theme.css" />
 <style>
+  /* Family theme shell (align with profile / timeline) */
+  .family-tree-page {
+    min-height: 100vh;
+    padding: 12px 16px 32px;
+    color: #e5e7eb;
+    background:
+      radial-gradient(1200px 500px at 8% -8%, rgba(245, 158, 11, 0.2), transparent 58%),
+      radial-gradient(900px 420px at 95% 0%, rgba(14, 165, 233, 0.1), transparent 55%),
+      linear-gradient(155deg, #0f172a 0%, #1e293b 100%);
+  }
+  .family-tree-page #graph {
+    background: rgba(15, 23, 42, 0.55) !important;
+    border-color: rgba(148, 163, 184, 0.35) !important;
+  }
+  .family-tree-page .graph-controls {
+    background: rgba(15, 23, 42, 0.92) !important;
+    border-color: rgba(148, 163, 184, 0.3) !important;
+    color: #e5e7eb;
+  }
+  .family-tree-page .ctrl-label { color: #94a3b8 !important; }
+  .family-tree-page .ctrl-btn {
+    background: rgba(30, 41, 59, 0.9) !important;
+    border-color: rgba(148, 163, 184, 0.35) !important;
+    color: #e5e7eb;
+  }
+  .family-tree-page .ctrl-input {
+    background: #0f172a !important;
+    color: #e5e7eb !important;
+    border-color: rgba(148, 163, 184, 0.35) !important;
+  }
+  .family-tree-page #graph-info-panel {
+    background: rgba(15, 23, 42, 0.88) !important;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #e5e7eb;
+  }
+
   /* ── Wrapper ─────────────────────────────── */
   #graph-wrapper { position: relative; width: 100%; }
 
@@ -245,8 +282,9 @@
   }
 </style>
 
+<div class="family-tree-page">
 <h1 style="margin-bottom: 4px;">Семейный граф</h1>
-<p style="color: #888; font-size: 13px; margin: 0 0 10px;">
+<p style="color: #94a3b8; font-size: 13px; margin: 0 0 10px;">
   Клик — выбрать персону. Правая кнопка — сменить корень. Колёсико — масштаб. Drag — перемещение.
 </p>
 
@@ -317,6 +355,7 @@
     </div>
     <div class="gip-actions"></div>
   </div>
+</div>
 </div>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
