@@ -1,5 +1,84 @@
 # CHANGELOG — TimeWoven
 
+## [v1.22.38-ops-protocol-and-incident-recovery] — 2026-04-27
+
+> Сводная запись, покрывающая период 2026-04-25 — 2026-04-27.
+> Включает: bilingual landing T40, admin UX OP-2026-04-26,
+> инцидент 2026-04-26 и его пост-инцидентное восстановление,
+> внедрение операционного протокола и серию из 8 атомарных коммитов.
+
+### Operations | Project Protocol | Major
+
+- **Feature (T-OPS-PROTOCOL-INSTALL-2026-04-27)**: введён операционный протокол `docs/PROJECT_OPS_PROTOCOL.md` v1.0 — единый источник правды по тому, как мы безопасно меняем систему. 4 уровня защиты, обязательный шаблон ТЗ (SCOPE-LOCK / DO-NOT-TOUCH / PRE-CHECK / DEVIATION-RULE / EXIT-CRITERIA), формальное разделение ролей (автор / главный исследователь / implementation-агент).
+- **Feature**: добавлены три bash-скрипта в `scripts/ops/`:
+  - `clean_state_gate.sh` — проверка чистоты репо и сервиса перед заданием (6 проверок: git status / stash / branch / log sync / systemctl / health).
+  - `safety_snapshot.sh` — полный архив рабочего дерева (включая untracked) + git bundle + опционально pg_dump. Поддерживает rolling-30-дней и `--protected` режим без TTL.
+  - `rollback_to_snapshot.sh` — откат к снапшоту с автоматическим pre-rollback snapshot для двойной страховки.
+- **Infra**: создан каталог `/root/projects/TimeWoven_snapshots/` (mode 700, вне репо) с подкаталогом `protected/` без авто-удаления.
+
+### Recovery | Family Access Layer | Post-incident 2026-04-26
+
+По итогам инцидента 2026-04-26 (см. `PROJECT_LOG.md` — `## INCIDENT 2026-04-26`):
+
+- **Recovery (T-RECOVERY-FAMILY-ACCESS-SHIM-2026-04-26)**: восстановлены критичные модули, существовавшие до этого как untracked-файлы — `app/core/i18n.py` (полнофункциональный), `app/services/person_alias_service.py` (как минимальный shim), `locales/{ru,en}/{app,family,landing}.yml`. Полное восстановление person_alias слоя — задача `T-FAMILY-ACCESS-REBUILD` в backlog (P0).
+- **Feature (T-TIMELINE-EVENTS-VIEW-2026-04-26)**: добавлен view-слой `app/services/timeline_event_view.py` (T42, без изменений БД и без миграций) — `TimelineEventView` dataclass + `memory_to_timeline_event_view()` factory, используется в `/family/timeline` через `app/api/routes/tree.py`.
+- **Feature (T-ADMIN-RESTORE-AND-PAGES-2026-04-26)**: восстановлен admin-слой — исправлен поиск `/admin/people` (q-параметр), импорт `ALIAS_TYPES`/`ALIAS_STATUS` из shim, hardening `admin_local_llm_check` через try/except. Добавлены диагностические страницы `admin_ai_local_llm_check`, `admin_memory_pipeline_test`, `admin_whisper_local_test`. Восстановлен `admin_dashboard.html` как 1-line shim к `admindashboard.html`. Добавлен новый `family/memory_new.html` (для роута `POST /family/memory/new`).
+- **Feature (T-FAMILY-PROFILE-COPY-2026-04-26)**: UX-проход по семейному профилю — «урожд.» → «девичья фамилия:» в hero subtitle, «Лента вокруг: {имя}» → «История {имя}», смягчение длинных описательных текстов в секциях «События (скоро)» и «Когда имя появляется в чужих историях». Только шаблоны, без изменений Python/CSS.
+- **Feature (T-LANDING-EN-DEPLOY-2026-04-26)**: `deploy_landing.sh` теперь опционально публикует EN-версию лендинга — если `app/web/templates/site/landing_en.html` присутствует, скрипт копирует его в `/var/www/timewoven/en/index.html`.
+- **i18n core (M4.5)**: внедрена YAML-based интернационализация — `app/main.py` через `_ensure_jinja_i18n_globals()` регистрирует фильтры `t` / `ts` на всех `Jinja2Templates`-окружениях (tree, admin, timeline, TW_Explorer). Источник переводов — `locales/{ru,en}/{app,family,landing}.yml`.
+
+### UX | Bilingual Landing (T40, 2026-04-25)
+
+- **Feature (T40)**: лендинг переведён на локали (RU/EN) на базе `landing` namespace, шаблон использует `t` вместо хардкода. Production scheme: `/` = RU, `/en/` = EN. Скрипт сборки `scripts/build_landing.py {ru|en}`.
+- **Polish**: визуальный polish header/hero/cards/footer + mobile header fix на узких экранах. Email-поле `type="email"` + Telegram field в waitlist форме, без изменения API payload.
+
+### UX | Admin People (OP-2026-04-26)
+
+- **Feature (OP-ADMIN-PEOPLE-UX-2026-04-26)**: `/admin/people` — интерактивные фильтры и поиск переведены **в строку заголовка таблицы**; над таблицей счётчик «Показано n из m». Колонка алиасов читает поля `label` и `alias_type` (v2-модель). Ссылка «Алиасы» ведёт на `/admin/people/{id}/aliases`.
+- **Visual**: `/explorer/` и `/admin/avatars` приведены к gold-токенам (тёмный фон, акцент `#f59e0b`, согласованные surface/input). Без смены маршрутов и бизнес-логики.
+
+### Documentation | Reconciliation (2026-04-27)
+
+- **Docs (T-PROJECT-LOG-RESTORE-2026-04-27)**: в `PROJECT_LOG.md` добавлен развёрнутый post-mortem инцидента 2026-04-26 (~150 строк) — хронология, что было потеряно, корневые причины, что сработало хорошо, Learning Log в формате таблицы «проблема → правило протокола», список новых safeguards, хеши дропнутых stash. Добавлена запись 2026-04-27 о шести атомарных коммитах разбора WIP.
+- **Docs (T-DOCS-RECONCILIATION-2026-04-27)**: `TECH_PASSPORT.md` приведён в соответствие с фактическим состоянием кода — обновлены §3.2 (структура каталогов на 2026-04-27), §3.3 (модульная архитектура с i18n core, person_alias_service shim, timeline_event_view), §3.4, новая §5.5.2 (Operational protocol & safety scripts), §6.1, §6.3, §9 roadmap. `PRODUCT_BACKLOG.md` получил «Сводку задач» в начале + 6 новых задач. `docs/PROJECT_OPS_PROTOCOL.md` дополнен §10.4 «Формат входного запроса от автора». `TIMEWOVEN_WORKFLOW_ROLES.md` удалён как поглощённый протоколом.
+
+### Snapshots & Recovery Points
+
+- Создана первая в истории проекта защищённая точка чистого старта `protected/CLEAN-START-2026-04-27` (52M: `worktree.tar.gz` 28M + `repo.bundle` 24M + `meta.txt`). Состояние воспроизводится одной командой `bash scripts/ops/rollback_to_snapshot.sh CLEAN-START-2026-04-27`.
+- Создан архив трёх stash дня инцидента в `protected/STASH-REFERENCE-2026-04-26/` (`.diff` + `.stat` для каждого) перед удалением через `git stash drop`. Архив остаётся как референс для будущих задач восстановления (`T-FAMILY-ACCESS-REBUILD`, `T-CORE-THEME-RESTORE`).
+
+### Workflow Improvements
+
+- При коммитах всех изменений 27.04 git-операции оборачивались в `flock --timeout 30 .git/index.lock.flock <git command>` — для безопасного сосуществования с git-extension в Cursor IDE, который параллельно дёргает `git status`/`git diff` в фоне и приводил к интермиттирующим ошибкам `.git/index.lock`. Стандартизация решения — задача `T-PROTOCOL-IDE-COEXISTENCE` в backlog.
+
+### New Backlog Tasks Created
+
+- **P0** `T-FAMILY-ACCESS-REBUILD` — полное восстановление person_alias_service слоя (сейчас shim).
+- **P0** `T-CORE-THEME-RESTORE` — восстановить утраченный модуль `app/core/theme.py` (`get_active_theme_preset`).
+- **P2** `T-DUPLICATE-FAMILY-TREE-ROUTE-INVESTIGATE` — расследовать дубль маршрута `/family/tree` в `tree.py` и `family_tree.py`.
+- **P3** `T-OPS-INDEX-LOG-FORMAT` — улучшить разделители полей в `INDEX.log`.
+- **P3** `T-PROTOCOL-IDE-COEXISTENCE` — формализовать раздел про сосуществование с git-extension Cursor IDE в протоколе.
+- **P3** `T-FAMILY-MEMORY-NEW-RETURN-303-INSTEAD-OF-422` — UX-минор для GET `/family/memory/new` без авторизации.
+
+### Commits in this release
+
+- `35e01ec` T-OPS-PROTOCOL-INSTALL-2026-04-27 — protocol + 3 ops scripts + README
+- `6d4b668` T-RECOVERY-FAMILY-ACCESS-SHIM-2026-04-26 — i18n core + person_alias shim + locales
+- `d15d4aa` T-TIMELINE-EVENTS-VIEW-2026-04-26 — TimelineEventView + tree.py + timeline.py + family_tree.html + admindashboard.html
+- `74e9d93` T-FAMILY-PROFILE-COPY-2026-04-26 — family/profile.html, family/welcome.html
+- `e54fad1` T-ADMIN-RESTORE-AND-PAGES-2026-04-26 — atomic admin layer restoration (14 files)
+- `98696bc` T-LANDING-EN-DEPLOY-2026-04-26 — deploy_landing.sh EN support
+- `9aed37f` T-PROJECT-LOG-RESTORE-2026-04-27 — post-mortem in PROJECT_LOG.md
+- `a45adc6` T-DOCS-RECONCILIATION-2026-04-27 — TECH_PASSPORT, PRODUCT_BACKLOG, OPS_PROTOCOL §10.4, removed WORKFLOW_ROLES
+
+### References
+
+- `PROJECT_LOG.md` — `## INCIDENT 2026-04-26` post-mortem, запись 2026-04-27
+- `docs/PROJECT_OPS_PROTOCOL.md` — операционный протокол v1.0
+- `TECH_PASSPORT.md` — §5.5.2 (operational protocol), §3.3 (module architecture)
+- `PRODUCT_BACKLOG.md` — Сводка задач (срез 2026-04-27)
+
+
 ## [v1.22.35-family-memory-edit-flow-t25_4] — 2026-04-24
 
 ### Feature | Family Memories | Edit Flow (author-only)
