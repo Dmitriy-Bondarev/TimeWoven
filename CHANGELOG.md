@@ -1,5 +1,20 @@
 # CHANGELOG — TimeWoven
 
+## v1.22.39 — 2026-04-27
+
+### Безопасность админки (T-ADMIN-HARDENING-2026-04-27)
+- **Rate limit на POST /admin/login:** 5 попыток/минуту, 20 попыток/час с одного IP. Превышение → HTTP 429. (`c927c3f`)
+- **Audit log попыток входа в админку:** новый файл `logs/admin_audit.log` (JSONL) с полями `ts`, `ip`, `username`, `result`. Логируются успешные, неуспешные и заблокированные rate limit попытки. (`0bb0de4`)
+- **Idle timeout админской сессии:** 30 минут бездействия → cookie `tw_admin_session` отзывается, требуется повторный логин. Настраивается через env `TW_ADMIN_IDLE_TIMEOUT_SECONDS`. (`b0ae7e8`)
+- **Очистка:** удалён неиспользуемый модуль `app/core/security.py` (itsdangerous-based, дублировал `app/security.py`). (`0d608f2`)
+
+### Чистка
+- `/logs/` добавлено в `.gitignore`.
+
+### Новые env переменные
+- `TW_ADMIN_IDLE_TIMEOUT_SECONDS` (опционально, по умолчанию `1800`) — время бездействия в секундах до отзыва админской сессии.
+- `TW_LOG_DIR` (опционально, по умолчанию `logs`) — директория для admin audit log.
+
 ## [v1.22.38-ops-protocol-and-incident-recovery] — 2026-04-27
 
 > Сводная запись, покрывающая период 2026-04-25 — 2026-04-27.

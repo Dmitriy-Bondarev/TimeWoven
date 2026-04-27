@@ -41,6 +41,7 @@
 | T-PROTOCOL-IDE-COEXISTENCE | P3 | Planned | Добавить в PROJECT_OPS_PROTOCOL раздел про сосуществование с git-extension Cursor IDE |
 | T-FAMILY-MEMORY-NEW-RETURN-303-INSTEAD-OF-422 | P3 | Planned | UX-минор: GET без авторизации/параметров → 303 на access вместо 422 pydantic-валидации |
 | P1.13 | — | Deferred | Temporal Name / Surname History |
+| **C.1** | — | **Done** | **Admin hardening (rate limit + idle timeout + audit log)** — закрыто 27.04.2026 (T-ADMIN-HARDENING-2026-04-27) |
 | T40 | — | Done | Bilingual Landing (RU/EN) + Waitlist Polish (2026-04-25) |
 | OP-2026-04-26 | — | Done | Admin people list: filters + aliases + gold theme (2026-04-26) |
 | P1.10 | — | Done | Admin-only Person Creation Form |
@@ -51,6 +52,44 @@
 
 
 ---
+
+### ✅ C.1 — Admin hardening (rate limit + idle timeout + audit log)
+**Закрыто:** 27.04.2026 (T-ADMIN-HARDENING-2026-04-27)
+**Коммиты:** `c927c3f`, `0bb0de4`, `b0ae7e8`, `0d608f2`
+**Подробности:** см. PROJECT_LOG.md → T-ADMIN-HARDENING-2026-04-27
+
+## T-ADMIN-CSRF-PROTECTION-FUTURE
+**Приоритет:** P2 (безопасность, не блокер)
+**Происхождение:** при закрытии C.1 27.04.2026.
+**Цель:** защитить POST-эндпоинты админки (login, people edit, unions, access reset и др.) от CSRF-атак.
+**Что нужно:**
+- Сгенерировать CSRF-токен при логине, положить в HttpOnly cookie + добавить hidden input в формы.
+- Проверять токен в зависимостях для всех `@router.post` под `require_admin`.
+- Использовать `itsdangerous` или `secrets.token_urlsafe` для генерации.
+**Размер:** S-M (~0.5 дня).
+**Зависимости:** нет.
+
+## T-ADMIN-2FA-TOTP-FUTURE
+**Приоритет:** P2 (безопасность)
+**Происхождение:** при закрытии C.1 27.04.2026.
+**Цель:** добавить второй фактор для входа в админку (TOTP / Google Authenticator).
+**Что нужно:**
+- Привязка TOTP-секрета админу при первом входе или через env (`ADMIN_TOTP_SECRET`).
+- Дополнительная страница после успешной проверки логин/пароль — ввод 6-значного кода.
+- Использовать существующую логику TOTP из family_access_service (там уже работает для семейного доступа).
+**Размер:** M (~1 день).
+**Зависимости:** существующий TOTP-код в `family_access_service` как референс.
+
+## T-ADMIN-IDLE-STORE-REDIS-FUTURE
+**Приоритет:** P3 (улучшение, не критично)
+**Происхождение:** при закрытии C.1 27.04.2026.
+**Цель:** перенести `_LOGIN_ATTEMPTS` и `_ADMIN_LAST_SEEN` из памяти процесса в Redis, чтобы переживать рестарты и работать в multi-worker конфигурации.
+**Что нужно:**
+- Поднять Redis (если ещё нет в проекте — это решение само по себе).
+- Заменить in-memory dict на Redis-keys с TTL.
+- Сохранить тот же API helper-функций.
+**Размер:** S (~0.5 дня после поднятия Redis).
+**Зависимости:** Redis должен быть в инфраструктуре проекта; пока не нужен — вынесено в P3.
 
 ## T-THEME-VISUAL-INTEGRATION-FUTURE
 

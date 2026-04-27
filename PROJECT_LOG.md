@@ -151,6 +151,59 @@ No.
 - `INCIDENT 2026-04-26` — выше в этом файле.
 - `PRODUCT_BACKLOG.md` — будут добавлены задачи `T-FAMILY-ACCESS-REBUILD`, `T-CORE-THEME-RESTORE`, `T-DUPLICATE-FAMILY-TREE-ROUTE-INVESTIGATE`, `T-OPS-INDEX-LOG-FORMAT`, `T-PROTOCOL-IDE-COEXISTENCE` (отдельный коммит документации, в той же сессии).
 
+### T-ADMIN-HARDENING-2026-04-27 — admin hardening (C.1)
+
+**Дата:** 27.04.2026
+**Статус:** ✅ Завершено
+**Коммиты:** `c927c3f`, `0bb0de4`, `b0ae7e8`, `0d608f2` (все на main, запушены)
+**Snapshot:** `/root/projects/TimeWoven_snapshots/T-ADMIN-HARDENING-2026-04-27/`
+
+**Цель:** усилить существующую (рабочую) авторизацию админки по трём направлениям + чистка мёртвого кода. Не редизайн, а минимальная инвазивная защита.
+
+**Что сделано:**
+
+1. **C1.A — Rate limit на POST /admin/login** (`c927c3f`)
+   - In-memory bucket (deque per IP) в `app/security.py`: 5 попыток/мин и 20 попыток/час.
+   - Без новых зависимостей (паттерн как у `family_access_service.check_rate_limit`).
+   - Helper `get_client_ip` учитывает `X-Forwarded-For` (приложение за прокси).
+   - При превышении — HTTP 429 с короткой страницей.
+   - Curl-проверка: try 1-5 → 200, try 6-7 → 429.
+
+2. **C1.C — Audit log попыток входа** (`0bb0de4`)
+   - Новый модуль `app/core/admin_audit.py`, JSONL формат.
+   - Файл лога: `logs/admin_audit.log` (TW_LOG_DIR override через env).
+   - Каждая попытка: timestamp UTC ISO, IP, username (≤64 chars), result (`success` / `fail` / `rate_limited`).
+   - Никогда не падает на ошибке записи (try/except OSError).
+   - `/logs/` добавлено в `.gitignore`.
+
+3. **C1.B — Idle timeout 30 минут** (`b0ae7e8`)
+   - In-memory `{token: last_seen_ts}` в `app/security.py`, без изменения формата cookie.
+   - Sliding window: каждый успешный проход через `require_admin` обновляет `last_seen`.
+   - Превышение → редирект на `/admin/login?next=...` + `delete_cookie(tw_admin_session)`.
+   - Регистрация при логине (`admin_register_login`) и явный logout (`admin_register_logout`).
+   - **Env override:** `TW_ADMIN_IDLE_TIMEOUT_SECONDS` (по умолчанию `1800`).
+   - Curl-проверка с override=10s: login=303, fresh=200, after_idle=303 + Set-Cookie Max-Age=0.
+
+4. **C1.D — Удаление dead code app/core/security.py** (`0d608f2`)
+   - Файл (33 строки, itsdangerous-based) использовал cookie `admin_token`, дублировал функционал `app/security.py`, никем не импортировался.
+   - PRE-CHECK: 0 прямых импортов, 0 динамических, 0 строковых ссылок.
+   - Smoke-тест после удаления: `systemctl is-active=active`, GET /admin/login=200, GET /health=200, нет ImportError.
+
+**Что осознанно НЕ делалось (вынесено в backlog):**
+- CSRF protection — P2
+- 2FA / TOTP для админки — P2
+- Перенос idle-store в Redis (для переживания рестартов) — P2
+- Prometheus-метрики попыток входа — P3
+- Структурированный logger вместо JSONL-файла — P3
+
+**Известные ограничения:**
+- In-memory state (`_LOGIN_ATTEMPTS`, `_ADMIN_LAST_SEEN`) теряется при рестарте `timewoven.service`. После рестарта rate limit обнуляется, idle-таймер начинается заново при первом запросе. Приемлемо для текущей нагрузки одного админа.
+- Rate limit ключ — IP. За одним прокси/CGNAT все клиенты делят квоту. При появлении проблем — мигрировать на (IP+username) или Redis.
+
+**Ссылки:**
+- ТЗ: `TZ_C1_ADMIN_HARDENING_2026-04-27_v2` (Perplexity computer)
+- PRE-CHECK снапшот: `/root/projects/TimeWoven_snapshots/T-ADMIN-HARDENING-2026-04-27/`
+
 ---
 
 ## OP-DIAG-BACKUP — daily verified + pre-timeline snapshot (2026-04-26)

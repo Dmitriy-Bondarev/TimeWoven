@@ -265,8 +265,8 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 | Модуль              | Файл(ы)                    | Ответственность                                  |
 |---------------------|----------------------------|--------------------------------------------------|
 | App entrypoint      | `app/main.py`              | Инициализация FastAPI, загрузка `.env`, подключение роутов и templates, регистрация i18n-фильтров на всех Jinja2Templates через `_ensure_jinja_i18n_globals()`, startup-проверка `_assert_family_memory_new_route` |
-| Security (core)     | `app/core/security.py`     | Низкоуровневая безопасность (защита, утилиты)    |
 | Security (app)      | `app/security.py`          | Высокоуровневая логика безопасности (require_admin и др.) |
+| Admin audit log     | `app/core/admin_audit.py`  | JSONL audit log попыток входа в админку (`logs/admin_audit.log`) |
 | **i18n core**       | **`app/core/i18n.py`**     | **YAML-based i18n: `install_jinja_i18n()`, фильтры `t` / `ts`, `detect_language()`, `set_context_lang()`, `reset_context_lang()`. Источник переводов — `locales/{ru,en}/{app,family,landing}.yml`** |
 | DB base             | `app/db/base.py`           | Базовые настройки SQLAlchemy                     |
 | DB session          | `app/db/session.py`        | `SessionLocal` и engine                          |
@@ -359,6 +359,50 @@ Runtime‑окружения (dev/prod) используют PostgreSQL чере
 
 ---
 
+
+## Безопасность админки
+
+### Авторизация
+- **Cookie:** `tw_admin_session` (HttpOnly, SameSite=Lax). Значение = `sha256(ADMIN_USERNAME:ADMIN_PASSWORD)`.
+- **Файл реализации:** `app/security.py` (45 строк → расширен до ~120 строк после T-ADMIN-HARDENING-2026-04-27).
+- **Зависимость:** `require_admin(request)` подключена к 35 эндпоинтам.
+- **Login route:** `POST /admin/login` (handler `admin_login_submit` в `app/api/routes/admin.py`).
+- **Logout route:** `GET/POST /admin/logout`.
+
+### Rate limit на /admin/login
+- In-memory bucket по IP: 5 попыток/мин и 20 попыток/час.
+- Реализация: `app/security.py::check_login_rate_limit()`.
+- IP получается через `get_client_ip()` с учётом `X-Forwarded-For` (первый элемент).
+- При превышении: HTTP 429 + запись в audit log.
+
+### Idle timeout админской сессии
+- 30 минут бездействия → cookie отзывается через `delete_cookie`, редирект на `/admin/login?next=...`.
+- Реализация: in-memory dict `_ADMIN_LAST_SEEN` в `app/security.py`, проверка в `require_admin()`.
+- Sliding window: каждое валидное обращение к админке обновляет `last_seen`.
+- **Env override:** `TW_ADMIN_IDLE_TIMEOUT_SECONDS` (по умолчанию `1800`).
+- **Ограничение:** state хранится в памяти процесса; при рестарте `timewoven.service` таймер начинается заново при первом обращении.
+
+### Audit log
+- **Файл:** `logs/admin_audit.log` (JSONL).
+- **Реализация:** `app/core/admin_audit.py::log_login_attempt(ip, username, result)`.
+- **Поля записи:** `ts` (UTC ISO), `event=admin_login_attempt`, `ip`, `username` (≤64 chars), `result` (`success`/`fail`/`rate_limited`).
+- **Env override:** `TW_LOG_DIR` (по умолчанию `logs`).
+- **Гарантия:** функция никогда не падает (OSError suppressed), не блокирует запрос.
+
+### Что НЕ реализовано (P2/P3 кандидаты в backlog)
+- CSRF protection
+- 2FA / TOTP
+- Redis для idle-store (переживание рестартов)
+- Prometheus-метрики попыток входа
+
+### Env переменные admin
+| Переменная | По умолчанию | Назначение |
+|---|---|---|
+| `ADMIN_USERNAME` | `admin` | Имя админа |
+| `ADMIN_PASSWORD` | `""` | Пароль админа (обязательная) |
+| `TW_EXPLORER_SALT` | `timewoven-explorer` | Соль для daily password |
+| `TW_ADMIN_IDLE_TIMEOUT_SECONDS` | `1800` | Idle timeout сессии (сек) |
+| `TW_LOG_DIR` | `logs` | Директория для admin_audit.log |
 
 ## 4. Доменная модель (high-level)
 
@@ -628,7 +672,7 @@ curl -s https://app.timewoven.ru/health
 - `app/services/person_alias_service.py` живёт как минимальный shim; полная функциональность — `T-FAMILY-ACCESS-REBUILD`.
 - Один из старых ответов Дмитрия сохранён в неверной кодировке (кракозябры); новые записи после фикса client_encoding → UTF‑8 должны сохраняться корректно, старые требуют ручной правки. [cite:33]
 - `POST /profile/avatar` ещё не реализован.
-- Admin‑login пока не даёт реальной авторизации; `require_admin()` временно пропускает всех (P0 в roadmap).
+- Админ-авторизация включена через `app/security.py::require_admin()` (cookie `tw_admin_session`). Дополнительно: rate limit на `POST /admin/login`, audit log попыток входа, idle timeout (см. раздел «Безопасность админки»).
 - Таймлайн выводит только те события (рождения, смерти, свадьбы), которые реально присутствуют в БД.
 - `/family/memory/new` при GET-запросе без person_id и family-сессии возвращает 422 (валидация pydantic) — поведение корректное, но UX-минор `T-FAMILY-MEMORY-NEW-RETURN-303-INSTEAD-OF-422` зафиксирован в backlog.
 
@@ -683,7 +727,7 @@ curl -s https://app.timewoven.ru/health
 
 | Приоритет | Задача | Описание |
 |-----------|--------|----------|
-| P0 | Реальная авторизация в админке | Убрать временное `require_admin()` и /admin/login без auth |
+| — | Реальная авторизация в админке | ✅ Реализовано: `tw_admin_session` + `require_admin()`; hardening: rate limit, audit log, idle timeout (T-ADMIN-HARDENING-2026-04-27) |
 | P0 | Завершить temporal normalization v2 | Связать Unions и брачные связи в PersonRelationship |
 | P0 | Исправить старые UTF‑8 артефакты | Очистить/исправить битые записи в БД |
 | P0 | T-FAMILY-ACCESS-REBUILD | Полное восстановление person_alias_service слоя (сейчас shim) |
