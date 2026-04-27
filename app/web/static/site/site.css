@@ -1,4 +1,20 @@
 :root{
+  /* Default preset: premium-gold / family (dark, warm). */
+  --bg:#020617;
+  --surface:#0f172a;
+  --surface-2:#111c33;
+  --text:#e5e7eb;
+  --muted:#94a3b8;
+  --line:rgba(148,163,184,0.18);
+  --accent:#f59e0b;
+  --accent-dark:#d97706;
+  --max:1180px;
+  --narrow:760px;
+  --radius:20px;
+}
+
+/* Landing keeps using explicit light preset via data-theme="light". */
+[data-theme="light"]{
   --bg:#f6f2ea;
   --surface:#fffdf9;
   --surface-2:#f2e8dc;
@@ -7,9 +23,6 @@
   --line:#ddd4ca;
   --accent:#7d4c2e;
   --accent-dark:#5f3820;
-  --max:1180px;
-  --narrow:760px;
-  --radius:20px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}

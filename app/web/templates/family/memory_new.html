@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Новое воспоминание</title>
+  <style>
+    :root {
+      --bg-0: #0f172a;
+      --bg-1: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --line: rgba(148, 163, 184, 0.22);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", -apple-system, system-ui, sans-serif;
+      color: var(--text);
+      background: linear-gradient(155deg, var(--bg-0) 0%, var(--bg-1) 100%);
+      padding: 24px 18px 48px;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    .back { display: inline-block; margin-bottom: 20px; font-size: 13px; color: var(--muted); text-decoration: none; }
+    .back:hover { color: var(--text); }
+    h1 { margin: 0 0 8px; font-size: 1.4rem; font-weight: 700; }
+    .sub { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+    .page-err {
+      margin: 0 0 16px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      background: rgba(127, 29, 29, 0.2);
+      color: #fecaca;
+      font-size: 14px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 20px 20px 18px;
+      background: rgba(15, 23, 42, 0.78);
+    }
+    .layer { margin-bottom: 20px; }
+    .layer:last-of-type { margin-bottom: 0; }
+    .layer-title {
+      margin: 0 0 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #fef3c7;
+    }
+    .layer-sub { margin: 0 0 10px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+    label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      background: rgba(2, 6, 23, 0.5);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 14px; line-height: 1.5;
+      font-family: inherit;
+      resize: vertical;
+    }
+    textarea.essence { min-height: 72px; max-height: 200px; }
+    textarea:focus { outline: none; border-color: rgba(245, 158, 11, 0.45); }
+    .read-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+    .btn-para {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 8px 14px; font-size: 13px; font-weight: 600;
+      border-radius: 10px; border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.85);
+      color: #e2e8f0; cursor: pointer;
+    }
+    .btn-para:hover { border-color: rgba(245, 158, 11, 0.45); color: #f8fafc; }
+    .read-tools-hint { font-size: 12px; color: #64748b; margin: 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 20px; }
+    .actions button[type="submit"] {
+      background: var(--accent);
+      color: #111827;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 22px;
+      font-size: 15px; font-weight: 600;
+      cursor: pointer;
+    }
+    .actions button[type="submit"]:hover { filter: brightness(1.04); }
+    a.cancel { font-size: 14px; color: #94a3b8; text-decoration: none; font-weight: 500; }
+    a.cancel:hover { color: #cbd5e1; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/family/person/{{ person_id }}">← К карточке</a>
+    <h1>Новая история</h1>
+    <p class="sub">Текст попадёт в семейный профиль и в семейный таймлайн наравне с остальными опубликованными записями.</p>
+    {% if empty_hint %}
+      <p class="page-err" role="alert">Введите текст истории, затем нажмите «Сохранить».</p>
+    {% endif %}
+    <div class="card">
+      <form method="post" action="/family/memory/new">
+        <input type="hidden" name="return_person_id" value="{{ person_id }}">
+        <div class="field layer">
+          <div class="layer-title">Текст</div>
+          <p class="layer-sub">Расскажите о событии или моменте так, как вам удобно: это и есть основа записи.</p>
+          <label for="t_read" class="visually-skip" style="position:absolute;left:-9999px;">Текст</label>
+          <textarea id="t_read" name="transcript_readable" rows="8" required placeholder="Напишите вашу историю…"></textarea>
+          <div class="read-tools">
+            <button type="button" class="btn-para" id="btn-split-paragraphs" title="Сгруппировать предложения в абзацы (без переписывания)">Разбить на абзацы</button>
+            <p class="read-tools-hint">По клику вставляются пустые строки между смысловыми кусками; смысл и слова не «переформулируются».</p>
+          </div>
+        </div>
+        <div class="field layer">
+          <div class="layer-title">Суть (по желанию)</div>
+          <p class="layer-sub">Краткое резюме на 2–3 строки</p>
+          <label for="t_essence" class="visually-skip" style="position:absolute;left:-9999px;">Суть</label>
+          <textarea id="t_essence" class="essence" name="essence_text" rows="3" placeholder="Например, о чём эта запись в двух фразах…"></textarea>
+        </div>
+        <div class="actions">
+          <button type="submit">Сохранить</button>
+          <a class="cancel" href="/family/person/{{ person_id }}">Отмена</a>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var btn = document.getElementById("btn-split-paragraphs");
+    var ta = document.getElementById("t_read");
+    if (!btn || !ta) return;
+    function splitIntoParagraphs(input) {
+      var t = String(input || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (!t) return t;
+      var blocks = t.split(/\n\n+/);
+      if (blocks.length > 1) {
+        return blocks
+          .map(function (b) { return b.replace(/\n/g, " ").replace(/\s+/g, " ").trim(); })
+          .filter(Boolean)
+          .join("\n\n");
+      }
+      var one = blocks[0].replace(/\n/g, " ").replace(/\s+/g, " ");
+      var parts = one.split(/(?<=[.!?…])\s+/);
+      if (parts.length <= 1) return t;
+      var out = [];
+      for (var i = 0; i < parts.length; i += 2) {
+        out.push(parts.slice(i, i + 2).join(" ").trim());
+      }
+      return out.join("\n\n");
+    }
+    btn.addEventListener("click", function () {
+      ta.value = splitIntoParagraphs(ta.value);
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+      ta.focus();
+    });
+  })();
+  </script>
+</body>
+</html>

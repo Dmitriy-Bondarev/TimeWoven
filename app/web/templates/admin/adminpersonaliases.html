@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Алиасы — {{ person_name }} ({{ person_id }})</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #020617;
+      --card: #0f172a;
+      --line: #1e293b;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --danger: #f43f5e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 32px 24px;
+    }
+    .container { max-width: 980px; margin: 0 auto; }
+    .back {
+      color: var(--muted);
+      font-size: 13px;
+      text-decoration: none;
+      display: inline-block;
+      margin-bottom: 18px;
+    }
+    .back:hover { color: var(--text); }
+    a.inline-link { color: var(--text); text-decoration: none; font-weight: 600; }
+    a.inline-link:hover { color: var(--accent); text-decoration: underline; }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+    h2 { font-size: 16px; font-weight: 700; margin: 24px 0 12px; color: var(--accent); }
+    .meta, .page-lead { color: var(--muted); font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+    .meta code { background: #020617; border: 1px solid #334155; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+    .error {
+      margin: 0 0 16px;
+      border: 1px solid color-mix(in oklab, var(--danger), white 25%);
+      background: color-mix(in oklab, var(--danger), transparent 85%);
+      color: #fecdd3;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .filter-btn {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .filter-btn:hover { color: var(--text); border-color: #334155; background: #0f172a; }
+    .filter-btn.is-active { background: var(--accent); color: #020617; border-color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 8px; }
+    th { text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid #1e293b; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+    tr:hover td { background: #0f172a; }
+    table a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    table a:hover { text-decoration: underline; }
+    .empty { color: var(--muted); font-size: 14px; margin: 12px 0; }
+    fieldset {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #111827 0%, var(--card) 100%);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: grid;
+      gap: 14px;
+      margin: 0 0 16px;
+    }
+    legend { color: var(--accent); font-weight: 700; padding: 0 6px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    input[type="text"], select {
+      width: 100%;
+      max-width: 28rem;
+      background: #020617;
+      color: var(--text);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #1f2937;
+      font-size: 14px;
+    }
+    button.btn-ghost { background: #334155; color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/admin/people" class="back">&larr; К списку персон</a>
+    <h1>🏷️ Алиасы персоны</h1>
+    <p class="meta">
+      <strong>ID</strong> {{ person_id }}
+      · <strong>Имя:</strong> <a href="/family/person/{{ person_id }}" class="inline-link">{{ person_name|e }}</a>
+    </p>
+
+    {% if form_error %}
+      <div class="error" role="alert">{{ form_error }}</div>
+    {% endif %}
+
+    <p class="page-lead" style="margin-bottom:8px;">Фильтры по статусу и источнику</p>
+    <div class="filter-buttons" aria-label="Фильтр по статусу">
+      <a
+        href="/admin/people/{{ person_id }}/aliases?status_filter=all&amp;source_filter={{ source_filter|e }}"
+        class="filter-btn {% if status_filter == 'all' %}is-active{% endif %}"
+      >все статусы</a>
+      <a
+        href="/admin/people/{{ person_id }}/aliases?status_filter=active&amp;source_filter={{ source_filter|e }}"
+        class="filter-btn {% if status_filter == 'active' %}is-active{% endif %}"
+      >active</a>
+      <a
+        href="/admin/people/{{ person_id }}/aliases?status_filter=rejected&amp;source_filter={{ source_filter|e }}"
+        class="filter-btn {% if status_filter == 'rejected' %}is-active{% endif %}"
+      >rejected</a>
+    </div>
+    <div class="filter-buttons" aria-label="Фильтр по источнику">
+      <a
+        href="/admin/people/{{ person_id }}/aliases?status_filter={{ status_filter|e }}&amp;source_filter=all"
+        class="filter-btn {% if source_filter == 'all' %}is-active{% endif %}"
+      >все источники</a>
+      <a
+        href="/admin/people/{{ person_id }}/aliases?status_filter={{ status_filter|e }}&amp;source_filter=ai_extracted"
+        class="filter-btn {% if source_filter == 'ai_extracted' %}is-active{% endif %}"
+      >ai_extracted</a>
+      <a
+        href="/admin/people/{{ person_id }}/aliases?status_filter={{ status_filter|e }}&amp;source_filter=manual"
+        class="filter-btn {% if source_filter == 'manual' %}is-active{% endif %}"
+      >manual</a>
+    </div>
+    <p class="meta" style="margin-top:0;">Текущие: <code>status</code>={{ status_filter|e }}, <code>source</code>={{ source_filter|e }}</p>
+
+    <h2>Список</h2>
+    {% if rows %}
+      <table>
+        <thead>
+          <tr>
+            <th>id</th>
+            <th>label</th>
+            <th>type</th>
+            <th>source</th>
+            <th>status</th>
+            <th>кто называет</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td><a href="/admin/people/{{ person_id }}/aliases?edit={{ r.id }}">{{ r.id }}</a></td>
+              <td>{{ r.label|e }}</td>
+              <td>{{ r.alias_type|e }}</td>
+              <td>{{ r.source|e }}</td>
+              <td>{{ r.status|e }}</td>
+              <td>{{ r.spoken_by_label|e }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">Нет строк по текущим фильтрам.</p>
+    {% endif %}
+
+    <h2>Новый алиас</h2>
+    <form method="post" action="/admin/people/{{ person_id }}/aliases">
+      <fieldset>
+        <legend>➕ Создать</legend>
+        <div>
+          <label for="new_label">Текст (label)</label>
+          <input id="new_label" type="text" name="label" required maxlength="500" />
+        </div>
+        <div>
+          <label for="new_alias_type">Тип</label>
+          <select id="new_alias_type" name="alias_type" required>
+            {% for t in alias_types %}
+              <option value="{{ t|e }}">{{ t|e }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="new_spoken_by">Кто называет (person_id, опционально)</label>
+          <select id="new_spoken_by" name="spoken_by_person_id">
+            <option value="">— универсальный</option>
+            {% for o in people_spoken %}
+              <option value="{{ o.person_id }}">{{ o.name|e }} ({{ o.person_id }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="submit">Создать</button>
+        </div>
+      </fieldset>
+    </form>
+
+    {% if editing %}
+      <h2>Редактирование #{{ editing.id }}</h2>
+      <form method="post" action="/admin/people/{{ person_id }}/aliases/{{ editing.id }}/edit">
+        <fieldset>
+          <legend>✎ Правка</legend>
+          <div>
+            <label for="edit_label">Текст</label>
+            <input id="edit_label" type="text" name="label" value="{{ editing.label|e }}" required maxlength="500" />
+          </div>
+          <div>
+            <label for="edit_alias_type">Тип</label>
+            <select id="edit_alias_type" name="alias_type" required>
+              {% for t in alias_types %}
+                <option value="{{ t|e }}" {% if editing.alias_type == t %}selected{% endif %}>{{ t|e }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="edit_status">Статус</label>
+            <select id="edit_status" name="status" required>
+              <option value="active" {% if editing.status == 'active' %}selected{% endif %}>active</option>
+              <option value="rejected" {% if editing.status == 'rejected' %}selected{% endif %}>rejected</option>
+              <option value="pending" {% if editing.status == 'pending' %}selected{% endif %}>pending</option>
+            </select>
+          </div>
+          <div>
+            <label for="edit_spoken_by">Кто называет</label>
+            <select id="edit_spoken_by" name="spoken_by_person_id">
+              <option value="">— универсальный</option>
+              {% for o in people_spoken %}
+                <option value="{{ o.person_id }}" {% if editing.spoken_by_person_id == o.person_id %}selected{% endif %}>{{ o.name|e }} ({{ o.person_id }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Сохранить</button>
+          </div>
+        </fieldset>
+      </form>
+      <form method="post" action="/admin/people/{{ person_id }}/aliases/{{ editing.id }}/reject" style="margin-top:4px;">
+        <div class="form-actions">
+          <button type="submit" class="btn-ghost">Отклонить (reject)</button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</body>
+</html>

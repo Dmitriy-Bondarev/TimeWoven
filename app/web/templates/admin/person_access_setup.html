@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Настройка семейного доступа — {{ name }}{% endblock %}
+{% block content %}
+  <h1>Настройка TOTP и резервных кодов</h1>
+  <p><strong>Персона:</strong> {{ name|e }} (id {{ person.person_id }})</p>
+  <p><strong>public_uuid:</strong> <code>{{ public_uuid|e }}</code></p>
+
+  <p>Добавьте аккаунт в приложение-аутентификатор, отсканировав QR или введя URI вручную.</p>
+  <p>
+    <img src="{{ qr_data_uri|e }}" alt="QR provisioning" style="max-width:260px;height:auto;" />
+  </p>
+  <p>
+    <strong>otpauth URI:</strong><br />
+    <code style="word-break:break-all;">{{ otpauth_uri|e }}</code>
+  </p>
+
+  <h2>Резервные коды (сохраните в надёжном месте)</h2>
+  {% if backup_codes %}
+    <ul>
+      {% for c in backup_codes %}
+        <li><code>{{ c|e }}</code></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Коды не переданы.</p>
+  {% endif %}
+
+  <h2>Подтверждение (TOTP)</h2>
+  <p>Введите 6-значный код из приложения, чтобы включить семейный доступ. После успеха откроется страница «Семейный доступ» со статусом <em>активен</em> — на ней <strong>не нажимайте</strong> зря «сгенерировать TOTP» (это снова отключит доступ до нового кода).</p>
+  <form method="post" action="/admin/people/{{ person.person_id }}/access/confirm">
+    <p>
+      <label>Код<br />
+        <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="12" style="width:10rem;" />
+      </label>
+    </p>
+    <p><button type="submit">Подтвердить</button></p>
+  </form>
+  <p><a href="/admin/people/{{ person.person_id }}/access">← к странице доступа (без подтверждения доступ остаётся в ожидании кода)</a></p>
+{% endblock %}

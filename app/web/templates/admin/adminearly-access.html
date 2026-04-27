@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Early access — заявки</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #020617; --card: #0f172a; --text: #e5e7eb; --muted: #94a3b8; --accent: #f59e0b; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; padding: 32px 24px; }
+    .back { color: var(--muted); font-size: 13px; text-decoration: none; display: inline-block; margin-bottom: 20px; }
+    .back:hover { color: var(--text); }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+    .page-lead { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid #1e293b; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+    tr:hover td { background: #0f172a; }
+    .muted { color: var(--muted); }
+    .empty { color: var(--muted); font-size: 14px; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <a href="/admin" class="back">&larr; Назад в панель</a>
+  <h1>🗝️ Early access</h1>
+  <p class="page-lead">Последние заявки (до 200 записей).</p>
+
+  {% if rows %}
+    <table>
+      <thead>
+        <tr>
+          <th>id</th>
+          <th>created_at</th>
+          <th>preferred_channel</th>
+          <th>contact_value</th>
+          <th>source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="muted">{{ r.id }}</td>
+            <td>{{ r.created_at }}</td>
+            <td>{{ r.preferred_channel|e }}</td>
+            <td>{{ r.contact_value|e }}</td>
+            <td>{{ r.source|e }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty"><em>Заявок пока нет</em></p>
+  {% endif %}
+</body>
+</html>

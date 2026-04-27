@@ -178,6 +178,17 @@
       font-size: 13px;
       padding: 11px 8px;
     }
+    .admin-section {
+      margin-top: 28px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 18px;
+      background: linear-gradient(180deg, #111827 0%, var(--card) 100%);
+    }
+    .admin-section h2 { font-size: 18px; color: var(--accent); margin: 0 0 10px; }
+    .admin-section p { color: var(--text); font-size: 14px; line-height: 1.5; margin: 0 0 10px; }
+    .admin-section a { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .admin-section a:hover { text-decoration: underline; }
     @media (max-width: 780px) {
       .two-col { grid-template-columns: 1fr; }
       body { padding: 16px; }
@@ -430,6 +441,24 @@
         <button type="submit">Сохранить изменения</button>
       </div>
     </form>
+
+    <section class="admin-section" aria-label="Семейный доступ и граф">
+      <h2>Доступ семьи и граф</h2>
+      <p>
+        Ссылка для входа семьи и управление TOTP находятся на отдельной странице.
+      </p>
+      <p>
+        <a href="{{ request.url_for('admin_person_access_page', person_id=person.person_id) }}">
+          Открыть настройки доступа семьи →
+        </a>
+      </p>
+      <p>
+        Старый вид графа (legacy):
+        <a href="{{ request.url_for('family_tree_page') }}?root_person_id={{ person.person_id }}&amp;depth=4">
+          Открыть старый граф семьи →
+        </a>
+      </p>
+    </section>
   </div>
 </body>
 </html>

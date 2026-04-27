@@ -186,18 +186,30 @@
   <p>Статус: {% if access_permitted %}<strong>активен</strong>{% elif pending %}ожидает подтверждения TOTP{% else %}не настроен{% endif %}</p>
   <p>Активных сессий: {{ n_active_sessions }} · Неиспользованных резервных кодов: {{ n_backup_left }}</p>
 
+  {% if request.query_params.get('activated') == '1' %}
+    <p style="color:#86efac;">Семейный доступ <strong>включён</strong>. Можно открывать публичную ссылку и входить по TOTP или резервным кодам.</p>
+  {% endif %}
   {% if request.query_params.get('err') == 'bad_code' %}
     <p style="color:#f87171;">Неверный код подтверждения.</p>
   {% endif %}
-
-  <form method="post" action="/admin/people/{{ person.person_id }}/access/setup">
-    <button type="submit" class="btn btn-primary">Настроить / сгенерировать TOTP и резервные коды</button>
-  </form>
+  {% if request.query_params.get('err') == 'crypto' %}
+    <p style="color:#f87171;">Ошибка чтения секрета (см. логи / TW_FAMILY_FERNET_KEY).</p>
+  {% endif %}
 
   {% if pending %}
-  <form method="post" action="/admin/people/{{ person.person_id }}/access/confirm" style="display:flex;gap:8px;align-items:center;max-width:400px;">
-    <input name="code" type="text" inputmode="numeric" placeholder="Первый TOTP-код" required style="flex:1;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:var(--text);" />
-    <button type="submit" class="btn btn-primary">Подтвердить</button>
+  <h2 style="font-size:16px;margin:20px 0 8px;color:var(--accent);">Шаг: подтвердите TOTP</h2>
+  <p style="max-width:520px;">Введите 6-значный код из приложения-аутентификатора. Не нажимайте «сгенерировать новый», если только что отсканировали QR — иначе секрет сбросится и нужна будет новая настройка.</p>
+  <form method="post" action="/admin/people/{{ person.person_id }}/access/confirm" style="display:flex;gap:8px;align-items:center;max-width:400px;flex-wrap:wrap;">
+    <input name="code" type="text" inputmode="numeric" placeholder="6 цифр TOTP" required autocomplete="one-time-code" style="flex:1;min-width:12rem;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:var(--text);" />
+    <button type="submit" class="btn btn-primary">Подтвердить и включить доступ</button>
+  </form>
+  <p style="margin-top:20px;">Нужен другой QR? Сначала сбросьте внимательно: это создаст <strong>новый</strong> секрет и снова оставит доступ в ожидании кода.</p>
+  <form method="post" action="/admin/people/{{ person.person_id }}/access/setup" onsubmit="return confirm('Сгенерировать новый TOTP? Текущий несохранённый в приложении шаг с QR будет недействителен.');">
+    <button type="submit" class="btn">Сгенерировать новый TOTP и резервные коды</button>
+  </form>
+  {% else %}
+  <form method="post" action="/admin/people/{{ person.person_id }}/access/setup" {% if access_permitted %}onsubmit="return confirm('Сгенерировать новый секрет? Семейный доступ уйдёт в режим ожидания, пока не введёте TOTP в форме на этой странице.');"{% endif %}>
+    <button type="submit" class="btn btn-primary">{% if access_permitted %}Перевыпустить TOTP (новый QR){% else %}Настроить / сгенерировать TOTP и резервные коды{% endif %}</button>
   </form>
   {% endif %}
 

@@ -20,6 +20,7 @@ from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.bot.max_messenger import MaxMessengerBot
+from app.core.i18n import install_jinja_i18n
 from app.db.session import get_db
 from app.models import (
     AvatarHistory,
@@ -58,6 +59,7 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
+install_jinja_i18n(templates)
 ALLOWED_ROLES = {"placeholder", "relative", "family_admin", "bot_only"}
 
 
@@ -351,8 +353,12 @@ async def admin_local_llm_check(request: Request):
     if redirect:
         return redirect
 
-    analyzer = ProviderAgnosticAnalyzer(provider_name="local_llm")
-    result = analyzer.analyze_memory_text("Это тестовая история о семье")
+    result: dict = {"status": "error", "message": "not executed"}
+    try:
+        analyzer = ProviderAgnosticAnalyzer(provider_name="local_llm")
+        result = analyzer.analyze_memory_text("Это тестовая история о семье")
+    except Exception as exc:
+        result = {"status": "error", "message": str(exc), "type": type(exc).__name__}
     ok = (result or {}).get("status") == "ok" and bool(str((result or {}).get("summary") or "").strip())
 
     return templates.TemplateResponse(
@@ -875,7 +881,7 @@ async def admin_early_access_list(request: Request, db: Session = Depends(get_db
     )
 
     return templates.TemplateResponse(
-        "admin/early_access.html",
+        "admin/adminearly-access.html",
         {"request": request, "rows": rows},
     )
 
@@ -945,8 +951,12 @@ async def admin_avatars_upload(
     return RedirectResponse(url="/admin/avatars", status_code=303)
 
 
-@router.get("/people", response_class=HTMLResponse)
-async def admin_people(request: Request, db: Session = Depends(get_db)):
+@router.get("/people", response_class=HTMLResponse, name="admin_people")
+async def admin_people(
+    request: Request,
+    q: str | None = Query(None, description="ID или подстрока имени (ru)"),
+    db: Session = Depends(get_db),
+):
     redirect = require_admin(request)
     if redirect:
         return redirect
@@ -1062,9 +1072,18 @@ async def admin_people(request: Request, db: Session = Depends(get_db)):
             "is_alive_key": "yes" if is_alive_bool else "no",
         })
 
+    q_clean = (q or "").strip()
+    if q_clean:
+        if q_clean.isdigit():
+            pid = int(q_clean)
+            rows = [r for r in rows if r["person_id"] == pid]
+        else:
+            needle = q_clean.casefold()
+            rows = [r for r in rows if needle in (r.get("name") or "").casefold()]
+
     return templates.TemplateResponse(
         "admin/admin_people.html",
-        {"request": request, "rows": rows},
+        {"request": request, "rows": rows, "search_q": q_clean},
     )
 
 
@@ -1174,7 +1193,7 @@ async def admin_person_aliases_page(
     people_spoken = _build_people_options(db, exclude_person_ids={person_id})
 
     return templates.TemplateResponse(
-        "admin/admin_person_aliases.html",
+        "admin/adminpersonaliases.html",
         {
             "request": request,
             "person_id": person_id,
@@ -1212,7 +1231,7 @@ async def admin_person_alias_create_submit(
     def re_render_error(message: str) -> HTMLResponse:
         _, _, rows_out = _load_person_alias_row_dicts(db, person_id, "all", "all")
         return templates.TemplateResponse(
-            "admin/admin_person_aliases.html",
+            "admin/adminpersonaliases.html",
             {
                 "request": request,
                 "person_id": person_id,
@@ -1849,7 +1868,11 @@ def _ensure_public_uuid(db: Session, person: Person) -> None:
     db.refresh(person)
 
 
-@router.get("/people/{person_id}/access", response_class=HTMLResponse)
+@router.get(
+    "/people/{person_id}/access",
+    response_class=HTMLResponse,
+    name="admin_person_access_page",
+)
 async def admin_person_access_page(
     person_id: int, request: Request, db: Session = Depends(get_db)
 ):
@@ -1962,10 +1985,14 @@ async def admin_person_access_confirm(
         )
     now = datetime.now(timezone.utc)
     person.family_access_enabled = True
-    person.totp_enabled_at = now
+    if person.totp_enabled_at is None:
+        person.totp_enabled_at = now
     person.family_access_revoked_at = None
     db.commit()
-    return RedirectResponse(url=f"/admin/people/{person_id}/access", status_code=303)
+    db.refresh(person)
+    return RedirectResponse(
+        url=f"/admin/people/{person_id}/access?activated=1", status_code=303
+    )
 
 
 @router.post("/people/{person_id}/access/reset", response_class=HTMLResponse)

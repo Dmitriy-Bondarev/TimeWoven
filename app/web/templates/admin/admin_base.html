@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Админ{% endblock %}</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #020617;
+      --card: #0f172a;
+      --line: #1e293b;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --danger: #f43f5e;
+      --ok: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 32px 24px;
+    }
+    .container { max-width: 980px; margin: 0 auto; }
+    .container--wide { max-width: 1280px; margin: 0 auto; }
+    .back {
+      display: inline-block;
+      margin-bottom: 18px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .back:hover { color: var(--text); }
+    a.inline-link { color: var(--text); text-decoration: none; font-weight: 600; }
+    a.inline-link:hover { color: var(--accent); text-decoration: underline; }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 8px;
+      color: var(--accent);
+    }
+    h2 {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 24px 0 12px;
+      color: var(--accent);
+    }
+    .page-lead, .meta {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 20px;
+      line-height: 1.5;
+    }
+    .meta code { background: #020617; border: 1px solid #334155; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+    .error {
+      margin: 0 0 16px;
+      border: 1px solid color-mix(in oklab, var(--danger), white 25%);
+      background: color-mix(in oklab, var(--danger), transparent 85%);
+      color: #fecdd3;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-bottom: 12px; }
+    .filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .filter-btn {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .filter-btn:hover { color: var(--text); border-color: #334155; background: #0f172a; }
+    .filter-btn.is-active { background: var(--accent); color: #020617; border-color: var(--accent); }
+    .admin-table-wrap { width: 100%; overflow-x: auto; margin-bottom: 8px; }
+    table.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .data-table th {
+      text-align: left;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-weight: 500;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+    .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .data-table tbody tr:hover td { background: #0f172a; }
+    .data-table a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    .data-table a:hover { text-decoration: underline; }
+    .empty { color: var(--muted); font-size: 14px; margin: 12px 0; }
+    .muted { color: var(--muted); }
+    form { display: grid; gap: 0; }
+    fieldset {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #111827 0%, var(--card) 100%);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: grid;
+      gap: 14px;
+      margin: 0 0 16px;
+    }
+    legend {
+      color: var(--accent);
+      font-weight: 700;
+      padding: 0 6px;
+    }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    input[type="text"], select, textarea {
+      width: 100%;
+      max-width: 28rem;
+      background: #020617;
+      color: var(--text);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    select { max-width: 28rem; }
+    .form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    button, .btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #1f2937;
+      font-size: 14px;
+    }
+    button.btn-ghost, .btn.btn-ghost {
+      background: #334155;
+      color: var(--text);
+    }
+    @media (max-width: 780px) { body { padding: 16px; } }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  {% block body_outer %}
+  <div class="{% block container_class %}container{% endblock %}">
+    {% block content %}{% endblock %}
+  </div>
+  {% endblock %}
+</body>
+</html>
