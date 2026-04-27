@@ -1,0 +1,44 @@
+# profile — сестринский блок к family: плоский ключ profile.* в namespace family (совпадает с t("family.profile…") после split)
+family:
+  nav:
+    back_impulse: "← К импульсу дня"
+  # События в семейной ленте (RU-каркас; t(..., namespace="family") с ключом family.timeline.…)
+  timeline:
+    event:
+      one: "Событие"
+      many: "События"
+    meaning_layer: "Слой смысла"
+    related_stories: "Связанные истории"
+    status:
+      meaning_draft: "Черновик смысла"
+      family_ready: "Готово для семьи"
+      public_ready: "Готово для публичной истории"
+      hidden: "Скрыто"
+    visibility:
+      only_you: "Только вы"
+      family: "Видно семье"
+      public: "Публично"
+    field:
+      event_date: "Дата события"
+      author: "Автор"
+      period: "Период"
+      source: "Источник"
+      based_on_stories: "Основано на историях"
+    action:
+      show_stories: "Показать истории"
+      hide_stories: "Скрыть истории"
+    label:
+      event_status: "Статус события"
+      event_visibility: "Видимость события"
+    notice:
+      is_draft: "Это черновик"
+      hidden_from_feed: "Событие скрыто из ленты"
+    hint:
+      what_is_event: "Событие помогает собрать несколько историй в один понятный жизненный момент."
+      what_is_meaning_layer: "Слой смысла — это короткое объяснение, что произошло и почему это важно."
+      draft_only_you: "Черновик видите только вы."
+      family_sees_verified: "Семье показывается только проверенная версия события."
+
+profile:
+  own_stories_lead: "Записи, которые публикует {name}."
+  own_stories_lead_neutral: "Записи этого человека."

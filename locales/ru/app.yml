@@ -1,0 +1,149 @@
+familyaccess:
+  notconfigured: "Семейный доступ не настроен."
+  toomanyattempts: "Слишком много попыток, попробуйте позже."
+  invalidbackupcode: "Неверный резервный код."
+  internalconfigerror: "Ошибка конфигурации семейного доступа."
+  invalidcode: "Неверный код."
+
+memory:
+  published: "Опубликовано"
+
+welcome:
+  firststoryprompt: "Добро пожаловать в TimeWoven! Напишите боту первую историю."
+
+timeline:
+  empty: "Пока нет данных для таймлайна."
+  defaulteventtitle: "Событие"
+
+nav:
+  brand: "TimeWoven"
+  home: "Домой"
+  main: "Главная"
+  logout: "Выйти"
+
+home:
+  dailyimpulsetitle: "Импульс дня"
+  dailyimpulsecta: "Открыть →"
+  dailyimpulseempty: "Пока нет импульса дня."
+
+whoami:
+  title: "Кто вы?"
+  subtitle: "Выберите, кем вы входите в TimeWoven"
+  submit: "Продолжить"
+# app namespace — common UI strings (T33 I18N-1)
+common:
+  brand: "TimeWoven"
+  language: "Язык"
+  language_ru: "Русский"
+  language_en: "English"
+  no_photo: "Нет фото"
+
+family_access:
+  title: "Семейный вход"
+  enter_code: "Код из приложения‑аутентификатора"
+  not_configured: "Семейный доступ для этой карточки ещё не настроен администратором."
+  too_many_attempts: "Слишком много попыток, подождите."
+  invalid_backup_code: "Неверный или уже использованный резервный код."
+  internal_config_error: "Внутренняя ошибка конфигурации доступа."
+  invalid_code: "Неверный или устаревший код."
+
+nav:
+  brand: "TimeWoven"
+  home: "Моя семья"
+  main: "Основная навигация"
+  logout: "Выйти"
+  tree: "Древо"
+  timeline: "Timeline"
+  profile: "Профиль"
+  admin_title: "Вход для администратора"
+  admin_subtitle: "Только для управления проектом"
+  back_home: "← На главную"
+  label_username: "Имя пользователя"
+  label_password: "Пароль"
+  submit_login: "Войти"
+
+home:
+  daily_impulse_title: "Импульс дня"
+  daily_impulse_cta: "Рассказать историю"
+  daily_impulse_empty: "Сегодня ещё нет импульса от Макса"
+  daily_impulse_timeline_link: "Семейный Timeline →"
+  daily_impulse_context: "Голос семьи, который звучит через десятилетия."
+  daily_impulse_audio_missing: "Аудио пока не подключено."
+
+memory:
+  published: "Воспоминание опубликовано"
+
+welcome:
+  first_story_prompt: "Добро пожаловать в TimeWoven! Напишите боту первую историю."
+  title: "Золотое воспоминание"
+  subtitle: "Одно живое воспоминание из семейного архива, чтобы начать день с тепла и связи поколений."
+
+timeline:
+  empty: "Воспоминаний пока нет"
+  default_event_title: "Событие"
+  title: "Семейный Timeline"
+  empty_fallback: "Пока нет данных для Timeline. Вернитесь позже или проверьте, что в архиве есть опубликованные рассказы."
+
+profile:
+  title: "Мой профиль"
+  related_memories_count: "связанных воспоминаний"
+  created_memories_count: "создано воспоминаний"
+  quotes_count: "цитат"
+
+memory_new:
+  title: "Новое воспоминание"
+
+memory_edit:
+  title: "Редактировать воспоминание"
+
+person_card:
+  memories_title: "Воспоминания"
+  memories_empty: "Воспоминаний пока нет."
+  quotes_title: "Цитаты"
+  quotes_empty: "Цитат пока нет."
+
+buttons:
+  save: "Сохранить"
+  cancel: "Отмена"
+  edit: "Редактировать"
+  add_memory: "Добавить воспоминание"
+  publish: "Опубликовать"
+  show_in_tree: "Показать в дереве"
+  view_timeline: "Посмотреть весь Таймлайн"
+  open_discussion: "Открыть обсуждение"
+
+whoami:
+  title: "Кто вы в этой семье?"
+  subtitle: "Это поможет подписывать ваши истории правильно."
+  submit: "Продолжить"
+  select_placeholder: "Выберите участника"
+  no_people: "Нет доступных участников"
+  legacy_disabled: "Используйте персональную ссылку семьи и вход по TOTP (код из приложения‑аутентификатора). Старый выбор из списка отключён администратором."
+  back_home: "← Вернуться к импульсу дня"
+
+# Админка / инспекция событийного слоя (t(..., namespace="app") — ключи admin.timeline.…)
+admin:
+  timeline:
+    event_one: "Событие"
+    events_many: "События"
+    meaning_layer: "Слой смысла"
+    status_meaning_draft: "Черновик смысла"
+    status_family_ready: "Готово для семьи"
+    status_public_ready: "Готово для публичной истории"
+    status_hidden: "Скрыто"
+    visibility_only_you: "Только вы"
+    visibility_family: "Видно семье"
+    visibility_public: "Публично"
+    field_event_date: "Дата события"
+    field_period: "Период"
+    field_source: "Источник"
+    field_based_on_stories: "Основано на историях"
+    field_event_status: "Статус события"
+    field_event_visibility: "Видимость события"
+    related_stories: "Связанные истории"
+    inspect: "События в ленте: слой смысла"
+    help_meaning_layer: "Слой смысла — кратко: что за момент и зачем он важен для семьи."
+
+# Present only in ru for fallback smoke (key missing in en/landing.yml is landing.missing_in_en)
+test:
+  only_ru: "тест‑RU"

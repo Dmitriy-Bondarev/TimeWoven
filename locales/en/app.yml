@@ -1,0 +1,121 @@
+familyaccess:
+  notconfigured: "Family access is not configured."
+  toomanyattempts: "Too many attempts, please try later."
+  invalidbackupcode: "Invalid backup code."
+  internalconfigerror: "Family access configuration error."
+  invalidcode: "Invalid code."
+
+memory:
+  published: "Published"
+
+welcome:
+  firststoryprompt: "Welcome to TimeWoven! Send your first story to the bot."
+
+timeline:
+  empty: "No timeline data yet."
+  defaulteventtitle: "Event"
+
+nav:
+  brand: "TimeWoven"
+  home: "Home"
+  main: "Main"
+  logout: "Log out"
+
+home:
+  dailyimpulsetitle: "Daily impulse"
+  dailyimpulsecta: "Open →"
+  dailyimpulseempty: "No daily impulse yet."
+
+whoami:
+  title: "Who are you?"
+  subtitle: "Choose who you are in TimeWoven"
+  submit: "Continue"
+common:
+  brand: "TimeWoven"
+  language: "Language"
+  language_ru: "Russian"
+  language_en: "English"
+  no_photo: "No photo"
+
+family_access:
+  title: "Family sign-in"
+  enter_code: "Code from your authenticator app"
+  not_configured: "Family access for this card has not been set up by the administrator yet."
+  too_many_attempts: "Too many attempts. Please wait and try again."
+  invalid_backup_code: "Invalid or already used backup code."
+  internal_config_error: "Internal access configuration error."
+  invalid_code: "Invalid or expired code."
+
+nav:
+  brand: "TimeWoven"
+  home: "My family"
+  main: "Main navigation"
+  logout: "Log out"
+  tree: "Tree"
+  timeline: "Timeline"
+  profile: "Profile"
+  admin_title: "Administrator sign-in"
+  admin_subtitle: "Project management only"
+  back_home: "← Home"
+  label_username: "Username"
+  label_password: "Password"
+  submit_login: "Sign in"
+
+home:
+  daily_impulse_title: "Daily impulse"
+  daily_impulse_cta: "Share a story"
+  daily_impulse_empty: "No impulse from Max yet today"
+  daily_impulse_timeline_link: "Family Timeline →"
+  daily_impulse_context: "A family voice that carries across decades."
+  daily_impulse_audio_missing: "Audio is not available yet."
+
+memory:
+  published: "Memory published"
+
+welcome:
+  first_story_prompt: "Welcome to TimeWoven! Send your first story to the bot."
+  title: "Golden memory"
+  subtitle: "One living memory from your family archive to start the day with warmth and connection across generations."
+
+timeline:
+  empty: "No memories yet"
+  default_event_title: "Event"
+  title: "Family Timeline"
+  empty_fallback: "No Timeline data yet. Come back later, or make sure there are published stories in the archive."
+
+profile:
+  title: "My profile"
+  related_memories_count: "related memories"
+  created_memories_count: "memories created"
+  quotes_count: "quotes"
+
+memory_new:
+  title: "New memory"
+
+memory_edit:
+  title: "Edit memory"
+
+person_card:
+  memories_title: "Memories"
+  memories_empty: "No memories yet."
+  quotes_title: "Quotes"
+  quotes_empty: "No quotes yet."
+
+buttons:
+  save: "Save"
+  cancel: "Cancel"
+  edit: "Edit"
+  add_memory: "Add memory"
+  publish: "Publish"
+  show_in_tree: "Show in tree"
+  view_timeline: "View full Timeline"
+  open_discussion: "Open discussion"
+
+whoami:
+  title: "Who are you in this family?"
+  subtitle: "This helps us sign your stories correctly."
+  submit: "Continue"
+  select_placeholder: "Choose a person"
+  no_people: "No available people"
+  legacy_disabled: "Use your family’s personal link and TOTP sign-in (code from your authenticator app). The old list-based choice was disabled by an administrator."
+  back_home: "← Back to daily impulse"
