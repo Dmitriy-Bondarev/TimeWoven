@@ -37,7 +37,14 @@ from app.models import (
 )
 from app.services import create_person_with_i18n, update_person_with_i18n
 from app.services.person_alias_service import ALIAS_STATUS, ALIAS_TYPES
-from app.security import get_daily_password, require_admin, make_admin_token, ADMIN_COOKIE_NAME
+from app.security import (
+    ADMIN_COOKIE_NAME,
+    check_login_rate_limit,
+    get_client_ip,
+    get_daily_password,
+    make_admin_token,
+    require_admin,
+)
 from app.services.ai_analyzer import ProviderAgnosticAnalyzer
 from app.services.family_access_service import (
     clear_backup_codes,
@@ -826,6 +833,14 @@ async def admin_login_submit(
     password: str = Form(...),
     next: str = Form("/admin"),
 ):
+    ip = get_client_ip(request)
+    if not check_login_rate_limit(ip):
+        return HTMLResponse(
+            content="<h1>429 — слишком много попыток входа</h1>"
+            "<p>Попробуйте через минуту.</p>",
+            status_code=429,
+        )
+
     expected_username = os.getenv("ADMIN_USERNAME", "admin")
     expected_password = os.getenv("ADMIN_PASSWORD", "")
 
