@@ -400,6 +400,7 @@
       background: rgba(15, 23, 42, 0.45);
     }
     .tw-events-prep__title { font-size: 14px; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
+    .tw-events-prep--profile .tw-events-prep__title:only-of-type { margin-bottom: 0; }
     .tw-events-prep__hint { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
     .tw-events-prep--profile .tw-events-prep__hint + .tw-events-prep__hint { margin-top: 8px; }
     .tw-events-prep__placeholders { margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
@@ -432,11 +433,12 @@
           {% if hero_subtitle %}
             {% set _hs = (hero_subtitle|string|trim) %}
             {% if _hs and (_hs|lower) not in ('none', 'null', 'undefined') %}
-              {# Согласованный вид: даты как в данных бэка; maiden («урожд. …») в hero не показываем (только шаблон). #}
+              {# Даты в строке бэка; «урожд.» показываем как «девичья фамилия:» без новой морфологии. #}
               {% set ns = namespace(parts=[]) %}
               {% for p in _hs.split(' · ') %}
                 {% set t = p|trim %}
-                {% if t and not (t|lower).startswith('урожд') %}
+                {% if t %}
+                  {% set t = t|replace('урожд.', 'девичья фамилия:') %}
                   {% set _ = ns.parts.append(t) %}
                 {% endif %}
               {% endfor %}
@@ -467,20 +469,19 @@
       </ul>
       <nav class="person-cta" aria-label="Действия">
         <a class="btn btn-primary" href="/family/memory/new?person_id={{ person.person_id|e }}">Добавить воспоминание</a>
-        <a class="btn btn-ghost" href="{{ (person_timeline_href|default('/family/timeline?person_id=' ~ person.person_id, true))|e }}">Лента вокруг: {{ name|e }}</a>
+        <a class="btn btn-ghost" href="{{ (person_timeline_href|default('/family/timeline?person_id=' ~ person.person_id, true))|e }}">История {{ name|e }}</a>
         <a class="btn btn-ghost" href="{{ (family_timeline_href|default('/family/timeline', true))|e }}">Общая семейная лента</a>
         <a class="btn btn-ghost" href="/family/tree?root_person_id={{ person.person_id }}">Семейное дерево</a>
       </nav>
       <div class="tw-events-prep--profile" role="region" aria-label="События (скоро)">
         <p class="tw-events-prep__title">События (скоро)</p>
-        <p class="tw-events-prep__hint">Сюда лягут важные жизненные моменты — свадьба, переезд, рождение ребёнка, юбилей: то, вокруг чего хочется собрать несколько разных семейных историй в одну понятную опору.</p>
-        <p class="tw-events-prep__hint">Пока это только намёк на будущую функцию, без списка и настроек — ничего заполнять не нужно.</p>
       </div>
     </header>
 
     <section class="section" aria-labelledby="h-mentions">
       <h2 id="h-mentions">Когда имя появляется в чужих историях</h2>
-      <p class="lead">Когда в семье пишут истории и вспоминают этого человека, сюда попадают короткие фрагменты — с датой и автором, чтобы было понятно, «где в тексте зазвучало имя».</p>
+      {% set _nd = (name|string|trim) if name else "" %}
+      <p class="lead">{% if _nd %}Упоминания {{ _nd|e }} в историях других людей.{% else %}Упоминания в историях других людей.{% endif %}</p>
       {% if mention_memories and mention_memories|length > 0 %}
         <div class="card-list">
           {% for m in mention_memories %}
@@ -496,7 +497,7 @@
       {% else %}
         <div class="empty-box" role="status">
           <h3>Пока нет таких фрагментов</h3>
-          <p>Это нормально: не в каждой семейной истории имя произносится вслух. Когда вспоминания и рассказы начнут встречаться чаще, сюда начнут собираться короткие «врезки» — как след чужой памяти.</p>
+          <p>Пока в чужих историях нет коротких вхождений имени.</p>
         </div>
       {% endif %}
     </section>
@@ -506,7 +507,7 @@
       <p class="lead">
         {% set _n = (name|string|trim) if name else "" %}
         {% if _n %}
-          {{ t("profile.own_stories_lead", namespace="family", name=_n) }}
+          Истории, которые {{ _n|e }} пишет сама.
         {% else %}
           {{ t("profile.own_stories_lead_neutral", namespace="family") }}
         {% endif %}
@@ -533,7 +534,7 @@
                   <div class="own-actions">
                     <a class="own-link--primary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Открыть</a>
                     <span class="own-actions-sep" aria-hidden="true">·</span>
-                    <a class="own-link--secondary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Добавить отклик</a>
+                    <a class="own-link--secondary" href="/family/reply/{{ m.id }}?person_id={{ person.person_id }}">Ответить</a>
                     {% if m.can_edit %}
                     <span class="own-actions-sep" aria-hidden="true">·</span>
                     <a class="own-link--secondary" href="/family/memory/{{ m.id }}/edit?person_id={{ person.person_id }}">Редактировать</a>

@@ -92,6 +92,10 @@
       object-fit: cover;
       border: 1px solid var(--line);
     }
+    .tw-golden-memory__meta {
+      margin: 0;
+      min-width: 0;
+    }
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -135,11 +139,8 @@
         {% if author_avatar %}
           <img class="avatar" src="{{ author_avatar }}" alt="author">
         {% endif %}
-        {% if author_name %}
-          <span>{{ author_name }}</span>
-        {% endif %}
-        {% if memory_date %}
-          <span>• {{ memory_date }}</span>
+        {% if (golden_memory and golden_memory.author_display_name) or golden_memory_date_display %}
+          <p class="tw-golden-memory__meta">{% if golden_memory and golden_memory.author_display_name %}{{ golden_memory.author_display_name }}{% endif %}{% if golden_memory and golden_memory.author_display_name and golden_memory_date_display %} • {% endif %}{% if golden_memory_date_display %}{{ golden_memory_date_display }}{% endif %}</p>
         {% endif %}
       </div>
       {% if memory_audio_url %}
