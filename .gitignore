@@ -51,3 +51,6 @@ temp/project_docs/*
 hostkey_n8n
 hostkey_n8n.pub
 
+# ===== LOGS =====
+/logs/
+

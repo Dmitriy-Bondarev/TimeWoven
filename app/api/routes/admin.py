@@ -20,6 +20,7 @@ from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.bot.max_messenger import MaxMessengerBot
+from app.core.admin_audit import log_login_attempt
 from app.core.i18n import install_jinja_i18n
 from app.db.session import get_db
 from app.models import (
@@ -835,6 +836,7 @@ async def admin_login_submit(
 ):
     ip = get_client_ip(request)
     if not check_login_rate_limit(ip):
+        log_login_attempt(ip, username, "rate_limited")
         return HTMLResponse(
             content="<h1>429 — слишком много попыток входа</h1>"
             "<p>Попробуйте через минуту.</p>",
@@ -845,6 +847,7 @@ async def admin_login_submit(
     expected_password = os.getenv("ADMIN_PASSWORD", "")
 
     if username == expected_username and password == expected_password:
+        log_login_attempt(ip, username, "success")
         # Validate next to prevent open redirect: only relative internal paths allowed
         safe_next = (
             next
@@ -862,6 +865,7 @@ async def admin_login_submit(
         )
         return response
 
+    log_login_attempt(ip, username, "fail")
     return templates.TemplateResponse(
         "admin/admin_login.html",
         {"request": request, "next": next, "error": "Неверные учётные данные"},
