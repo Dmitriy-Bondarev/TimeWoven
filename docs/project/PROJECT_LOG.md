@@ -1956,3 +1956,30 @@ No.
 ### Validation / Proof
 
 - Запуск: `DB_NAME=timewoven_bondarev python3 scripts/processor.py` → подключение к БД OK, директории создаются в `/root/data/timewoven/bondarev/...`.
+
+---
+
+## Update: T-CLEANUP-OLD-DATA-SOFT-2026-04-28-12 — archive old filesystem directories
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — старые проектные директории данных вынесены из репозитория в архив.
+
+### Schema change
+
+No.
+
+### Changes
+
+- Создан архив: `/root/data/timewoven/_legacy_backup/`
+- Перемещены директории (без удаления данных):
+  - `/root/projects/TimeWoven/raw` → `/root/data/timewoven/_legacy_backup/raw_legacy`
+  - `/root/projects/TimeWoven/processed` → `/root/data/timewoven/_legacy_backup/processed_legacy`
+  - `/root/projects/TimeWoven/storage` → `/root/data/timewoven/_legacy_backup/storage_legacy`
+
+### Validation / Proof
+
+- В корне проекта `raw/processed/storage` отсутствуют.
+- `systemctl is-active timewoven.service` = `active`, `/health` = `200`.
