@@ -43,3 +43,5 @@ TimeWoven_snapshots/
 .coverage
 htmlcov/
 **/__pycache__/
+*.bak
+docs/snapshots/
