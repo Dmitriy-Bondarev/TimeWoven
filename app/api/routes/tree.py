@@ -13,6 +13,7 @@ from sqlalchemy import and_, or_, func, false
 from sqlalchemy.orm import Session
 
 from app.core.i18n import install_jinja_i18n
+from app.core.media_urls import default_family_slug, family_data_path_for_slug, normalize_media_url
 from app.core.whoami_experiment import is_whoami_experiment_enabled
 from app.db.session import get_db
 from app.models import Memory, Person, PersonI18n, Quote
@@ -664,6 +665,9 @@ async def family_access_login_page(
     person = find_person_by_public_uuid(db, public_uuid)
     if not person or not _is_live_visible_person(person):
         raise HTTPException(status_code=404, detail="Not found")
+    slug = request.path_params.get("slug") or default_family_slug()
+    if getattr(person, "avatar_url", None):
+        person.avatar_url = normalize_media_url(person.avatar_url, slug)
     default_next = "/family/welcome"
     next_url = _safe_internal_next_url(next, default_next)
     viewer = resolve_viewer(request, db)
@@ -986,6 +990,10 @@ async def family_person(
     person_timeline_href = f"/family/timeline?person_id={person_id}"
     family_timeline_href = "/family/timeline"
 
+    slug = request.path_params.get("slug") or default_family_slug()
+    if getattr(person, "avatar_url", None):
+        person.avatar_url = normalize_media_url(person.avatar_url, slug)
+
     return templates.TemplateResponse(
         "family/profile.html",
         {
@@ -1024,6 +1032,7 @@ async def family_timeline(
         return redirect
 
     from app.models import Union, UnionChild
+    slug = request.path_params.get("slug") or default_family_slug()
 
     items = []
     visible_people = (
@@ -1077,7 +1086,7 @@ async def family_timeline(
                     "title": f"Рождение: {name}",
                     "text": "",
                     "person_id": person.person_id,
-                    "avatar_url": person.avatar_url,
+                    "avatar_url": normalize_media_url(person.avatar_url, slug),
                     "source": "people",
                     "type": "birth",
                 }
@@ -1091,7 +1100,7 @@ async def family_timeline(
                     "title": f"Смерть: {name}",
                     "text": "",
                     "person_id": person.person_id,
-                    "avatar_url": person.avatar_url,
+                    "avatar_url": normalize_media_url(person.avatar_url, slug),
                     "source": "people",
                     "type": "death",
                 }
@@ -1220,7 +1229,10 @@ async def family_timeline(
                 "text": text[:280],
                 "memory_id": memory.id,
                 "person_id": memory.author_id,
-                "avatar_url": memory.author.avatar_url if memory.author else None,
+                "avatar_url": normalize_media_url(
+                    memory.author.avatar_url if memory.author else None,
+                    request.path_params.get("slug") or default_family_slug(),
+                ),
                 "source": "people",
                 "type": "memory_recording",
                 "has_audio": _memory_has_audio(memory),
@@ -1277,6 +1289,7 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
     memory_text = ""
     golden_memory_date_display = ""
     author_name = ""
+    slug = request.path_params.get("slug") or default_family_slug()
     author_avatar = ""
     memory_id = None
     golden_memory = None
@@ -1305,7 +1318,7 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
 
             person = db.query(Person).filter(Person.person_id == memory.author_id).first()
             if person and person.avatar_url:
-                author_avatar = person.avatar_url
+                author_avatar = normalize_media_url(person.avatar_url, slug) or ""
 
         golden_memory = {
             "id": memory_id,
@@ -1317,7 +1330,7 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
 
     memory_audio_url = ""
     if memory and (memory.audio_url or "").strip():
-        memory_audio_url = (memory.audio_url or "").strip()
+        memory_audio_url = normalize_media_url((memory.audio_url or "").strip(), slug) or ""
 
     return templates.TemplateResponse(
         "family/welcome.html",
@@ -1447,13 +1460,14 @@ async def who_am_i_pin(
     if not name:
         name = f"Персона #{person_id}"
 
+    slug = request.path_params.get("slug") or default_family_slug()
     return templates.TemplateResponse(
         "family/pin_form.html",
         {
             "request": request,
             "person_id": person_id,
             "name": name,
-            "avatar_url": person.avatar_url,
+            "avatar_url": normalize_media_url(person.avatar_url, slug),
             "next": next,
             "error": None,
         },
@@ -1533,6 +1547,7 @@ async def family_reply(
     )
 
     responses = []
+    slug = request.path_params.get("slug") or default_family_slug()
     quotes = (
         db.query(Quote)
         .filter(Quote.source_memory_id == memory_id)
@@ -1546,7 +1561,7 @@ async def family_reply(
         if quote.author_id:
             author = db.query(Person).filter(Person.person_id == quote.author_id).first()
             if author:
-                resp_avatar_url = author.avatar_url
+                resp_avatar_url = normalize_media_url(author.avatar_url, slug)
                 i18n = db.query(PersonI18n).filter(
                     PersonI18n.person_id == quote.author_id,
                     PersonI18n.lang_code == "ru",
@@ -1564,7 +1579,7 @@ async def family_reply(
     
     message = "Ответ сохранён" if saved else None
 
-    original_audio_url = (memory.audio_url or "").strip() if memory else ""
+    original_audio_url = normalize_media_url((memory.audio_url or "").strip() if memory else "", slug) or ""
 
     return templates.TemplateResponse(
         "family/reply.html",
@@ -1778,7 +1793,8 @@ async def profile_avatar_upload(
     if suffix not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
         suffix = ".jpg"
 
-    avatar_dir = BASE_DIR / "web" / "static" / "images" / "avatars"
+    slug = default_family_slug()
+    avatar_dir = Path(family_data_path_for_slug(slug)) / "media" / "avatars" / "current"
     avatar_dir.mkdir(parents=True, exist_ok=True)
     filename = f"profile_{resolved_person_id}_{uuid4().hex}{suffix}"
     target = avatar_dir / filename
@@ -1788,7 +1804,7 @@ async def profile_avatar_upload(
         raise HTTPException(status_code=400, detail="Empty file")
 
     target.write_bytes(content)
-    person.avatar_url = f"/static/images/avatars/{filename}"
+    person.avatar_url = f"/media/{slug}/avatars/current/{filename}"
     db.commit()
 
     return RedirectResponse(url=f"/family/person/{resolved_person_id}", status_code=303)

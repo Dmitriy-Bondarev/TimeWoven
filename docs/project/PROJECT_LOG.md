@@ -2132,3 +2132,35 @@ No.
 - `/static/audio/processed/13517383557209.mp3` → `200`
 - `/static/images/avatars/person_1.jpg` → `200`
 - `/static/avatars/person_1.png` → `200`
+
+---
+
+## Update: T-MEDIA-CLEANUP-V2-2026-04-28-23 — finalize media routing and remove static dependency
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — media полностью обслуживается через `/media/{slug}/...`; static остаётся только для core assets.
+
+### Schema change
+
+No.
+
+### Changes
+
+- Удалены media-symlink'и из `app/web/static`:
+  - `app/web/static/audio/processed`
+  - `app/web/static/images/avatars`
+  - `app/web/static/avatars`
+- Убран `follow_symlink` из static-mount (`StaticFiles(...)` без symlink support).
+- Добавлен/включён routing для media:
+  - `GET /media/{slug}/{file_path:path}` → `FileResponse` из `{data_path}/media/...`
+- Убраны backend-зависимости от static media paths (перевод на `/media/...` для новых записей и runtime-нормализация legacy URL).
+
+### Validation / Proof
+
+- `/static/audio/...` → `404`
+- `/static/images/avatars/...` → `404`
+- `/media/bondarev/audio/processed/...` → `200`
+- `/media/bondarev/avatars/current/...` → `200`

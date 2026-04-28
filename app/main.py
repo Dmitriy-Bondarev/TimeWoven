@@ -9,6 +9,7 @@ from app.api.routes.tree import router as tree_router
 from app.api.routes.TW_Explorer import router as explorer_router
 from app.api.timeline import router as timeline_router
 from app.api.routes.admin import router as admin_router
+from app.api.routes.media import router as media_router
 app = FastAPI(title="TimeWoven")
 
 
@@ -43,7 +44,7 @@ async def health():
 try:
     app.mount(
         "/static",
-        StaticFiles(directory="app/web/static", follow_symlink=True),
+        StaticFiles(directory="app/web/static"),
         name="static",
     )
 except RuntimeError:
@@ -55,6 +56,7 @@ app.include_router(tree_router)
 app.include_router(explorer_router)
 app.include_router(timeline_router)
 app.include_router(admin_router)
+app.include_router(media_router)
 
 
 logger = logging.getLogger(__name__)

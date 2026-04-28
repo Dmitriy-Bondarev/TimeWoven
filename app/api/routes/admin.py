@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from app.bot.max_messenger import MaxMessengerBot
 from app.core.admin_audit import log_login_attempt
 from app.core.i18n import install_jinja_i18n
+from app.core.media_urls import default_family_slug, family_data_path_for_slug, normalize_media_url
 from app.db.session import get_db
 from app.models import (
     AvatarHistory,
@@ -936,7 +937,14 @@ async def admin_avatars(request: Request, db: Session = Depends(get_db)):
         if not name:
             name = f"Персона #{person.person_id}"
 
-        people.append({"id": person.person_id, "name": name, "avatar_url": person.avatar_url})
+        slug = default_family_slug()
+        people.append(
+            {
+                "id": person.person_id,
+                "name": name,
+                "avatar_url": normalize_media_url(person.avatar_url, slug),
+            }
+        )
 
     return templates.TemplateResponse(
         "admin/avatars_form.html",
@@ -963,7 +971,8 @@ async def admin_avatars_upload(
     if suffix not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
         suffix = ".jpg"
 
-    avatar_dir = BASE_DIR / "web" / "static" / "images" / "avatars"
+    slug = default_family_slug()
+    avatar_dir = Path(family_data_path_for_slug(slug)) / "media" / "avatars" / "current"
     avatar_dir.mkdir(parents=True, exist_ok=True)
     filename = f"person_{person_id}_{uuid4().hex}{suffix}"
     target = avatar_dir / filename
@@ -973,7 +982,7 @@ async def admin_avatars_upload(
         raise HTTPException(status_code=400, detail="Empty file")
 
     target.write_bytes(content)
-    person.avatar_url = f"/static/images/avatars/{filename}"
+    person.avatar_url = f"/media/{slug}/avatars/current/{filename}"
     db.commit()
 
     return RedirectResponse(url="/admin/avatars", status_code=303)
@@ -1079,7 +1088,7 @@ async def admin_people(
             "messenger_tg_id": p.messenger_tg_id or "",
             "contact_email": p.contact_email or "",
             "is_alive": p.is_alive,
-            "avatar_url": p.avatar_url,
+            "avatar_url": normalize_media_url(p.avatar_url, default_family_slug()),
             "memories_count": memories_count,
             "quotes_count": quotes_count,
             "aliases": aliases,

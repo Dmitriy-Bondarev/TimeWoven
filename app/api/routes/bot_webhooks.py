@@ -14,13 +14,19 @@ from app.models import MaxContactEvent, Person, PersonI18n
 from app.services import max_session_service
 from app.services import bot_reply
 from app.services.transcription import TranscriptionService
+from app.core.media_urls import default_family_slug, family_data_path_for_slug
 
 
 router = APIRouter(prefix="/webhooks/maxbot", tags=["MaxBot Webhooks"])
 MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "").strip()
 logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parents[2]
-RAW_AUDIO_DIR = BASE_DIR / "web" / "static" / "audio" / "raw"
+
+
+def _raw_audio_dir() -> Path:
+    slug = default_family_slug()
+    data_path = Path(family_data_path_for_slug(slug))
+    return data_path / "media" / "audio" / "raw"
 
 
 def _sanitize_identifier(raw_value: str, fallback: str = "audio") -> str:
@@ -40,12 +46,13 @@ def _guess_audio_extension(audio_url: str) -> str:
 
 
 def _download_audio_to_raw(audio_url: str, attachment_id: str) -> str | None:
-    RAW_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    raw_dir = _raw_audio_dir()
+    raw_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     safe_attachment_id = _sanitize_identifier(attachment_id, fallback="attachment")
     extension = _guess_audio_extension(audio_url)
     filename = f"max_{safe_attachment_id}_{timestamp}{extension}"
-    target_path = RAW_AUDIO_DIR / filename
+    target_path = raw_dir / filename
 
     try:
         with httpx.stream("GET", audio_url, timeout=30.0, follow_redirects=True) as response:
@@ -65,7 +72,8 @@ def _download_audio_to_raw(audio_url: str, attachment_id: str) -> str | None:
         )
         return None
 
-    return f"/static/audio/raw/{filename}"
+    slug = default_family_slug()
+    return f"/media/{slug}/audio/raw/{filename}"
 
 
 def _extract_max_id(payload: dict) -> str:
@@ -297,7 +305,12 @@ def _save_max_contact_event(db, sender_max_user_id: str, contact_item: dict[str,
 
 
 def _to_filesystem_audio_path(local_static_path: str) -> str:
-    """Convert '/static/audio/raw/file.ogg' into absolute project filesystem path."""
+    """
+    Legacy helper.
+
+    Kept for backward-compat: convert previously stored static raw-audio links to
+    an absolute filesystem path inside the repo. New flow writes to /media/.
+    """
     normalized = local_static_path.strip()
     return str(BASE_DIR / "web" / normalized.lstrip("/"))
 
