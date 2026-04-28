@@ -1,62 +1,44 @@
-# ===== DATABASE & DATA =====
-# База данных (не в git - только SQL дампы)
-data/db/family.db
-data/db/family.db.backup*
-data/db/*.textClipping
-
-# Аудио и медиа-файлы
-data/processed/
-data/raw/
-
-# ===== PYTHON & VENV =====
+# Python
 __pycache__/
 *.pyc
 *.pyo
-.venv/
+*.pyd
+
+# Virtual env
 venv/
 .env
+.env.*
 
-# ===== MACOS & IDE =====
-.DS_Store
-.AppleDouble
-.vscode/
-.cursor/
-*.swp
-
-# ===== APP GENERATED FILES =====
-family.db
-*.db
-backups/
-app/static/processed/
-app/static/avatars/
-
-# ===== TEMPORARY & LOCAL SANDBOX =====
-# Полностью игнорируем temp/, кроме маркеров и документации
-temp/*
-!temp/.gitkeep
-!temp/README.md
-!temp/project_docs/
-
-# Локальные дампы и эксперименты
-temp/project_docs/*
-!temp/project_docs/ADR.template.md
-!temp/project_docs/DB_CHANGELOG.template.md
-!temp/project_docs/TECH_PASSPORT.template.md
-!temp/project_docs/README.template.md
-!temp/project_docs/requirements.template.txt
-!temp/project_docs/README.md
-!temp/project_docs/examples/
-
-# ===== INFRA & CREDENTIALS =====
-hostkey_n8n
-hostkey_n8n.pub
-
-# ===== LOGS =====
-/logs/
-
-# ===== EXTRA SAFETY =====
-.env*
+# Logs
+logs/
 *.log
+
+# Data (critical)
+data/
+backups/
+snapshots/
+TimeWoven_snapshots/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Cache / temp
+*.tmp
+*.cache
+.cache/
+
+# Media (runtime)
+*.mp3
+*.wav
+*.ogg
+*.jpg
+*.png
+*.webp
+
+# Extra safety (doesn't affect tracked files)
+.cursor/
 .pytest_cache/
 .coverage
 htmlcov/
