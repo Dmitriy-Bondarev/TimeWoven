@@ -28,9 +28,19 @@
 set -u
 set -o pipefail
 
+# --- Время (portable ISO-8601) ---------------------------------------------
+iso_now() {
+  if date -Is >/dev/null 2>&1; then
+    date -Is
+  else
+    date +"%Y-%m-%dT%H:%M:%S%z"
+  fi
+}
+
 # --- Конфигурация ----------------------------------------------------------
-PROJECT_DIR="${TW_PROJECT_DIR:-/root/projects/TimeWoven}"
-SNAPSHOTS_ROOT="${TW_SNAPSHOTS_ROOT:-/root/projects/TimeWoven_snapshots}"
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+PROJECT_DIR="${TW_PROJECT_DIR:-$PROJECT_ROOT}"
+SNAPSHOTS_ROOT="${TW_SNAPSHOTS_ROOT:-${PROJECT_DIR}_snapshots}"
 ENV_FILE="${TW_ENV_FILE:-$PROJECT_DIR/.env}"
 SERVICE_NAME="${TW_SERVICE:-timewoven.service}"
 HEALTH_LOCAL="${TW_HEALTH_LOCAL:-http://127.0.0.1:8000/health}"
@@ -76,6 +86,12 @@ ok()   { echo "${C_GRN}[ OK ]${C_RST} $*"; }
 warn() { echo "${C_YLW}[WARN]${C_RST} $*"; }
 err()  { echo "${C_RED}[FAIL]${C_RST} $*"; }
 
+# --- 0. Проект на месте -----------------------------------------------------
+if [[ -z "$PROJECT_DIR" ]]; then
+  err "Не удалось определить корень git-репозитория (git rev-parse --show-toplevel)"
+  exit 1
+fi
+
 # --- Поиск снапшота --------------------------------------------------------
 SNAP_DIR=""
 for cand in "$SNAPSHOTS_ROOT/$TASK_ID" "$SNAPSHOTS_ROOT/protected/$TASK_ID"; do
@@ -106,7 +122,7 @@ echo "${C_BLD}║  Snapshot:    $SNAP_DIR${C_RST}"
 echo "${C_BLD}║  Project:     $PROJECT_DIR${C_RST}"
 echo "${C_BLD}║  With git:    $([[ $WITH_GIT -eq 1 ]] && echo YES || echo no)${C_RST}"
 echo "${C_BLD}║  With DB:     $([[ $WITH_DB  -eq 1 ]] && echo YES || echo no)${C_RST}"
-echo "${C_BLD}║  Time:        $(date -Is)${C_RST}"
+echo "${C_BLD}║  Time:        $(iso_now)${C_RST}"
 echo "${C_BLD}╚══════════════════════════════════════════════════════════════╝${C_RST}"
 echo ""
 
@@ -148,10 +164,14 @@ fi
 
 # --- Шаг 2. Stop service ---------------------------------------------------
 log "Останавливаю $SERVICE_NAME..."
-if systemctl stop "$SERVICE_NAME" 2>/dev/null; then
-  ok "$SERVICE_NAME остановлен"
+if command -v systemctl >/dev/null 2>&1; then
+  if systemctl stop "$SERVICE_NAME" 2>/dev/null; then
+    ok "$SERVICE_NAME остановлен"
+  else
+    warn "Не удалось остановить $SERVICE_NAME (возможно, уже не работает)"
+  fi
 else
-  warn "Не удалось остановить $SERVICE_NAME (возможно, уже не работает)"
+  warn "[SKIP] systemctl check (not available)"
 fi
 
 # --- Шаг 3. Restore worktree -----------------------------------------------
@@ -234,10 +254,14 @@ fi
 
 # --- Шаг 6. Start service --------------------------------------------------
 log "Запускаю $SERVICE_NAME..."
-if systemctl start "$SERVICE_NAME"; then
-  ok "$SERVICE_NAME запускается..."
+if command -v systemctl >/dev/null 2>&1; then
+  if systemctl start "$SERVICE_NAME"; then
+    ok "$SERVICE_NAME запускается..."
+  else
+    err "Не удалось запустить $SERVICE_NAME"
+  fi
 else
-  err "Не удалось запустить $SERVICE_NAME"
+  warn "[SKIP] systemctl check (not available)"
 fi
 
 sleep 3

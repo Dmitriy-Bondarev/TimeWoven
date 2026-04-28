@@ -13,7 +13,7 @@
 ## Быстрый старт
 
 ```bash
-cd /root/projects/TimeWoven
+cd "$(git rev-parse --show-toplevel)"
 
 # 1. Перед стартом задания
 bash scripts/ops/clean_state_gate.sh
@@ -34,8 +34,8 @@ bash scripts/ops/rollback_to_snapshot.sh T-XXX-2026-04-27-01
 
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
-| `TW_PROJECT_DIR` | `/root/projects/TimeWoven` | Путь к проекту |
-| `TW_SNAPSHOTS_ROOT` | `/root/projects/TimeWoven_snapshots` | Корень снапшотов |
+| `TW_PROJECT_DIR` | `$(git rev-parse --show-toplevel)` | Путь к проекту |
+| `TW_SNAPSHOTS_ROOT` | `${TW_PROJECT_DIR}_snapshots` | Корень снапшотов |
 | `TW_SERVICE` | `timewoven.service` | Имя systemd-сервиса |
 | `TW_HEALTH_LOCAL` | `http://127.0.0.1:8000/health` | Локальный health |
 | `TW_HEALTH_PUBLIC` | `https://app.timewoven.ru/health` | Публичный health |
@@ -45,7 +45,7 @@ bash scripts/ops/rollback_to_snapshot.sh T-XXX-2026-04-27-01
 ## Хранилище снапшотов
 
 ```
-/root/projects/TimeWoven_snapshots/
+${TW_PROJECT_DIR}_snapshots/
 ├── INDEX.log                      # Журнал всех снапшотов
 ├── T-XXX-2026-04-27-01/           # Rolling (TTL 30 дней)
 │   ├── meta.txt

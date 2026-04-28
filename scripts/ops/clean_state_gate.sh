@@ -17,10 +17,31 @@
 
 set -u
 
+# --- Время (portable ISO-8601) ---------------------------------------------
+iso_now() {
+  if date -Is >/dev/null 2>&1; then
+    date -Is
+  else
+    date +"%Y-%m-%dT%H:%M:%S%z"
+  fi
+}
+
 # --- Конфигурация ----------------------------------------------------------
-PROJECT_DIR="${TW_PROJECT_DIR:-/root/projects/TimeWoven}"
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+PROJECT_DIR="${TW_PROJECT_DIR:-$PROJECT_ROOT}"
 HEALTH_URL_LOCAL="${TW_HEALTH_LOCAL:-http://127.0.0.1:8000/health}"
-HEALTH_URL_PUBLIC="${TW_HEALTH_PUBLIC:-https://app.timewoven.ru/health}"
+# PUBLIC health:
+# - on server (systemctl available) default to app.timewoven.ru
+# - on local (no systemctl) skip unless TW_HEALTH_PUBLIC set explicitly
+if [[ -n "${TW_HEALTH_PUBLIC:-}" ]]; then
+  HEALTH_URL_PUBLIC="$TW_HEALTH_PUBLIC"
+else
+  if command -v systemctl >/dev/null 2>&1; then
+    HEALTH_URL_PUBLIC="https://app.timewoven.ru/health"
+  else
+    HEALTH_URL_PUBLIC=""
+  fi
+fi
 SERVICE_NAME="${TW_SERVICE:-timewoven.service}"
 EXPECTED_BRANCH_PATTERN='^(main|T-[A-Z0-9._-]+)$'
 
@@ -44,8 +65,13 @@ REPORT=()
 pass()  { REPORT+=("${C_GRN}[PASS]${C_RST} $*"); }
 warn()  { REPORT+=("${C_YLW}[WARN]${C_RST} $*"); WARNINGS=$((WARNINGS+1)); }
 fail()  { REPORT+=("${C_RED}[FAIL]${C_RST} $*"); FAILS=$((FAILS+1)); }
+skip()  { REPORT+=("${C_DIM}[SKIP]${C_RST} $*"); }
 
 # --- 0. Проект на месте -----------------------------------------------------
+if [[ -z "$PROJECT_DIR" ]]; then
+  echo "${C_RED}[FATAL]${C_RST} Не удалось определить корень git-репозитория (git rev-parse --show-toplevel)"
+  exit 1
+fi
 if [[ ! -d "$PROJECT_DIR/.git" ]]; then
   echo "${C_RED}[FATAL]${C_RST} Не найден git-репозиторий в $PROJECT_DIR"
   exit 1
@@ -55,7 +81,7 @@ cd "$PROJECT_DIR"
 echo "${C_BLD}╔══════════════════════════════════════════════════════════════╗${C_RST}"
 echo "${C_BLD}║  CLEAN STATE GATE — TimeWoven                                ║${C_RST}"
 echo "${C_BLD}║  Project: $PROJECT_DIR${C_RST}"
-echo "${C_BLD}║  Time:    $(date -Is)${C_RST}"
+echo "${C_BLD}║  Time:    $(iso_now)${C_RST}"
 echo "${C_BLD}╚══════════════════════════════════════════════════════════════╝${C_RST}"
 echo ""
 
@@ -127,7 +153,7 @@ if command -v systemctl >/dev/null 2>&1; then
     fail "systemctl: $SERVICE_NAME = $SVC_STATE (ожидалось active)"
   fi
 else
-  warn "systemctl: недоступен в этом окружении (пропуск)"
+  skip "systemctl check (not available)"
 fi
 
 # --- 6. /health endpoint ----------------------------------------------------
@@ -143,7 +169,11 @@ check_health() {
   fi
 }
 check_health "$HEALTH_URL_LOCAL" "(local)"
-check_health "$HEALTH_URL_PUBLIC" "(public)"
+if [[ -n "$HEALTH_URL_PUBLIC" ]]; then
+  check_health "$HEALTH_URL_PUBLIC" "(public)"
+else
+  skip "health (public): URL not set"
+fi
 
 # --- Итог -------------------------------------------------------------------
 echo ""

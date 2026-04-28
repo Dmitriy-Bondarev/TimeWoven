@@ -30,9 +30,19 @@
 set -u
 set -o pipefail
 
+# --- Время (portable ISO-8601) ---------------------------------------------
+iso_now() {
+  if date -Is >/dev/null 2>&1; then
+    date -Is
+  else
+    date +"%Y-%m-%dT%H:%M:%S%z"
+  fi
+}
+
 # --- Конфигурация ----------------------------------------------------------
-PROJECT_DIR="${TW_PROJECT_DIR:-/root/projects/TimeWoven}"
-SNAPSHOTS_ROOT="${TW_SNAPSHOTS_ROOT:-/root/projects/TimeWoven_snapshots}"
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+PROJECT_DIR="${TW_PROJECT_DIR:-$PROJECT_ROOT}"
+SNAPSHOTS_ROOT="${TW_SNAPSHOTS_ROOT:-${PROJECT_DIR}_snapshots}"
 ENV_FILE="${TW_ENV_FILE:-$PROJECT_DIR/.env}"
 ROLLING_DAYS="${TW_SNAPSHOT_TTL_DAYS:-30}"
 SERVICES=( "${TW_SERVICE:-timewoven.service}" "timewoven-llm.service" "timewoven-whisper.service" )
@@ -75,6 +85,9 @@ warn() { echo "${C_YLW}[WARN]${C_RST} $*"; }
 err()  { echo "${C_RED}[FAIL]${C_RST} $*"; }
 
 # --- Подготовка пути снапшота ----------------------------------------------
+if [[ -z "$PROJECT_DIR" ]]; then
+  err "Не удалось определить корень git-репозитория (git rev-parse --show-toplevel)"; exit 1
+fi
 if [[ ! -d "$PROJECT_DIR/.git" ]]; then
   err "Не найден git-репозиторий в $PROJECT_DIR"; exit 1
 fi
@@ -100,7 +113,7 @@ echo "${C_BLD}║  SAFETY SNAPSHOT — TimeWoven                                
 echo "${C_BLD}║  Task:     $TASK_ID${C_RST}"
 echo "${C_BLD}║  Target:   $SNAP_DIR${C_RST}"
 echo "${C_BLD}║  Mode:     $([[ $PROTECTED -eq 1 ]] && echo PROTECTED || echo rolling)${C_RST}"
-echo "${C_BLD}║  Time:     $(date -Is)${C_RST}"
+echo "${C_BLD}║  Time:     $(iso_now)${C_RST}"
 echo "${C_BLD}╚══════════════════════════════════════════════════════════════╝${C_RST}"
 echo ""
 
@@ -110,7 +123,7 @@ cd "$PROJECT_DIR"
 log "Сохраняю meta..."
 {
   echo "task_id=$TASK_ID"
-  echo "timestamp=$(date -Is)"
+  echo "timestamp=$(iso_now)"
   echo "hostname=$(hostname)"
   echo "project_dir=$PROJECT_DIR"
   echo "git_branch=$(git branch --show-current 2>/dev/null || echo detached)"
@@ -196,7 +209,11 @@ log "Снимаю статус сервисов..."
 {
   for svc in "${SERVICES[@]}"; do
     echo "=== $svc ==="
-    systemctl status "$svc" --no-pager -l 2>/dev/null || echo "(сервис не найден)"
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl status "$svc" --no-pager -l 2>/dev/null || echo "(сервис не найден)"
+    else
+      echo "(systemctl not available)"
+    fi
     echo ""
   done
 } > "$SNAP_DIR/service.status" 2>/dev/null || true
@@ -216,7 +233,7 @@ fi
 # --- 7. INDEX.log -----------------------------------------------------------
 HEAD_HASH="$(git rev-parse HEAD 2>/dev/null || echo none)"
 INDEX_FILE="$SNAPSHOTS_ROOT/INDEX.log"
-echo "$TASK_ID	$HEAD_HASH	$(date -Is)	$([[ $PROTECTED -eq 1 ]] && echo protected || echo rolling)	$SNAP_DIR" >> "$INDEX_FILE"
+echo "$TASK_ID	$HEAD_HASH	$(iso_now)	$([[ $PROTECTED -eq 1 ]] && echo protected || echo rolling)	$SNAP_DIR" >> "$INDEX_FILE"
 chmod 600 "$INDEX_FILE"
 ok "INDEX.log обновлён"
 
