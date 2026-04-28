@@ -38,3 +38,15 @@ Architecture stabilized (multi-family + media layer implemented)
 ---
 
 TimeWoven is evolving into a scalable family history platform.
+
+## Deployment
+
+Deployment flow:
+
+Mac → git push → GitHub → webhook → /deploy → HMAC → deploy script
+
+Requirements:
+
+- `GITHUB_WEBHOOK_SECRET` must be set on the server
+- `/deploy` accepts only signed GitHub requests
+- query-based secrets are forbidden
