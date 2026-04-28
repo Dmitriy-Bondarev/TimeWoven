@@ -2069,3 +2069,33 @@ No.
 
 - `systemctl is-active timewoven.service` → `active`
 - `curl http://127.0.0.1:8000/health` → `200`
+
+---
+
+## Update: T-PROJECTS-CLEANUP-V1-2026-04-28-16 — cleanup projects directory
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — нормализована структура `/root/projects` до единственного проекта `TimeWoven`.
+
+### Schema change
+
+No.
+
+### Changes
+
+- Snapshots перенесены:
+  - `/root/projects/TimeWoven_snapshots` → `/root/backups/timewoven_snapshots/TimeWoven_snapshots`
+- Recovery-артефакты архивированы:
+  - `/root/projects/_recovery_check_*` → `/root/backups/recovery_archive/`
+- Временные worktrees удалены:
+  - `/root/projects/TimeWoven.worktrees` (copilot worktrees)
+- `/root/projects` очищен от служебных артефактов, оставлен только:
+  - `/root/projects/TimeWoven`
+
+### Validation / Proof
+
+- `systemctl is-active timewoven.service` → `active`
+- `curl http://localhost:8000/health` → `{"status":"ok"}`
