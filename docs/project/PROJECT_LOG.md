@@ -2164,3 +2164,32 @@ No.
 - `/static/images/avatars/...` → `404`
 - `/media/bondarev/audio/processed/...` → `200`
 - `/media/bondarev/avatars/current/...` → `200`
+
+---
+
+## Запись 28 апреля — введение Git workflow
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — введена модель веток разработки.
+
+### Decision / Notes
+
+- Зафиксирована модель:
+  - main — production
+  - develop — integration
+  - feature/* — task branches
+- Запрещены прямые коммиты в main
+- Вся разработка теперь проходит через feature → develop → main
+
+### Reason
+
+- Снижение риска повторения инцидента 26.04
+- Контроль изменений и rollback
+- Синхронизация с PROJECT_OPS_PROTOCOL
+
+### Impact
+
+- Все будущие задачи выполняются только в feature-ветках

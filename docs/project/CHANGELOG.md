@@ -1,5 +1,12 @@
 # CHANGELOG — TimeWoven
 
+## Unreleased
+
+### DevOps
+
+- Introduced Git branching workflow: main / develop / feature branches
+- Direct commits to main are now prohibited
+
 ## v1.22.39 — 2026-04-27
 
 ### Безопасность админки (T-ADMIN-HARDENING-2026-04-27)

@@ -437,3 +437,36 @@ Perplexity computer обязан:
 | Дата | Версия | Что изменилось | Кто |
 |------|--------|----------------|-----|
 | 2026-04-27 | 1.0 | Введён по итогам инцидента 2026-04-26 | Автор + Perplexity |
+
+---
+
+## 11. Development Workflow (Git)
+
+### Branch model
+
+- `main` — production branch (всегда deployable)
+- `develop` — integration branch (основная ветка разработки)
+- `feature/*` — ветки под конкретные задачи
+
+### Rules
+
+1. Прямые коммиты в `main` запрещены.
+2. Вся разработка идёт через `feature/*` ветки.
+3. Каждая задача = отдельная ветка:
+   - `feature/T-XXX-short-name`
+4. Слияние происходит:
+   - `feature/*` → `develop` (через PR или контролируемый merge)
+   - `develop` → `main` (только после проверки)
+
+### Sync with OPS protocol
+
+- Перед началом задачи:
+  - `clean_state_gate.sh`
+  - `safety_snapshot.sh`
+- После завершения:
+  - 1 задача = 1 commit
+  - `git status` должен быть чистым
+
+### Deviation rule
+
+Любое отклонение от этого workflow = BLOCKED

@@ -40,6 +40,7 @@
 | T-OPS-INDEX-LOG-FORMAT | P3 | Planned | Улучшить разделители полей в `TimeWoven_snapshots/INDEX.log` |
 | T-PROTOCOL-IDE-COEXISTENCE | P3 | Planned | Добавить в PROJECT_OPS_PROTOCOL раздел про сосуществование с git-extension Cursor IDE |
 | T-FAMILY-MEMORY-NEW-RETURN-303-INSTEAD-OF-422 | P3 | Planned | UX-минор: GET без авторизации/параметров → 303 на access вместо 422 pydantic-валидации |
+| T-GIT-WORKFLOW-DOCS-2026-04-28 | P0 | Done | Введение Git branching model (main/develop/feature) |
 | P1.13 | — | Deferred | Temporal Name / Surname History |
 | **C.1** | — | **Done** | **Admin hardening (rate limit + idle timeout + audit log)** — закрыто 27.04.2026 (T-ADMIN-HARDENING-2026-04-27) |
 | T40 | — | Done | Bilingual Landing (RU/EN) + Waitlist Polish (2026-04-25) |

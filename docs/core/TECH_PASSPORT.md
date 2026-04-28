@@ -738,3 +738,15 @@ curl -s https://app.timewoven.ru/health
 | P1 | Telegram Bot и Whisper | «Импульс дня» и интеграция транскрибации |
 | P2 | Улучшение графа и UI | Масштабирование графа, полировка UI, брендирование |
 | P2 | T-DUPLICATE-FAMILY-TREE-ROUTE-INVESTIGATE | Расследовать дубль маршрута `/family/tree` в `tree.py` и `family_tree.py` |
+
+---
+
+### Development Workflow
+
+Project uses simplified branching model:
+
+- main — production
+- develop — integration
+- feature/* — isolated task branches
+
+All changes go through controlled merge process.
