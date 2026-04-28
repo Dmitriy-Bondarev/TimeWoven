@@ -54,3 +54,10 @@ hostkey_n8n.pub
 # ===== LOGS =====
 /logs/
 
+# ===== EXTRA SAFETY =====
+.env*
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+**/__pycache__/
