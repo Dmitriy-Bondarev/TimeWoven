@@ -605,6 +605,7 @@ def _redirect_if_whoami_disabled(*, next_url: str | None) -> RedirectResponse | 
 
 
 @router.get(FAMILY_NEED_ACCESS_PATH, response_class=HTMLResponse)
+@router.get("/f/{slug}" + FAMILY_NEED_ACCESS_PATH, response_class=HTMLResponse)
 async def family_need_access(
     request: Request,
     next: str = Query("/family/welcome", description="Куда вернуться после входа по семейной ссылке"),
@@ -626,6 +627,7 @@ def _safe_internal_next_url(next_url: str | None, default: str) -> str:
 
 
 @router.get("/family/p/{public_uuid}")
+@router.get("/f/{slug}/family/p/{public_uuid}")
 async def family_public_entry(
     request: Request,
     public_uuid: str,
@@ -651,6 +653,7 @@ async def family_public_entry(
 
 
 @router.get("/family/access/{public_uuid}", response_class=HTMLResponse)
+@router.get("/f/{slug}/family/access/{public_uuid}", response_class=HTMLResponse)
 async def family_access_login_page(
     request: Request,
     public_uuid: str,
@@ -691,6 +694,7 @@ async def family_access_login_page(
 
 
 @router.post("/family/access/{public_uuid}")
+@router.post("/f/{slug}/family/access/{public_uuid}")
 async def family_access_login_submit(
     request: Request,
     public_uuid: str,
@@ -759,6 +763,7 @@ async def family_access_login_submit(
 
 
 @router.get("/family/leave-session")
+@router.get("/f/{slug}/family/leave-session")
 async def family_leave_session() -> RedirectResponse:
     r = RedirectResponse(FAMILY_NEED_ACCESS_PATH, status_code=303)
     r.delete_cookie(FAMILY_COOKIE_NAME, path="/")
@@ -766,6 +771,7 @@ async def family_leave_session() -> RedirectResponse:
 
 
 @router.get("/family/tree", response_class=HTMLResponse, name="family_tree_page")
+@router.get("/f/{slug}/family/tree", response_class=HTMLResponse, name="family_tree_page_slug")
 async def family_tree_page(
     request: Request,
     root_person_id: int = Query(1, description="ID персоны для корня графа"),
@@ -796,6 +802,7 @@ async def family_tree_page(
 
 
 @router.get("/family/tree/json", response_model=FamilyGraph)
+@router.get("/f/{slug}/family/tree/json", response_model=FamilyGraph)
 async def family_tree_json(
     root_person_id: int = Query(..., description="ID персоны для корня графа"),
     depth: int = Query(2, ge=1, le=10, description="Глубина поиска (1-10)"),
@@ -841,6 +848,7 @@ async def family_tree_json(
 
 
 @router.get("/family/person/{person_id}", response_class=HTMLResponse)
+@router.get("/f/{slug}/family/person/{person_id}", response_class=HTMLResponse)
 async def family_person(
     request: Request,
     person_id: int,
@@ -1004,6 +1012,7 @@ async def family_person(
 
 
 @router.get("/family/timeline", response_class=HTMLResponse)
+@router.get("/f/{slug}/family/timeline", response_class=HTMLResponse)
 async def family_timeline(
     request: Request,
     person_id: int | None = Query(None, description="Фильтр timeline по персоне"),
@@ -1235,6 +1244,7 @@ async def family_timeline(
 
 
 @router.get("/family/welcome", response_class=HTMLResponse)
+@router.get("/f/{slug}/family/welcome", response_class=HTMLResponse)
 async def family_welcome(request: Request, person_id: int = Query(None), db: Session = Depends(get_db)):
     redirect = _require_family_session(request, db)
     if redirect:
@@ -1325,6 +1335,7 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
 
 
 @router.get("/who-am-i", response_class=HTMLResponse)
+@router.get("/f/{slug}/who-am-i", response_class=HTMLResponse)
 async def who_am_i(request: Request, next: str = "/family/welcome", db: Session = Depends(get_db)):
     r = _redirect_if_whoami_disabled(next_url=next)
     if r is not None:
@@ -1366,6 +1377,7 @@ async def who_am_i(request: Request, next: str = "/family/welcome", db: Session 
 
 
 @router.post("/who-am-i")
+@router.post("/f/{slug}/who-am-i")
 async def who_am_i_submit(
     person_id: int = Form(...),
     next: str = Form("/family/welcome"),
@@ -1395,6 +1407,7 @@ async def who_am_i_submit(
 
 
 @router.get("/who-am-i/pin", response_class=HTMLResponse)
+@router.get("/f/{slug}/who-am-i/pin", response_class=HTMLResponse)
 async def who_am_i_pin(
     request: Request,
     person_id: int = Query(...),
@@ -1448,6 +1461,7 @@ async def who_am_i_pin(
 
 
 @router.post("/who-am-i/pin")
+@router.post("/f/{slug}/who-am-i/pin")
 async def who_am_i_pin_submit(
     person_id: int = Form(...),
     pin: str = Form(...),
@@ -1490,6 +1504,7 @@ async def who_am_i_pin_submit(
 
 
 @router.get("/family/reply/{memory_id}", response_class=HTMLResponse)
+@router.get("/f/{slug}/family/reply/{memory_id}", response_class=HTMLResponse)
 async def family_reply(
     request: Request,
     memory_id: int,
@@ -1568,6 +1583,7 @@ async def family_reply(
 
 
 @router.post("/family/reply/{memory_id}", response_class=HTMLResponse)
+@router.post("/f/{slug}/family/reply/{memory_id}", response_class=HTMLResponse)
 async def family_reply_submit(
     memory_id: int,
     text: str = Form(...),
@@ -1602,6 +1618,11 @@ async def family_reply_submit(
     response_class=HTMLResponse,
     name="family_memory_new",
 )
+@router.get(
+    "/f/{slug}/family/memory/new",
+    response_class=HTMLResponse,
+    name="family_memory_new_slug",
+)
 async def family_memory_new_get(
     request: Request,
     person_id: int = Query(...),
@@ -1626,6 +1647,7 @@ async def family_memory_new_get(
 
 
 @router.post("/family/memory/new", response_class=HTMLResponse)
+@router.post("/f/{slug}/family/memory/new", response_class=HTMLResponse)
 async def family_memory_new_post(
     request: Request,
     return_person_id: int = Form(...),
@@ -1664,6 +1686,7 @@ async def family_memory_new_post(
 
 
 @router.get("/family/memory/{memory_id}/edit", response_class=HTMLResponse)
+@router.get("/f/{slug}/family/memory/{memory_id}/edit", response_class=HTMLResponse)
 async def family_memory_edit_get(
     request: Request,
     memory_id: int,
@@ -1700,6 +1723,7 @@ async def family_memory_edit_get(
 
 
 @router.post("/family/memory/{memory_id}/edit", response_class=HTMLResponse)
+@router.post("/f/{slug}/family/memory/{memory_id}/edit", response_class=HTMLResponse)
 async def family_memory_edit_post(
     request: Request,
     memory_id: int,
@@ -1727,6 +1751,7 @@ async def family_memory_edit_post(
 
 
 @router.post("/profile/avatar")
+@router.post("/f/{slug}/profile/avatar")
 async def profile_avatar_upload(
     request: Request,
     person_id: int = Form(None),

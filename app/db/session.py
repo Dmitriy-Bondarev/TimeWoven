@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from functools import lru_cache
 import os
 import urllib.parse
 
@@ -11,29 +12,50 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set")
 
-slug = os.getenv("DEFAULT_FAMILY_SLUG", "bondarev")
-family = resolve_family(slug)
-
-DATABASE_URL = urllib.parse.urlparse(DATABASE_URL)._replace(
-    path=f"/{family['db_name']}"
-).geturl()
-
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args={"client_encoding": "utf8"},
-)
-
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+_BASE_DATABASE_URL_PARSED = urllib.parse.urlparse(DATABASE_URL)
 
 Base = declarative_base()
 
 
-def get_db():
+def _build_database_url_for_db(db_name: str) -> str:
+    return _BASE_DATABASE_URL_PARSED._replace(path=f"/{db_name}").geturl()
+
+
+@lru_cache(maxsize=32)
+def _engine_for_db(db_name: str):
+    return create_engine(
+        _build_database_url_for_db(db_name),
+        pool_pre_ping=True,
+        connect_args={"client_encoding": "utf8"},
+    )
+
+
+def _default_db_name() -> str:
+    # Backward-compatible default for background jobs / legacy routes.
+    return resolve_family("bondarev")["db_name"]
+
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=_engine_for_db(_default_db_name()),
+)
+
+
+def get_db(slug: str = "bondarev"):
+    s = (slug or "").strip() or "bondarev"
+    try:
+        family = resolve_family(s)
+    except Exception:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail=f"Family not found: {s}")
+
+    SessionLocal = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=_engine_for_db(family["db_name"]),
+    )
     db = SessionLocal()
     try:
         yield db

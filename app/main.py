@@ -26,6 +26,15 @@ async def login():
     return RedirectResponse(url="/family/need-access", status_code=303)
 
 
+@app.get("/f/{slug}/")
+async def family_root(slug: str, request: Request):
+    family_member_id = request.cookies.get("family_member_id", "").strip()
+    if family_member_id:
+        return RedirectResponse(url=f"/f/{slug}/family/welcome", status_code=303)
+
+    return RedirectResponse(url=f"/f/{slug}/family/need-access", status_code=303)
+
+
 @app.get("/health")
 async def health():
     return JSONResponse({"status": "ok"})

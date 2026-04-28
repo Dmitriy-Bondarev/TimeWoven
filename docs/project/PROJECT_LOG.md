@@ -1983,3 +1983,28 @@ No.
 
 - В корне проекта `raw/processed/storage` отсутствуют.
 - `systemctl is-active timewoven.service` = `active`, `/health` = `200`.
+
+---
+
+## Update: T-FAMILY-CONTEXT-V1-2026-04-28-13 — introduce slug-based routing
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — добавлен routing-контур для выбора семьи по URL: `/f/{slug}/...`.
+
+### Schema change
+
+No.
+
+### Changes
+
+- `app/db/session.py`: `get_db` теперь резолвит family DB по `slug` (fallback `bondarev`) через `timewoven_core.families`; если slug неизвестен → HTTP 404.
+- `app/api/routes/tree.py`: добавлены зеркальные маршруты с префиксом `/f/{slug}` для family-flow (`/family/*`, `/who-am-i*`, `/profile/avatar`).
+- `app/main.py`: добавлена точка входа `/f/{slug}/` с редиректом на `/f/{slug}/family/welcome` или `/f/{slug}/family/need-access`.
+
+### Validation / Proof
+
+- `/f/bondarev/` работает (редирект в family flow).
+- Неверный slug возвращает 404 (Family not found).
