@@ -18,6 +18,7 @@ from app.api.routes.TW_Explorer import router as explorer_router
 from app.api.timeline import router as timeline_router
 from app.api.routes.admin import router as admin_router
 from app.api.routes.media import router as media_router
+from app.api.routes.deploy import router as deploy_router
 app = FastAPI(title="TimeWoven")
 
 
@@ -65,6 +66,7 @@ app.include_router(explorer_router)
 app.include_router(timeline_router)
 app.include_router(admin_router)
 app.include_router(media_router)
+app.include_router(deploy_router)
 
 
 logger = logging.getLogger(__name__)
