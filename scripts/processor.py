@@ -14,9 +14,11 @@ DB_CONFIG = {
     "port": os.getenv("DB_PORT", "5432"),
 }
 
-STORAGE_DIR = "storage/memories"
-RAW_DIR = "raw"
-PROCESSED_DIR = "processed"
+DATA_PATH = os.getenv("DATA_PATH", "/root/data/timewoven/bondarev")
+
+RAW_DIR = f"{DATA_PATH}/raw"
+PROCESSED_DIR = f"{DATA_PATH}/processed"
+STORAGE_DIR = f"{DATA_PATH}/storage"
 DEFAULT_AUTHOR_ID = 1
 
 def get_connection():

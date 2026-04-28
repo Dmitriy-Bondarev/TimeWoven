@@ -1930,3 +1930,29 @@ No.
 ### Validation / Proof
 
 - `du -sh` совпадает для каждой пары source/target директорий (`raw`, `processed`, `storage`).
+
+---
+
+## Update: T-FILESYSTEM-SWITCH-PROCESSOR-2026-04-28-10 — switch processor to DATA_PATH
+
+Date: 2026-04-28
+
+### Structural change
+
+No (только смена путей записи/чтения для processor).
+
+### Schema change
+
+No.
+
+### Changes
+
+- `scripts/processor.py` переведён на использование `DATA_PATH`:
+  - `RAW_DIR = f"{DATA_PATH}/raw"`
+  - `PROCESSED_DIR = f"{DATA_PATH}/processed"`
+  - `STORAGE_DIR = f"{DATA_PATH}/storage"`
+  - `DATA_PATH` читается из env с fallback `/root/data/timewoven/bondarev`.
+
+### Validation / Proof
+
+- Запуск: `DB_NAME=timewoven_bondarev python3 scripts/processor.py` → подключение к БД OK, директории создаются в `/root/data/timewoven/bondarev/...`.
