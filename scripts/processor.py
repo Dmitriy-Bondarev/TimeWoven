@@ -7,11 +7,11 @@ from datetime import datetime
 # === КОНФИГУРАЦИЯ СЕРВЕРА ===
 # На сервере используем localhost, так как БД находится тут же
 DB_CONFIG = {
-    "host": "localhost",
-    "database": "timewoven",
-    "user": "postgres",
-    "password": "Тjokqu2-zygnuw-tatRyx",
-    "port": "5432"
+    "host": os.getenv("DB_HOST", "localhost"),
+    "database": os.getenv("DB_NAME", "timewoven"),
+    "user": os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD"),
+    "port": os.getenv("DB_PORT", "5432"),
 }
 
 STORAGE_DIR = "storage/memories"
