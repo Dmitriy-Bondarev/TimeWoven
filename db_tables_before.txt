@@ -1,3 +1,0 @@
-AvatarHistory       Memories            People_I18n         Quotes            
-EventParticipants   MemoryPeople        PersonRelationship  RelationshipType  
-Events              People              Places            
