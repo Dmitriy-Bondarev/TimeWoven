@@ -2008,3 +2008,35 @@ No.
 
 - `/f/bondarev/` работает (редирект в family flow).
 - Неверный slug возвращает 404 (Family not found).
+
+---
+
+## Update: T-ROOT-STRUCTURE-CLEANUP-2026-04-28-14 — normalize root structure and scripts layout
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — скрипты вынесены из `/root` в `/root/scripts` с явной структурой подпапок.
+
+### Schema change
+
+No.
+
+### Changes
+
+- Создана структура:
+  - `/root/scripts/ops/`
+  - `/root/scripts/deploy/`
+  - `/root/scripts/maintenance/`
+- Перенесены ops-скрипты:
+  - `/root/backup_timewoven.sh` → `/root/scripts/ops/backup_timewoven.sh`
+  - `/root/check_timewoven.sh` → `/root/scripts/ops/check_timewoven.sh`
+- Deploy-скрипты вынесены из проекта:
+  - `deploy.sh` и `deploy_landing.sh` перемещены из `/root/projects/TimeWoven/` в `/root/scripts/deploy/`
+- В `/root` больше нет task-скриптов (root очищен от `*.sh`).
+
+### Validation / Proof
+
+- `systemctl is-active timewoven.service` → `active`
+- `curl http://127.0.0.1:8000/health` → `200`
