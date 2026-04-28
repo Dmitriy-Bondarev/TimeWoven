@@ -1,6 +1,5 @@
 import json
 import os
-import subprocess
 from datetime import datetime, timedelta, timezone
 
 # app/routes/admin.py
@@ -2069,14 +2068,3 @@ async def admin_person_access_revoke_sessions(
 
 
 SECRET = "super-secret-timewoven-key"
-
-
-@router.post("/deploy", response_class=JSONResponse)
-async def deploy(secret: str = Query(...)):
-    """Protected deploy endpoint that triggers update script via secret key."""
-    if secret != SECRET:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    subprocess.Popen(["/root/scripts/deploy/update_timewoven.sh"])
-
-    return {"status": "deploy started"}
