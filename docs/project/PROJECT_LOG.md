@@ -1900,3 +1900,33 @@ No.
 ### Validation / Proof
 
 - Приложение стартует и подключается к `timewoven_bondarev` через резолв из core registry.
+
+---
+
+## Update: T-DATA-MIGRATION-FILESYSTEM-2026-04-28-07 — migrate filesystem to /root/data/timewoven/bondarev
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — введена отдельная директория данных семьи вне репозитория: `/root/data/timewoven/bondarev/`.
+
+### Schema change
+
+No.
+
+### Changes
+
+- Создана директория `/root/data/timewoven/bondarev/` и поддиректории:
+  - `raw/`
+  - `processed/`
+  - `storage/`
+- Выполнено копирование данных **без удаления источников** (`cp`, не `mv`):
+  - `/root/projects/TimeWoven/raw/*` → `/root/data/timewoven/bondarev/raw/`
+  - `/root/projects/TimeWoven/processed/*` → `/root/data/timewoven/bondarev/processed/`
+  - `/root/projects/TimeWoven/storage/*` → `/root/data/timewoven/bondarev/storage/`
+- Выставлены права: `chown -R root:root /root/data/timewoven` и `chmod -R 755 /root/data/timewoven`.
+
+### Validation / Proof
+
+- `du -sh` совпадает для каждой пары source/target директорий (`raw`, `processed`, `storage`).
