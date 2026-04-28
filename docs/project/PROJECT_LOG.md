@@ -2099,3 +2099,36 @@ No.
 
 - `systemctl is-active timewoven.service` → `active`
 - `curl http://localhost:8000/health` → `{"status":"ok"}`
+
+---
+
+## Update: T-MEDIA-SEPARATION-V1-2026-04-28-21 — separate runtime media from repo via symlinks
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — runtime media вынесена в data-layer и подключена обратно через symlink, без изменения ссылок в БД.
+
+### Schema change
+
+No.
+
+### Changes
+
+- Создана media-структура:
+  - `/root/data/timewoven/bondarev/media/audio/processed/`
+  - `/root/data/timewoven/bondarev/media/avatars/current/`
+  - `/root/data/timewoven/bondarev/media/avatars/history/`
+- Перенесены runtime файлы из `app/web/static` в `/root/data/.../media/...`.
+- Созданы symlink'и обратно:
+  - `app/web/static/audio/processed` → `/root/data/timewoven/bondarev/media/audio/processed`
+  - `app/web/static/images/avatars` → `/root/data/timewoven/bondarev/media/avatars/current`
+  - `app/web/static/avatars` → `/root/data/timewoven/bondarev/media/avatars/history`
+- `StaticFiles` настроен на отдачу symlink-таргетов: `follow_symlink=True`.
+
+### Validation / Proof
+
+- `/static/audio/processed/13517383557209.mp3` → `200`
+- `/static/images/avatars/person_1.jpg` → `200`
+- `/static/avatars/person_1.png` → `200`

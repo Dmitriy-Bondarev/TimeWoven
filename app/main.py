@@ -41,7 +41,11 @@ async def health():
 
 
 try:
-    app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
+    app.mount(
+        "/static",
+        StaticFiles(directory="app/web/static", follow_symlink=True),
+        name="static",
+    )
 except RuntimeError:
     pass
 
