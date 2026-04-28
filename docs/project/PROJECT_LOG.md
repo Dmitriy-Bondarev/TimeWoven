@@ -2040,3 +2040,32 @@ No.
 
 - `systemctl is-active timewoven.service` → `active`
 - `curl http://127.0.0.1:8000/health` → `200`
+
+---
+
+## Update: T-ROOT-DOCS-README-2026-04-28-15 — add root-level documentation (README)
+
+Date: 2026-04-28
+
+### Structural change
+
+No (добавлена только текстовая документация-ориентир).
+
+### Schema change
+
+No.
+
+### Changes
+
+- Созданы README-файлы для навигации по серверной структуре:
+  - `/root/README.md`
+  - `/root/projects/README.md`
+  - `/root/data/README.md`
+  - `/root/logs/README.md`
+  - `/root/scripts/README.md`
+  - `/root/backups/README.md`
+
+### Validation / Proof
+
+- `systemctl is-active timewoven.service` → `active`
+- `curl http://127.0.0.1:8000/health` → `200`
