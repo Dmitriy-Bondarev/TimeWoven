@@ -1813,3 +1813,37 @@ Validation / Proof:
 Result:
 - Локальные провайдеры LLM и Whisper не только подняты как сервисы на VPS, но и реально интегрированы в живой pipeline создания и анализа Memories.
 - End-to-end сценарий “голосовое воспоминание -> транскрипция -> анализ -> запись в БД” подтверждён на прод-подобной среде.
+
+---
+
+## Update: T-DATA-MIGRATION-CORE-BOOTSTRAP-2026-04-28-04 — bootstrap core DB and register bondarev family
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — добавлен core-слой данных: отдельная БД `timewoven_core` с реестром семей `families`.
+
+### Schema change
+
+Yes (в новой БД `timewoven_core`): создана таблица `families`, включено расширение `pgcrypto`.
+
+### Changes
+
+- Создана БД `timewoven_core`.
+- Включено расширение `pgcrypto`.
+- Создана таблица `families`:
+  - `id UUID PRIMARY KEY`
+  - `slug TEXT UNIQUE NOT NULL`
+  - `db_name TEXT NOT NULL`
+  - `data_path TEXT NOT NULL`
+  - `created_at TIMESTAMP DEFAULT NOW()`
+- Добавлена запись семьи:
+  - `slug=bondarev`
+  - `db_name=timewoven_bondarev`
+  - `data_path=/root/data/timewoven/bondarev`
+
+### Validation / Proof
+
+- `SELECT slug, db_name, data_path FROM families;` в `timewoven_core` вернул:
+  - `bondarev | timewoven_bondarev | /root/data/timewoven/bondarev`
