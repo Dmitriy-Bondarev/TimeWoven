@@ -1847,3 +1847,28 @@ Yes (в новой БД `timewoven_core`): создана таблица `famili
 
 - `SELECT slug, db_name, data_path FROM families;` в `timewoven_core` вернул:
   - `bondarev | timewoven_bondarev | /root/data/timewoven/bondarev`
+
+---
+
+## Update: T-DATA-MIGRATION-RENAME-DB-TO-BONDAREV-2026-04-28-05 — rename DB to timewoven_bondarev
+
+Date: 2026-04-28
+
+### Structural change
+
+Yes — нормализация naming: `timewoven` переименована в `timewoven_bondarev`.
+
+### Schema change
+
+No (переименование БД без изменения таблиц/данных).
+
+### Changes
+
+- Завершены активные подключения к БД `timewoven` (если были).
+- Выполнено: `ALTER DATABASE timewoven RENAME TO timewoven_bondarev;`
+- Проверен registry в `timewoven_core.families`: `bondarev` указывает на `timewoven_bondarev`.
+
+### Validation / Proof
+
+- `\l` показывает: `timewoven_bondarev`, `timewoven_core` (и прочие базы), при этом `timewoven` отсутствует.
+- `SELECT slug, db_name FROM families;` в `timewoven_core` вернул: `bondarev | timewoven_bondarev`.
