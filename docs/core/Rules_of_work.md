@@ -141,3 +141,103 @@ Mac:
 GitHub:
 
 .env.example
+
+---
+### Ежедневный цикл работы (идеальный)
+
+Утро
+git checkout develop
+git pull origin develop
+git checkout -b feature/T-NEW-TASK
+
+Дальше открываете в Cursor.
+Работа в Cursor
+код
+тесты
+docs
+локальная проверка
+
+Коммит
+git add .
+git commit -m "T-NEW-TASK: short summary"
+git push -u origin feature/T-NEW-TASK
+
+Merge
+
+PR:
+
+feature/T-NEW-TASK -> develop
+Release (когда готово)
+
+PR:
+
+develop -> main
+
+После merge:
+
+deploy на production.
+
+Что использовать Cursor для сервера
+
+Cursor с SSH отлично подходит для:
+
+Можно:
+читать логи
+inspect configs
+read-only audit
+deploy scripts
+emergency fixes по ТЗ
+
+Нельзя как норма:
+жить кодом на сервере
+писать фичи в prod repo
+менять ветки хаотично
+
+
+Настройка веток (очень рекомендую)
+В локальном repo иметь всегда:
+
+main
+develop
+feature/*
+
+Naming standard
+
+feature/T-VOICE-UPLOAD
+feature/T-PERSON-PAGE
+feature/T-TIMELINE-PERF
+hotfix/T-LOGIN-FIX
+
+Идеальный deploy flow
+
+MacBook tested
+→ merge develop
+→ release to main
+→ server git pull main
+→ restart if needed
+→ health check
+
+---
+### Architecture
+MacBook = Factory
+GitHub = Control Tower
+Production Server = Runtime
+
+---
+
+TimeWoven SOLO FOUNDER OPERATING SYSTEM v1 (кратко)
+Каждый день:
+Утро (5 минут)
+- git status
+- git pull develop
+- выбрать 1 главную задачу
+- открыть Cursor
+День
+работа только в feature branch
+Вечер
+commit / push / note in PROJECT_LOG
+Что запрещено себе теперь
+
+❌ “быстро поправлю на сервере”
+❌ “сделаю прямо в develop без ветки”
+❌ “потом разберусь с git”
