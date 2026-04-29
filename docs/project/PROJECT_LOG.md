@@ -2193,3 +2193,36 @@ Yes — введена модель веток разработки.
 ### Impact
 
 - Все будущие задачи выполняются только в feature-ветках
+
+---
+
+## 2026-04-29
+
+### Engineering maturity upgrade
+
+* MacBook established as primary development environment
+* Local PostgreSQL validated for development workflow
+* Databases confirmed:
+
+  * timewoven_core
+  * timewoven_bondarev
+* Git workflow normalized:
+
+  * feature/* -> develop -> main
+* GitHub Actions CI enabled
+* Alembic migration framework initialized
+* Baseline revision created and stamped to current schema
+* Observability layer introduced:
+
+  * structured logging
+  * request_id middleware
+  * global exception handler
+  * audit foundation
+  * enriched /health endpoint
+
+### Operational result
+
+* Faster and safer local development
+* Repeatable schema evolution path
+* Better production diagnostics
+* Reduced manual deployment risk
