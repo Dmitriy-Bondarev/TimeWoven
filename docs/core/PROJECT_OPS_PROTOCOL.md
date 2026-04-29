@@ -470,3 +470,11 @@ Perplexity computer обязан:
 ### Deviation rule
 
 Любое отклонение от этого workflow = BLOCKED
+
+### GDPR / Data Ownership Rules
+
+- Every family must have an explicit owner (User)
+- No data can exist without an owner
+- All user data must be exportable
+- All user data must be deletable
+- Consent must be recorded before storing personal data
