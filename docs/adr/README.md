@@ -14,4 +14,5 @@
 | 008   | GitHub Webhook Deployment with HMAC Verification | Accepted | 2026-04-28 |  |
 | 009   | User Ownership and GDPR Compliance Foundation | Proposed | 2026-04-29 |  |
 | 010   | User Layer Foundation | Proposed | 2026-04-29 |  |
+| 011   | User Layer v1 and Membership Model | Proposed | 2026-04-29 |  |
 
