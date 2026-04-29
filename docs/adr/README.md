@@ -13,4 +13,5 @@
 | 007   | Multi-Family Data Architecture (Core + Isolated Family Units) | Accepted | 2026-04-28 |  |
 | 008   | GitHub Webhook Deployment with HMAC Verification | Accepted | 2026-04-28 |  |
 | 009   | User Ownership and GDPR Compliance Foundation | Proposed | 2026-04-29 |  |
+| 010   | User Layer Foundation | Proposed | 2026-04-29 |  |
 
