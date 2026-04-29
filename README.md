@@ -50,3 +50,19 @@ Requirements:
 - `GITHUB_WEBHOOK_SECRET` must be set on the server
 - `/deploy` accepts only signed GitHub requests
 - query-based secrets are forbidden
+
+## Development Quick Start
+
+```bash
+source .venv/bin/activate
+make dev
+make health
+```
+
+## Engineering Workflow
+
+```text
+feature/* -> develop -> main
+CI must pass before merge
+Alembic controls schema changes
+```

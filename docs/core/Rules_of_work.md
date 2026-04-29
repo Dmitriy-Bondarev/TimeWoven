@@ -1,243 +1,170 @@
-🧭 Идеальная operational схема для TimeWoven
+🧭 TimeWoven — Rules of Work v2 (CTO Edition)
 
-Mac dev + GitHub + Production Server + Safe DB migrations + Backups
+State: 2026-04-29 | Post-Architecture Stabilization
 
-Для вашего проекта это уже не “сайт”, а семейная цифровая память, значит схема должна быть как у серьёзного SaaS, но без лишней корпоративной тяжести.
-
-🧱 1. Три среды (обязательно)
-[DEV]      MacBook
-[MAIN]     GitHub
-[PROD]     vm-nano server
-🟢 DEV (Mac)
-
-Только для разработки.
-
-Содержит:
-
-локальный код
-локальный PostgreSQL
-тестовые базы:
-timewoven_core_dev
-timewoven_demo
-Cursor
-эксперименты
-миграции до выката
-
-Никогда:
-
-не работать на проде напрямую
-не писать продовые данные сюда
-🔵 GitHub
-
-Единый source of truth.
-
-Хранит:
-
-код
-docs
-ADR
-migrations
-scripts
-CI checks later
-
-Никогда:
-
-secrets
-реальные дампы БД
-prod пароли
-🔴 PROD (vm-nano)
-
-Только:
-
-живое приложение
-живая БД
-реальные пользователи
-backup jobs
-
-Никогда:
-
-разработка
-тесты
-хаотичные правки руками
-🔁 2. Идеальный цикл работы
-Каждый новый task:
-1. Mac dev
-2. Test local DB
-3. Commit
-4. Push GitHub
-5. Pull on server
-6. Backup
-7. Migration
-8. Restart app
-9. Smoke test
-💾 3. PostgreSQL схема
-На Mac:
-timewoven_core_dev
-timewoven_demo
-На PROD:
-timewoven_core
-timewoven_bondarev
-future:
-timewoven_petrov
-timewoven_sidorov
-...
-🔐 4. Safe migrations (золотое правило)
-Любое изменение БД только так:
-migration file in repo
-↓
-tested locally
-↓
-backup prod
-↓
-apply on server
-Никогда:
-ALTER TABLE ... directly in prod
-
-если это не emergency hotfix.
-
-🧰 5. Backup стратегия (обязательно)
-Ежедневно:
-PostgreSQL dumps:
-timewoven_core
-timewoven_bondarev
-Хранить:
-локально на сервере (7 дней)
-отдельно offsite / cloud (30+ дней)
-Перед каждым deploy:
-pre-deploy snapshot
-Перед каждой migration:
-schema + data dump
-🔥 6. Идеальный deploy script
-git pull
-python -m alembic upgrade head
-systemctl restart timewoven
-curl healthcheck
-
-Если ошибка:
-
-restore backup
-rollback code
-🧪 7. Local dev copy (очень важно)
-Сделать anonymized copy production schema
-
-На Mac:
-
-same tables
-fake people
-fake memories
-same structure
-
-Это даст 10x скорость разработки.
-
-🔐 8. Secrets модель
-PROD:
-
-.env
-
-Mac:
-
-.env.local
-
-GitHub:
-
-.env.example
-
----
-### Ежедневный цикл работы (идеальный)
-
-Утро
+0. Архитектурная модель системы
+MacBook        = Development Factory
+GitHub         = Source of Truth (Control Tower)
+Production     = Runtime Only
+PostgreSQL     = Dual-mode (local + prod)
+Cursor         = Primary IDE + SSH ops tool
+1. Основной принцип
+Никакие изменения не делаются напрямую в production.
+Все изменения проходят через feature → develop → main flow.
+2. Ежедневный цикл работы
+Утро (старт дня)
+cd ~/projects/TimeWoven
+source .venv/bin/activate
 git checkout develop
 git pull origin develop
+make health
+
+Выбор задачи:
+
+только 1 active feature
+Feature development
 git checkout -b feature/T-NEW-TASK
 
-Дальше открываете в Cursor.
-Работа в Cursor
+Работа:
+
 код
 тесты
 docs
-локальная проверка
-
-Коммит
+локальный запуск
+Локальная проверка
+make dev
+make test
+make health
+Commit rule
 git add .
-git commit -m "T-NEW-TASK: short summary"
-git push -u origin feature/T-NEW-TASK
+git commit -m "T-XXX: short description"
+git push -u origin feature/T-XXX
+3. Merge flow (development)
+feature/* → develop (via PR)
 
-Merge
+Перед merge:
 
-PR:
+локально протестировано
+нет breaking changes
+нет незавершённых миграций
+4. Release flow (production)
+develop → main → production
+Release steps:
+git checkout develop
+git pull origin develop
+make health
+PR: develop → main
+merge approved
+server:
+git checkout main
+git pull origin main
+systemctl restart timewoven
+curl /health
+5. Forbidden actions (STRICT)
+❌ commits directly to main
+❌ development on production server
+❌ bypassing feature branches
+❌ manual DB edits on production
+❌ force push to shared branches
+❌ running migrations without review
+6. Cursor usage model
 
-feature/T-NEW-TASK -> develop
-Release (когда готово)
+Allowed:
 
-PR:
+✔ logs inspection
+✔ config review
+✔ SSH read-only audit
+✔ controlled deployment scripts
 
-develop -> main
+Not allowed:
 
-После merge:
+✖ feature development directly on server
+✖ unsynchronized production edits
+7. Database model
+timewoven_core        = system registry (families, metadata)
+timewoven_<family>    = isolated domain data per family
 
-deploy на production.
+Rules:
 
-Что использовать Cursor для сервера
+no schema changes without explicit migration
+no manual production DB edits
+schema changes always go through develop
+8. Environment system
+Mac:
+  .env → active dev config
 
-Cursor с SSH отлично подходит для:
+Git:
+  .env.example → template only
 
-Можно:
-читать логи
-inspect configs
-read-only audit
-deploy scripts
-emergency fixes по ТЗ
+Server:
+  .env → production secrets (NOT in git)
+9. Make-based workflow
+make dev      → start local server
+make stop     → stop server
+make health   → check API
+make test     → run tests
+10. Release checklist
 
-Нельзя как норма:
-жить кодом на сервере
-писать фичи в prod repo
-менять ветки хаотично
+Before production release:
 
+✔ develop tested locally
+✔ no pending migrations
+✔ no failing tests
+✔ health check OK
+✔ feature merged
 
-Настройка веток (очень рекомендую)
-В локальном repo иметь всегда:
+After release:
 
-main
-develop
-feature/*
+✔ server updated
+✔ restart completed
+✔ /health = OK
+✔ PROJECT_LOG updated
+11. System mindset
+MacBook is the only place where code is born.
+GitHub is the system of truth.
+Production only executes validated state.
+🏁 Result of this version
 
-Naming standard
+Теперь у тебя:
 
-feature/T-VOICE-UPLOAD
-feature/T-PERSON-PAGE
-feature/T-TIMELINE-PERF
-hotfix/T-LOGIN-FIX
-
-Идеальный deploy flow
-
-MacBook tested
-→ merge develop
-→ release to main
-→ server git pull main
-→ restart if needed
-→ health check
+единый рабочий стандарт
+предсказуемые релизы
+безопасный production
+чистая dev среда
+масштабируемая архитектура
 
 ---
-### Architecture
-MacBook = Factory
-GitHub = Control Tower
-Production Server = Runtime
 
----
+All schema changes MUST go through Alembic after 2026-04-29
+No direct SQL schema edits in production
 
-TimeWoven SOLO FOUNDER OPERATING SYSTEM v1 (кратко)
-Каждый день:
-Утро (5 минут)
-- git status
-- git pull develop
-- выбрать 1 главную задачу
-- открыть Cursor
-День
-работа только в feature branch
-Вечер
-commit / push / note in PROJECT_LOG
-Что запрещено себе теперь
+## Engineering Rules (effective 2026-04-29)
 
-❌ “быстро поправлю на сервере”
-❌ “сделаю прямо в develop без ветки”
-❌ “потом разберусь с git”
+### Development Model
+
+* MacBook is the primary development environment.
+* Production server is runtime environment only.
+* Feature development must happen locally first.
+
+### Git Flow
+
+* feature/* branches are for active work.
+* develop is integration branch.
+* main is release branch.
+
+### CI Discipline
+
+* Pull requests require green CI before merge.
+* Direct risky changes to protected branches are discouraged.
+
+### Database Discipline
+
+* All schema changes must go through Alembic migrations.
+* No direct schema edits in production.
+* Manual SQL hotfixes only in emergency with written log entry.
+
+### Observability Discipline
+
+* Errors must be diagnosable through logs.
+* Health endpoint must remain operational.
+* New critical flows should emit audit events.
