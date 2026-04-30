@@ -3,7 +3,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
-from .event import Event
 
 class Person(Base):
     __tablename__ = "People"
@@ -270,3 +269,11 @@ class PersonAccessBackupCode(Base):
     code_hash = Column(String, nullable=False, index=True)
     used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)
+
+
+class DemoTable(Base):
+    __tablename__ = "demo_table"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    note = Column(String(255), nullable=True)
