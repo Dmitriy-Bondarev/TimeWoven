@@ -1,11 +1,13 @@
 import hashlib
 import hmac
+import logging
 import os
 import subprocess
 
 from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def verify_github_signature(secret: str, body: bytes, signature: str) -> bool:
@@ -27,21 +29,30 @@ async def deploy(request: Request):
 
     # 🚨 1. signature must be present (GitHub webhook contract)
     if not signature:
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     # 🚨 2. secret must be configured server-side
     secret = os.getenv("GITHUB_WEBHOOK_SECRET")
     if not secret:
-        raise HTTPException(status_code=500)
+        logger.error("Deploy endpoint disabled: missing GITHUB_WEBHOOK_SECRET")
+        # Avoid 500 loops in GitHub delivery; this is a misconfiguration (service not ready).
+        raise HTTPException(
+            status_code=503,
+            detail="Deploy endpoint is not configured (missing GITHUB_WEBHOOK_SECRET)",
+        )
 
     # 🚨 3. verify HMAC (fail-fast, no side effects)
     if not verify_github_signature(secret, body, signature):
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-    subprocess.Popen(
-        ["/root/scripts/deploy/update_timewoven.sh"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    script = "/root/scripts/deploy/update_timewoven.sh"
+    try:
+        proc = subprocess.Popen(
+            [script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+    except Exception:
+        logger.exception("Deploy failed: could not start update script")
+        raise HTTPException(status_code=503, detail="Deploy failed to start") from None
 
-    return {"status": "deploy started"}
+    logger.info("Deploy triggered (pid=%s)", getattr(proc, "pid", None))
+    return {"status": "ok"}

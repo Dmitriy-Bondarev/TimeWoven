@@ -6,6 +6,8 @@
 
 - Introduced Git branching workflow: main / develop / feature branches
 - Direct commits to main are now prohibited
+- (2026-04-30) **Docs**: resolved merge-conflict markers in `docs/core/Rules_of_work.md`.
+- (2026-04-30) **Operations (T-P2-007)**: repaired `/deploy` control-plane endpoint — removed silent 500s on missing `GITHUB_WEBHOOK_SECRET` (now explicit 503 + server-side exception logging), and made server toolchain deterministic via systemd `PATH` + `python -m uvicorn` (added `/etc/profile.d/timewoven.sh` for interactive shell).
 - (2026-04-30) **Infrastructure (T-P2-003)**: hardened GitHub Actions CI gatekeeper — Python pinned to **3.10.12**, `ruff`/`black --check` now cover `app/` and `scripts/`, added Alembic migrations smoke-check and pytest run (no-tests exit is allowed) to prevent regressions before merge.
 - (2026-04-30) **Infrastructure (T-P2-004)**: migrated dependency management to **Poetry** — dependencies moved from `requirements.txt` into `pyproject.toml`, generated `poetry.lock` for reproducible installs, updated `Makefile` and CI to use `poetry install` / `poetry run`, removed `requirements.txt` as source of truth.
 - (2026-04-30) **Infrastructure (T-P2-004)**: fixed pytest import path for Poetry/CI — set `pythonpath=["."]` in `pyproject.toml` to prevent `ModuleNotFoundError: app`.
@@ -523,7 +525,7 @@
 
 ### Bugfix | QA
 
-- **Bugfix (Template Render)**: `app/web/templates/family_tree.html` — удалены дублирующиеся `{% extends %}` / `{% block content %}`, которые вызывали `500` (`TemplateSyntaxError: Unexpected end of template`) на `/family/tree` после авторизации.
+- **Bugfix (Template Render)**: `app/web/templates/family_tree.html` — удалены дублирующиеся `{% raw %}{% extends %}{% endraw %}` / `{% raw %}{% block content %}{% endraw %}`, которые вызывали `500` (`TemplateSyntaxError: Unexpected end of template`) на `/family/tree` после авторизации.
 - **Bugfix (Frontend Asset Integrity)**: `app/web/static/js/family_graph.js` — устранено повреждение файла (смешение v1/v2 кода, `Unexpected end of input` в браузере). Файл принудительно переписан в единый валидный Graph v2 скрипт.
 - **QA (Smoke Test)**: Выполнен browser-level smoke-test (Playwright, headless Chromium) с cookie-авторизацией: render=true, click_focus=true, tooltip=true, union_click_no_focus_change=true, filters=true, depth=true, history=true, page_errors=[].
 - **Known non-blocking**: В console фиксируется внешний SRI warning для Font Awesome CSS (из базового шаблона), не влияет на рендер/работу семейного графа.

@@ -13,15 +13,15 @@ def health():
     resolver_status = "ok"
 
     try:
-        db = SessionLocal()
-        db.execute(text("SELECT 1"))
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
     except Exception:
-        db_status = "fail"
+        db_status = "error"
 
     try:
-        resolve_family("bondarev")
+        resolve_family(None)
     except Exception:
-        resolver_status = "fail"
+        resolver_status = "error"
 
     return {
         "status": "ok" if db_status == "ok" and resolver_status == "ok" else "degraded",
