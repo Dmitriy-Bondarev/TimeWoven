@@ -44,6 +44,7 @@ async def family_root(slug: str, request: Request):
 
     return RedirectResponse(url=f"/f/{slug}/family/need-access", status_code=303)
 
+
 try:
     app.mount(
         "/static",
