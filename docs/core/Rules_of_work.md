@@ -168,3 +168,82 @@ No direct SQL schema edits in production
 * Errors must be diagnosable through logs.
 * Health endpoint must remain operational.
 * New critical flows should emit audit events.
+
+---
+## Ежедневный цикл работы (идеальный)
+
+### Утро
+- `git checkout develop`
+- `git pull origin develop`
+- `git checkout -b feature/T-NEW-TASK`
+
+### Работа в Cursor
+- код
+- тесты
+- docs
+- локальная проверка
+
+### Коммит
+- `git add .`
+- `git commit -m "T-NEW-TASK: short summary"`
+- `git push -u origin feature/T-NEW-TASK`
+
+### Merge / Release
+- PR: `feature/T-NEW-TASK` → `develop`
+- PR: `develop` → `main`
+- После merge: deploy на production
+
+### Cursor на сервере (SSH)
+Можно:
+- читать логи
+- inspect configs
+- read-only audit
+- deploy scripts
+- emergency fixes по ТЗ
+
+Нельзя как норма:
+- жить кодом на сервере
+- писать фичи в prod repo
+- менять ветки хаотично
+
+### Настройка веток (очень рекомендую)
+Держать локально всегда:
+- `main`
+- `develop`
+- `feature/*`
+
+Naming standard:
+- `feature/T-VOICE-UPLOAD`
+- `feature/T-PERSON-PAGE`
+- `feature/T-TIMELINE-PERF`
+- `hotfix/T-LOGIN-FIX`
+
+### Идеальный deploy flow
+MacBook tested → merge develop → release to main → server `git pull main` → restart (если нужно) → health check
+
+---
+### Architecture
+MacBook = Factory  
+GitHub = Control Tower  
+Production Server = Runtime
+
+---
+## TimeWoven SOLO FOUNDER OPERATING SYSTEM v1 (кратко)
+Каждый день:
+
+Утро (5 минут):
+- git status
+- git pull develop
+- выбрать 1 главную задачу
+- открыть Cursor
+
+День:
+- работа только в feature branch
+
+Вечер:
+- commit / push / note in PROJECT_LOG
+
+Что запрещено себе теперь:
+- ❌ “быстро поправлю на сервере”
+- ❌ “сделаю прямо в develop без ветки”
+- ❌ “потом разберусь с git”
