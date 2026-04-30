@@ -122,11 +122,12 @@ def update_person_with_i18n(
     person.contact_email = _optional_text(person_payload.get("contact_email"))
     person.avatar_url = _optional_text(person_payload.get("avatar_url"))
     person.is_user = _to_flag(person_payload.get("is_user"), default=0)
-    person.record_status = _optional_text(person_payload.get("record_status")) or "active"
-    person.messenger_max_id = (
-        _optional_text(person_payload.get("max_user_id"))
-        or _optional_text(person_payload.get("messenger_max_id"))
+    person.record_status = (
+        _optional_text(person_payload.get("record_status")) or "active"
     )
+    person.messenger_max_id = _optional_text(
+        person_payload.get("max_user_id")
+    ) or _optional_text(person_payload.get("messenger_max_id"))
 
     ru_i18n = (
         db.query(PersonI18n)

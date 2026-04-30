@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from app.db.base import Base
 from datetime import datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+
+from app.db.base import Base
 
 
 class Event(Base):
@@ -15,4 +17,3 @@ class Event(Base):
 
     family_id = Column(Integer, ForeignKey("families.id"))
     person_id = Column(Integer, ForeignKey("persons.id"), nullable=True)
-    

@@ -1,9 +1,11 @@
 from fastapi import APIRouter
 from sqlalchemy import text
-from app.db.session import SessionLocal
+
 from app.core.family_resolver import resolve_family
+from app.db.session import SessionLocal
 
 router = APIRouter()
+
 
 @router.get("/health")
 def health():
@@ -24,5 +26,5 @@ def health():
     return {
         "status": "ok" if db_status == "ok" and resolver_status == "ok" else "degraded",
         "db": db_status,
-        "resolver": resolver_status
+        "resolver": resolver_status,
     }

@@ -1,21 +1,19 @@
-import os
-import logging
 import json
+import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException, Request
 import httpx
+from fastapi import APIRouter, HTTPException, Request
 
 from app.bot.max_messenger import MaxMessengerBot
+from app.core.media_urls import default_family_slug, family_data_path_for_slug
 from app.db.session import SessionLocal
 from app.models import MaxContactEvent, Person, PersonI18n
-from app.services import max_session_service
-from app.services import bot_reply
+from app.services import bot_reply, max_session_service
 from app.services.transcription import TranscriptionService
-from app.core.media_urls import default_family_slug, family_data_path_for_slug
-
 
 router = APIRouter(prefix="/webhooks/maxbot", tags=["MaxBot Webhooks"])
 MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "").strip()
@@ -55,7 +53,9 @@ def _download_audio_to_raw(audio_url: str, attachment_id: str) -> str | None:
     target_path = raw_dir / filename
 
     try:
-        with httpx.stream("GET", audio_url, timeout=30.0, follow_redirects=True) as response:
+        with httpx.stream(
+            "GET", audio_url, timeout=30.0, follow_redirects=True
+        ) as response:
             response.raise_for_status()
             with target_path.open("wb") as file_handle:
                 for chunk in response.iter_bytes(chunk_size=8192):
@@ -98,7 +98,9 @@ def _extract_max_id(payload: dict) -> str:
                 raw_id = from_data.get("id")
 
     if raw_id is None:
-        raw_id = payload.get("max_id") or payload.get("user_id") or payload.get("from_id")
+        raw_id = (
+            payload.get("max_id") or payload.get("user_id") or payload.get("from_id")
+        )
     if raw_id is None and isinstance(payload.get("from"), dict):
         raw_id = payload["from"].get("id")
     return str(raw_id).strip() if raw_id is not None else ""
@@ -287,7 +289,9 @@ def _extract_contact_items(payload: dict) -> list[dict[str, str]]:
     return contacts
 
 
-def _save_max_contact_event(db, sender_max_user_id: str, contact_item: dict[str, str], raw_payload: dict) -> MaxContactEvent:
+def _save_max_contact_event(
+    db, sender_max_user_id: str, contact_item: dict[str, str], raw_payload: dict
+) -> MaxContactEvent:
     event = MaxContactEvent(
         created_at=datetime.utcnow().isoformat(),
         sender_max_user_id=sender_max_user_id,
@@ -340,7 +344,9 @@ async def incoming_webhook(request: Request):
     contact_items = _extract_contact_items(payload)
 
     if not max_id:
-        raise HTTPException(status_code=400, detail="Missing max_id or user_id/from_id in payload")
+        raise HTTPException(
+            status_code=400, detail="Missing max_id or user_id/from_id in payload"
+        )
     if not message_text and not audio_attachment and not contact_items:
         raise HTTPException(status_code=400, detail="No processable content in payload")
 
@@ -371,7 +377,11 @@ async def incoming_webhook(request: Request):
             if not message_text and not audio_attachment:
                 response_text = "Контакт получен."
                 await bot.send_message(user_id=max_id, text=response_text)
-                return {"status": "ok", "identified": bool(person), "response_text": response_text}
+                return {
+                    "status": "ok",
+                    "identified": bool(person),
+                    "response_text": response_text,
+                }
 
         # --- Finalize command ---
         if message_text and max_session_service.is_finalize_command(message_text):
@@ -393,7 +403,9 @@ async def incoming_webhook(request: Request):
                     analysis=None,
                 )
             else:
-                response_text = "Сессия завершена (ошибка сохранения, обратитесь к администратору)."
+                response_text = (
+                    "Сессия завершена (ошибка сохранения, обратитесь к администратору)."
+                )
 
             await bot.send_message(user_id=max_id, text=response_text)
             return {
@@ -444,7 +456,9 @@ async def incoming_webhook(request: Request):
                     audio_attachment["attachment_id"],
                 )
 
-            session = max_session_service.get_or_create_open_session(db, max_id, person_id)
+            session = max_session_service.get_or_create_open_session(
+                db, max_id, person_id
+            )
             max_session_service.add_audio_item(
                 db=db,
                 session=session,
@@ -497,7 +511,9 @@ async def incoming_webhook(request: Request):
 
         # --- Text message: add to session draft ---
         if message_text:
-            session = max_session_service.get_or_create_open_session(db, max_id, person_id)
+            session = max_session_service.get_or_create_open_session(
+                db, max_id, person_id
+            )
             max_session_service.add_text_item(
                 db=db, session=session, text=message_text, raw_payload=payload
             )
@@ -514,7 +530,9 @@ async def incoming_webhook(request: Request):
                     analysis=None,
                 )
             else:
-                response_text = "Принято. Продолжайте или напишите «Готово» для сохранения."
+                response_text = (
+                    "Принято. Продолжайте или напишите «Готово» для сохранения."
+                )
             await bot.send_message(user_id=max_id, text=response_text)
             return {
                 "status": "ok",

@@ -1,6 +1,8 @@
-from sqlalchemy.orm import Session
-from app.models.event import Event
 from datetime import datetime
+
+from sqlalchemy.orm import Session
+
+from app.models.event import Event
 
 
 def get_timeline(db: Session, family_id: int):
@@ -39,4 +41,3 @@ def delete_event(db: Session, event_id: int):
     db.commit()
 
     return True
-    

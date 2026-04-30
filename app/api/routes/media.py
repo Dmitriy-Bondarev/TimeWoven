@@ -34,4 +34,3 @@ def serve_media(slug: str, file_path: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(full_path)
-

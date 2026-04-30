@@ -1,25 +1,24 @@
 import logging
-
-from dotenv import load_dotenv
-
 import os
+
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from app.api.routes.health import router as health_router
 
+from app.api.routes.admin import router as admin_router
 from app.api.routes.bot_webhooks import router as bot_webhooks_router
+from app.api.routes.deploy import router as deploy_router
+from app.api.routes.health import router as health_router
+from app.api.routes.media import router as media_router
 from app.api.routes.tree import router as tree_router
 from app.api.routes.TW_Explorer import router as explorer_router
 from app.api.timeline import router as timeline_router
-from app.api.routes.admin import router as admin_router
-from app.api.routes.media import router as media_router
-from app.api.routes.deploy import router as deploy_router
+
 app = FastAPI(title="TimeWoven")
 
 
@@ -44,9 +43,6 @@ async def family_root(slug: str, request: Request):
         return RedirectResponse(url=f"/f/{slug}/family/welcome", status_code=303)
 
     return RedirectResponse(url=f"/f/{slug}/family/need-access", status_code=303)
-
-
-
 
 
 try:
@@ -83,11 +79,11 @@ def _assert_family_memory_new_route() -> None:
 
 def _ensure_jinja_i18n_globals() -> None:
     """Each module using Jinja2Templates gets its own Environment; register t/ts on all of them."""
-    from app.core.i18n import install_jinja_i18n
     from app.api import timeline as timeline_api
     from app.api.routes import TW_Explorer
     from app.api.routes import admin as admin_routes
     from app.api.routes import tree as tree_routes
+    from app.core.i18n import install_jinja_i18n
 
     install_jinja_i18n(tree_routes.templates)
     install_jinja_i18n(admin_routes.templates)

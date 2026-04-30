@@ -52,7 +52,9 @@ def _ai_variation_or_none(prompt: str) -> str | None:
     return _cap_reply(candidate)
 
 
-def build_ack_for_new_session(text: str, session: Any = None, analysis: dict | None = None) -> str:
+def build_ack_for_new_session(
+    text: str, session: Any = None, analysis: dict | None = None
+) -> str:
     """Ack for first text in a new/open session."""
     fallback = "Я записываю эту историю. Можете продолжать, а когда закончите — напишите 'Готово'."
 
@@ -66,7 +68,11 @@ def build_ack_for_new_session(text: str, session: Any = None, analysis: dict | N
     return ai or fallback
 
 
-def build_ack_for_audio(session: Any = None, audio_item: dict | None = None, transcription_result: dict | None = None) -> str:
+def build_ack_for_audio(
+    session: Any = None,
+    audio_item: dict | None = None,
+    transcription_result: dict | None = None,
+) -> str:
     """Ack after incoming audio.
 
     Success means audio was downloaded and saved locally; transcription may still be empty.
@@ -91,7 +97,9 @@ def build_ack_for_audio(session: Any = None, audio_item: dict | None = None, tra
     return ai or fallback
 
 
-def build_ack_for_finalize(memory: Any, session: Any = None, analysis: dict | None = None) -> str:
+def build_ack_for_finalize(
+    memory: Any, session: Any = None, analysis: dict | None = None
+) -> str:
     """Ack after successful finalize_session -> Memory created."""
     fallback = "Спасибо. Я сохранил эту историю как черновик семейного архива."
 

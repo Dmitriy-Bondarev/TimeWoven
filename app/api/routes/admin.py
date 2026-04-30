@@ -1,28 +1,40 @@
-import json
-import os
-from datetime import datetime, timedelta, timezone
-
 # app/routes/admin.py
-
 import base64
 import io
+import json
+import os
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
+import httpx
 import pyotp
 import qrcode
-from fastapi import APIRouter, Depends, Request, Form, File, UploadFile, HTTPException, Query
-from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-import time
-import httpx
 from sqlalchemy import or_, text
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from app.bot.max_messenger import MaxMessengerBot
 from app.core.admin_audit import log_login_attempt
 from app.core.i18n import install_jinja_i18n
-from app.core.media_urls import default_family_slug, family_data_path_for_slug, normalize_media_url
+from app.core.media_urls import (
+    default_family_slug,
+    family_data_path_for_slug,
+    normalize_media_url,
+)
 from app.db.session import get_db
 from app.models import (
     AvatarHistory,
@@ -37,8 +49,6 @@ from app.models import (
     Union,
     UnionChild,
 )
-from app.services import create_person_with_i18n, update_person_with_i18n
-from app.services.person_alias_service import ALIAS_STATUS, ALIAS_TYPES
 from app.security import (
     ADMIN_COOKIE_NAME,
     admin_register_login,
@@ -49,12 +59,12 @@ from app.security import (
     make_admin_token,
     require_admin,
 )
+from app.services import create_person_with_i18n, update_person_with_i18n
 from app.services.ai_analyzer import ProviderAgnosticAnalyzer
 from app.services.family_access_service import (
     clear_backup_codes,
     decrypt_totp_secret,
     encrypt_totp_secret,
-    find_person_by_public_uuid,
     generate_backup_code_plain,
     new_totp_provisioning_uri,
     person_family_access_permitted,
@@ -62,6 +72,7 @@ from app.services.family_access_service import (
     store_backup_codes,
     verify_totp_code,
 )
+from app.services.person_alias_service import ALIAS_STATUS, ALIAS_TYPES
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 router = APIRouter(
@@ -194,13 +205,17 @@ def _person_name_ru(db: Session, person_id: int | None) -> str:
         .first()
     )
     if i18n:
-        name = " ".join([part for part in (i18n.first_name, i18n.last_name) if part]).strip()
+        name = " ".join(
+            [part for part in (i18n.first_name, i18n.last_name) if part]
+        ).strip()
         if name:
             return name
     return f"Персона #{person_id}"
 
 
-def _build_people_options(db: Session, exclude_person_ids: set[int] | None = None) -> list[dict]:
+def _build_people_options(
+    db: Session, exclude_person_ids: set[int] | None = None
+) -> list[dict]:
     excluded = exclude_person_ids or set()
     options: list[dict] = []
     for person in db.query(Person).order_by(Person.person_id.asc()).all():
@@ -221,17 +236,13 @@ def _sync_pk_sequence(db: Session, table_name: str) -> None:
     if table_name not in allowed_tables:
         raise ValueError("Unsupported table for sequence sync")
 
-    db.execute(
-        text(
-            f"""
+    db.execute(text(f"""
             SELECT setval(
                 pg_get_serial_sequence('"{table_name}"', 'id'),
                 COALESCE((SELECT MAX(id) FROM "{table_name}"), 1),
                 true
             )
-            """
-        )
-    )
+            """))
 
 
 def _build_union_rows_for_person(db: Session, person_id: int) -> list[dict]:
@@ -244,7 +255,9 @@ def _build_union_rows_for_person(db: Session, person_id: int) -> list[dict]:
 
     rows: list[dict] = []
     for union in unions:
-        other_partner_id = union.partner2_id if union.partner1_id == person_id else union.partner1_id
+        other_partner_id = (
+            union.partner2_id if union.partner1_id == person_id else union.partner1_id
+        )
 
         children_links = (
             db.query(UnionChild)
@@ -274,7 +287,9 @@ def _build_union_rows_for_person(db: Session, person_id: int) -> list[dict]:
     return rows
 
 
-def _build_person_form_data(person: Person, ru_i18n: PersonI18n | None, en_i18n: PersonI18n | None) -> dict:
+def _build_person_form_data(
+    person: Person, ru_i18n: PersonI18n | None, en_i18n: PersonI18n | None
+) -> dict:
     return {
         "gender": person.gender or "Unknown",
         "default_lang": person.default_lang or "ru",
@@ -302,7 +317,9 @@ def _build_person_form_data(person: Person, ru_i18n: PersonI18n | None, en_i18n:
     }
 
 
-def _load_person_for_edit(db: Session, person_id: int) -> tuple[Person, dict, list[dict]]:
+def _load_person_for_edit(
+    db: Session, person_id: int
+) -> tuple[Person, dict, list[dict]]:
     person = db.query(Person).filter(Person.person_id == person_id).first()
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
@@ -370,7 +387,9 @@ async def admin_local_llm_check(request: Request):
         result = analyzer.analyze_memory_text("Это тестовая история о семье")
     except Exception as exc:
         result = {"status": "error", "message": str(exc), "type": type(exc).__name__}
-    ok = (result or {}).get("status") == "ok" and bool(str((result or {}).get("summary") or "").strip())
+    ok = (result or {}).get("status") == "ok" and bool(
+        str((result or {}).get("summary") or "").strip()
+    )
 
     return templates.TemplateResponse(
         "admin/admin_ai_local_llm_check.html",
@@ -402,7 +421,9 @@ async def admin_whisper_local_test_form(request: Request):
 
 
 @router.post("/whisper/local-test", response_class=HTMLResponse)
-async def admin_whisper_local_test_submit(request: Request, file: UploadFile = File(...)):
+async def admin_whisper_local_test_submit(
+    request: Request, file: UploadFile = File(...)
+):
     redirect = require_admin(request)
     if redirect:
         return redirect
@@ -438,7 +459,9 @@ async def admin_whisper_local_test_submit(request: Request, file: UploadFile = F
 
     start = time.monotonic()
     try:
-        files = {"file": (file.filename or "audio.bin", content, "application/octet-stream")}
+        files = {
+            "file": (file.filename or "audio.bin", content, "application/octet-stream")
+        }
         response = httpx.post(whisper_local_url, files=files, timeout=240.0)
         status_code = response.status_code
         payload = response.json() if response.content else {}
@@ -448,7 +471,11 @@ async def admin_whisper_local_test_submit(request: Request, file: UploadFile = F
             "admin/admin_whisper_local_test.html",
             {
                 "request": request,
-                "result": {"status": "error", "error": str(exc), "processing_seconds": elapsed},
+                "result": {
+                    "status": "error",
+                    "error": str(exc),
+                    "processing_seconds": elapsed,
+                },
                 "error": f"Ошибка вызова локального Whisper: {exc}",
                 "whisper_local_url": whisper_local_url,
                 "whisper_provider": whisper_provider,
@@ -462,7 +489,11 @@ async def admin_whisper_local_test_submit(request: Request, file: UploadFile = F
         result.setdefault("http_status_code", status_code)
         result.setdefault("processing_seconds", elapsed)
 
-    ok = isinstance(result, dict) and result.get("status") == "ok" and bool(str(result.get("text") or "").strip())
+    ok = (
+        isinstance(result, dict)
+        and result.get("status") == "ok"
+        and bool(str(result.get("text") or "").strip())
+    )
     error = None if ok else "Whisper вернул пустой/ошибочный результат."
 
     return templates.TemplateResponse(
@@ -494,7 +525,8 @@ async def admin_memory_pipeline_test_form(request: Request):
             "whisper_local_url": os.getenv("WHISPER_LOCAL_URL", "").strip(),
             "whisper_provider": (os.getenv("WHISPER_PROVIDER", "") or "").strip(),
             "ai_local_llm_url": os.getenv("AI_LOCAL_LLM_URL", "").strip(),
-            "ai_provider": (os.getenv("AI_PROVIDER", "") or "").strip() or (os.getenv("AIPROVIDER", "") or "").strip(),
+            "ai_provider": (os.getenv("AI_PROVIDER", "") or "").strip()
+            or (os.getenv("AIPROVIDER", "") or "").strip(),
         },
     )
 
@@ -512,7 +544,9 @@ async def admin_memory_pipeline_test_submit(
     whisper_local_url = os.getenv("WHISPER_LOCAL_URL", "").strip()
     whisper_provider = (os.getenv("WHISPER_PROVIDER", "") or "").strip()
     ai_local_llm_url = os.getenv("AI_LOCAL_LLM_URL", "").strip()
-    ai_provider = (os.getenv("AI_PROVIDER", "") or "").strip() or (os.getenv("AIPROVIDER", "") or "").strip()
+    ai_provider = (os.getenv("AI_PROVIDER", "") or "").strip() or (
+        os.getenv("AIPROVIDER", "") or ""
+    ).strip()
 
     transcript_text = (input_text or "").strip()
     transcript_payload = None
@@ -554,7 +588,13 @@ async def admin_memory_pipeline_test_submit(
 
         start = time.monotonic()
         try:
-            files = {"file": (file.filename or "audio.bin", audio_content, "application/octet-stream")}
+            files = {
+                "file": (
+                    file.filename or "audio.bin",
+                    audio_content,
+                    "application/octet-stream",
+                )
+            }
             response = httpx.post(whisper_local_url, files=files, timeout=240.0)
             transcript_payload = response.json() if response.content else {}
         except Exception as exc:
@@ -576,7 +616,10 @@ async def admin_memory_pipeline_test_submit(
         whisper_timing = round(time.monotonic() - start, 3)
         if isinstance(transcript_payload, dict):
             transcript_payload.setdefault("processing_seconds", whisper_timing)
-        if isinstance(transcript_payload, dict) and transcript_payload.get("status") == "ok":
+        if (
+            isinstance(transcript_payload, dict)
+            and transcript_payload.get("status") == "ok"
+        ):
             transcript_text = str(transcript_payload.get("text") or "").strip()
 
     if not transcript_text:
@@ -588,8 +631,14 @@ async def admin_memory_pipeline_test_submit(
                     "transcript": {"status": "empty", "text": ""},
                     "analysis": None,
                     "providers": {
-                        "whisper": {"provider": whisper_provider, "endpoint": whisper_local_url},
-                        "local_llm": {"provider": "local_llm", "endpoint": ai_local_llm_url},
+                        "whisper": {
+                            "provider": whisper_provider,
+                            "endpoint": whisper_local_url,
+                        },
+                        "local_llm": {
+                            "provider": "local_llm",
+                            "endpoint": ai_local_llm_url,
+                        },
                     },
                 },
                 "error": "Пустой результат: нет текста для анализа (введите текст или загрузите аудио).",
@@ -719,7 +768,9 @@ async def admin_transcriptions(
             except (json.JSONDecodeError, TypeError):
                 metadata = {}
 
-            local_audio_path = metadata.get("local_audio_path") if isinstance(metadata, dict) else None
+            local_audio_path = (
+                metadata.get("local_audio_path") if isinstance(metadata, dict) else None
+            )
             if isinstance(local_audio_path, str) and local_audio_path.strip():
                 audio_player_src = local_audio_path.strip()
                 audio_source = "local"
@@ -728,16 +779,30 @@ async def admin_transcriptions(
                 cand = metadata.get("analysis")
                 if isinstance(cand, dict):
                     analysis = cand
-                    analysis_status = str(cand.get("status") or "").strip().lower() or None
+                    analysis_status = (
+                        str(cand.get("status") or "").strip().lower() or None
+                    )
                     analysis_summary = str(cand.get("summary") or "").strip() or None
-                    analysis_persons = cand.get("persons") if isinstance(cand.get("persons"), list) else []
-                    analysis_dates = cand.get("dates") if isinstance(cand.get("dates"), list) else []
-                    analysis_locations = cand.get("locations") if isinstance(cand.get("locations"), list) else []
+                    analysis_persons = (
+                        cand.get("persons")
+                        if isinstance(cand.get("persons"), list)
+                        else []
+                    )
+                    analysis_dates = (
+                        cand.get("dates") if isinstance(cand.get("dates"), list) else []
+                    )
+                    analysis_locations = (
+                        cand.get("locations")
+                        if isinstance(cand.get("locations"), list)
+                        else []
+                    )
 
                 items = metadata.get("draft_items")
                 if isinstance(items, list):
                     statuses = [
-                        str((it or {}).get("transcription_status") or "").strip().lower()
+                        str((it or {}).get("transcription_status") or "")
+                        .strip()
+                        .lower()
                         for it in items
                         if isinstance(it, dict) and it.get("type") == "audio"
                     ]
@@ -854,7 +919,12 @@ async def admin_login_submit(
         # Validate next to prevent open redirect: only relative internal paths allowed
         safe_next = (
             next
-            if (next and next.startswith("/") and not next.startswith("//") and "://" not in next)
+            if (
+                next
+                and next.startswith("/")
+                and not next.startswith("//")
+                and "://" not in next
+            )
             else "/admin"
         )
         response = RedirectResponse(url=safe_next, status_code=303)
@@ -932,7 +1002,14 @@ async def admin_avatars(request: Request, db: Session = Depends(get_db)):
             .first()
         )
         name = " ".join(
-            [p for p in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if p]
+            [
+                p
+                for p in (
+                    i18n.first_name if i18n else None,
+                    i18n.last_name if i18n else None,
+                )
+                if p
+            ]
         ).strip()
         if not name:
             name = f"Персона #{person.person_id}"
@@ -998,17 +1075,11 @@ async def admin_people(
     if redirect:
         return redirect
 
-    people = (
-        db.query(Person)
-        .order_by(Person.person_id)
-        .all()
-    )
+    people = db.query(Person).order_by(Person.person_id).all()
 
     person_ids = [p.person_id for p in people]
     avatar_rows = (
-        db.query(AvatarHistory)
-        .filter(AvatarHistory.person_id.in_(person_ids))
-        .all()
+        db.query(AvatarHistory).filter(AvatarHistory.person_id.in_(person_ids)).all()
         if person_ids
         else []
     )
@@ -1030,12 +1101,21 @@ async def admin_people(
             .first()
         )
         name = " ".join(
-            [part for part in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if part]
+            [
+                part
+                for part in (
+                    i18n.first_name if i18n else None,
+                    i18n.last_name if i18n else None,
+                )
+                if part
+            ]
         ).strip()
         if not name:
             name = f"Персона #{p.person_id}"
 
-        memories_count = db.query(Memory).filter(Memory.author_id == p.person_id).count()
+        memories_count = (
+            db.query(Memory).filter(Memory.author_id == p.person_id).count()
+        )
         quotes_count = db.query(Quote).filter(Quote.author_id == p.person_id).count()
         alias_rows = (
             db.query(PersonAlias)
@@ -1062,13 +1142,18 @@ async def admin_people(
         candidate_rows = current_avatars or person_avatar_rows
         latest_avatar = max(
             candidate_rows,
-            key=lambda a: _parse_datetime_safe(a.created_at) or datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda a: _parse_datetime_safe(a.created_at)
+            or datetime.min.replace(tzinfo=timezone.utc),
             default=None,
         )
 
-        history_has_avatar = bool(latest_avatar and str(latest_avatar.storage_path or "").strip())
+        history_has_avatar = bool(
+            latest_avatar and str(latest_avatar.storage_path or "").strip()
+        )
         has_avatar = bool(str(p.avatar_url or "").strip()) or history_has_avatar
-        avatar_last_dt = _parse_datetime_safe(latest_avatar.created_at) if latest_avatar else None
+        avatar_last_dt = (
+            _parse_datetime_safe(latest_avatar.created_at) if latest_avatar else None
+        )
         is_alive_bool = bool(p.is_alive)
         avatar_state, avatar_is_expired = _avatar_filter_state(
             has_avatar=has_avatar,
@@ -1077,37 +1162,43 @@ async def admin_people(
             now_utc=now_utc,
         )
 
-        rows.append({
-            "person_id": p.person_id,
-            "name": name,
-            "role": p.role or "",
-            "record_status": p.record_status or "active",
-            "phone": p.phone or "",
-            "preferred_ch": p.preferred_ch or "",
-            "messenger_max_id": p.messenger_max_id or "",
-            "messenger_tg_id": p.messenger_tg_id or "",
-            "contact_email": p.contact_email or "",
-            "is_alive": p.is_alive,
-            "avatar_url": normalize_media_url(p.avatar_url, default_family_slug()),
-            "memories_count": memories_count,
-            "quotes_count": quotes_count,
-            "aliases": aliases,
-            "has_avatar": has_avatar,
-            "avatar_is_expired": avatar_is_expired,
-            "avatar_state": avatar_state,
-            "avatar_state_label": (
-                "Нет аватара"
-                if avatar_state == "no_avatar"
-                else "Аватар истёк"
-                if avatar_state == "expired_avatar"
-                else "Аватар актуален"
-            ),
-            "avatar_last_updated_at": latest_avatar.created_at if latest_avatar else None,
-            "role_key": _role_filter_key(p.role),
-            "record_status_key": _status_filter_key(p.record_status),
-            "preferred_ch_key": _channel_filter_key(p.preferred_ch),
-            "is_alive_key": "yes" if is_alive_bool else "no",
-        })
+        rows.append(
+            {
+                "person_id": p.person_id,
+                "name": name,
+                "role": p.role or "",
+                "record_status": p.record_status or "active",
+                "phone": p.phone or "",
+                "preferred_ch": p.preferred_ch or "",
+                "messenger_max_id": p.messenger_max_id or "",
+                "messenger_tg_id": p.messenger_tg_id or "",
+                "contact_email": p.contact_email or "",
+                "is_alive": p.is_alive,
+                "avatar_url": normalize_media_url(p.avatar_url, default_family_slug()),
+                "memories_count": memories_count,
+                "quotes_count": quotes_count,
+                "aliases": aliases,
+                "has_avatar": has_avatar,
+                "avatar_is_expired": avatar_is_expired,
+                "avatar_state": avatar_state,
+                "avatar_state_label": (
+                    "Нет аватара"
+                    if avatar_state == "no_avatar"
+                    else (
+                        "Аватар истёк"
+                        if avatar_state == "expired_avatar"
+                        else "Аватар актуален"
+                    )
+                ),
+                "avatar_last_updated_at": (
+                    latest_avatar.created_at if latest_avatar else None
+                ),
+                "role_key": _role_filter_key(p.role),
+                "record_status_key": _status_filter_key(p.record_status),
+                "preferred_ch_key": _channel_filter_key(p.preferred_ch),
+                "is_alive_key": "yes" if is_alive_bool else "no",
+            }
+        )
 
     q_clean = (q or "").strip()
     if q_clean:
@@ -1134,7 +1225,9 @@ def _parse_alias_spoken_by(form_value: object) -> int | None:
         return None
 
 
-def _normalize_alias_list_filters(status_filter: str, source_filter: str) -> tuple[str, str]:
+def _normalize_alias_list_filters(
+    status_filter: str, source_filter: str
+) -> tuple[str, str]:
     if status_filter not in {"all", "active", "rejected"}:
         status_filter = "all"
     if source_filter not in {"all", "ai_extracted", "manual"}:
@@ -1145,7 +1238,9 @@ def _normalize_alias_list_filters(status_filter: str, source_filter: str) -> tup
 def _load_person_alias_row_dicts(
     db: Session, person_id: int, status_filter: str, source_filter: str
 ) -> tuple[str, str, list[dict]]:
-    status_filter, source_filter = _normalize_alias_list_filters(status_filter, source_filter)
+    status_filter, source_filter = _normalize_alias_list_filters(
+        status_filter, source_filter
+    )
     q = (
         db.query(PersonAlias)
         .filter(PersonAlias.person_id == person_id)
@@ -1275,7 +1370,9 @@ async def admin_person_alias_create_submit(
                 "person_name": _person_name_ru(db, person_id),
                 "rows": rows_out,
                 "editing": None,
-                "people_spoken": _build_people_options(db, exclude_person_ids={person_id}),
+                "people_spoken": _build_people_options(
+                    db, exclude_person_ids={person_id}
+                ),
                 "status_filter": "all",
                 "source_filter": "all",
                 "alias_types": sorted(ALIAS_TYPES),
@@ -1288,7 +1385,10 @@ async def admin_person_alias_create_submit(
         return re_render_error("Укажите текст алиаса (label).")
     if alias_type not in ALIAS_TYPES:
         return re_render_error("Некорректный тип алиаса.")
-    if spoken_id is not None and not db.query(Person).filter(Person.person_id == spoken_id).first():
+    if (
+        spoken_id is not None
+        and not db.query(Person).filter(Person.person_id == spoken_id).first()
+    ):
         return re_render_error("Выбранный «Кто называет» не найден.")
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -1349,7 +1449,10 @@ async def admin_person_alias_edit_submit(
             url=f"/admin/people/{person_id}/aliases?edit={alias_id}",
             status_code=303,
         )
-    if spoken_id is not None and not db.query(Person).filter(Person.person_id == spoken_id).first():
+    if (
+        spoken_id is not None
+        and not db.query(Person).filter(Person.person_id == spoken_id).first()
+    ):
         return RedirectResponse(
             url=f"/admin/people/{person_id}/aliases?edit={alias_id}",
             status_code=303,
@@ -1372,7 +1475,9 @@ async def admin_person_alias_edit_submit(
     )
 
 
-@router.post("/people/{person_id}/aliases/{alias_id}/reject", response_class=HTMLResponse)
+@router.post(
+    "/people/{person_id}/aliases/{alias_id}/reject", response_class=HTMLResponse
+)
 async def admin_person_alias_reject(
     person_id: int,
     alias_id: int,
@@ -1456,7 +1561,9 @@ async def admin_person_new_submit(request: Request, db: Session = Depends(get_db
 
     is_alive = "is_alive" in form
     try:
-        preferred_ch = _normalize_preferred_channel(form.get("preferred_ch"), is_alive=is_alive)
+        preferred_ch = _normalize_preferred_channel(
+            form.get("preferred_ch"), is_alive=is_alive
+        )
     except ValueError as exc:
         return render_error(str(exc))
 
@@ -1534,7 +1641,9 @@ async def admin_person_redirect_to_edit(request: Request, person_id: int):
 
 
 @router.get("/people/{person_id}/edit", response_class=HTMLResponse)
-async def admin_person_edit_form(person_id: int, request: Request, db: Session = Depends(get_db)):
+async def admin_person_edit_form(
+    person_id: int, request: Request, db: Session = Depends(get_db)
+):
     redirect = require_admin(request)
     if redirect:
         return redirect
@@ -1553,7 +1662,9 @@ async def admin_person_edit_form(person_id: int, request: Request, db: Session =
 
 
 @router.post("/people/{person_id}/edit", response_class=HTMLResponse)
-async def admin_person_edit_submit(person_id: int, request: Request, db: Session = Depends(get_db)):
+async def admin_person_edit_submit(
+    person_id: int, request: Request, db: Session = Depends(get_db)
+):
     redirect = require_admin(request)
     if redirect:
         return redirect
@@ -1593,7 +1704,9 @@ async def admin_person_edit_submit(person_id: int, request: Request, db: Session
 
     is_alive = "is_alive" in form
     try:
-        preferred_ch = _normalize_preferred_channel(form.get("preferred_ch"), is_alive=is_alive)
+        preferred_ch = _normalize_preferred_channel(
+            form.get("preferred_ch"), is_alive=is_alive
+        )
     except ValueError as exc:
         return render_error(str(exc))
 
@@ -1641,7 +1754,13 @@ async def admin_person_edit_submit(person_id: int, request: Request, db: Session
     }
 
     try:
-        update_person_with_i18n(db, person_id=person_id, person_data=person_data, ru_data=ru_data, en_data=en_data)
+        update_person_with_i18n(
+            db,
+            person_id=person_id,
+            person_data=person_data,
+            ru_data=ru_data,
+            en_data=en_data,
+        )
     except IntegrityError as exc:
         db.rollback()
         details = str(getattr(exc, "orig", exc)).lower()
@@ -1659,7 +1778,9 @@ async def admin_person_edit_submit(person_id: int, request: Request, db: Session
 
 
 @router.get("/unions/new", response_class=HTMLResponse)
-async def admin_union_new_form(person_id: int, request: Request, db: Session = Depends(get_db)):
+async def admin_union_new_form(
+    person_id: int, request: Request, db: Session = Depends(get_db)
+):
     redirect = require_admin(request)
     if redirect:
         return redirect
@@ -1675,7 +1796,9 @@ async def admin_union_new_form(person_id: int, request: Request, db: Session = D
             "error": None,
             "person": person,
             "person_name": _person_name_ru(db, person.person_id),
-            "people_options": _build_people_options(db, exclude_person_ids={person.person_id}),
+            "people_options": _build_people_options(
+                db, exclude_person_ids={person.person_id}
+            ),
             "form_data": {
                 "person_id": person.person_id,
                 "partner_id": "",
@@ -1701,7 +1824,11 @@ async def admin_union_new_submit(request: Request, db: Session = Depends(get_db)
         person_name = ""
         excluded: set[int] = set()
         if person_id_for_context is not None:
-            person_for_context = db.query(Person).filter(Person.person_id == person_id_for_context).first()
+            person_for_context = (
+                db.query(Person)
+                .filter(Person.person_id == person_id_for_context)
+                .first()
+            )
             excluded = {person_id_for_context}
             if person_for_context:
                 person_name = _person_name_ru(db, person_for_context.person_id)
@@ -1713,7 +1840,9 @@ async def admin_union_new_submit(request: Request, db: Session = Depends(get_db)
                 "error": message,
                 "person": person_for_context,
                 "person_name": person_name,
-                "people_options": _build_people_options(db, exclude_person_ids=excluded),
+                "people_options": _build_people_options(
+                    db, exclude_person_ids=excluded
+                ),
                 "form_data": dict(form),
             },
             status_code=status_code,
@@ -1755,7 +1884,9 @@ async def admin_union_new_submit(request: Request, db: Session = Depends(get_db)
         db.commit()
     except IntegrityError:
         db.rollback()
-        return render_error("Не удалось создать союз. Проверьте выбранных участников и попробуйте снова.")
+        return render_error(
+            "Не удалось создать союз. Проверьте выбранных участников и попробуйте снова."
+        )
     except Exception as exc:
         db.rollback()
         return render_error(f"Ошибка при создании союза: {exc}")
@@ -1799,7 +1930,9 @@ async def admin_union_add_child_form(
 
 
 @router.post("/unions/{union_id}/add-child", response_class=HTMLResponse)
-async def admin_union_add_child_submit(union_id: int, request: Request, db: Session = Depends(get_db)):
+async def admin_union_add_child_submit(
+    union_id: int, request: Request, db: Session = Depends(get_db)
+):
     redirect = require_admin(request)
     if redirect:
         return redirect
@@ -1863,7 +1996,9 @@ async def admin_union_add_child_submit(union_id: int, request: Request, db: Sess
     redirect_person_id = person_id_for_redirect or fallback_person_id
 
     if redirect_person_id:
-        return RedirectResponse(url=f"/admin/people/{redirect_person_id}/edit", status_code=303)
+        return RedirectResponse(
+            url=f"/admin/people/{redirect_person_id}/edit", status_code=303
+        )
     return RedirectResponse(url="/admin/people", status_code=303)
 
 
@@ -1882,8 +2017,10 @@ def _absolute_app_base_url(request: Request) -> str:
     b = str(request.base_url).rstrip("/")
     if b and b not in ("http://", "https://"):
         return b
-    return (os.environ.get("TW_DEFAULT_PUBLIC_BASE_URL") or "https://app.timewoven.ru").strip().rstrip(
-        "/"
+    return (
+        (os.environ.get("TW_DEFAULT_PUBLIC_BASE_URL") or "https://app.timewoven.ru")
+        .strip()
+        .rstrip("/")
     )
 
 
