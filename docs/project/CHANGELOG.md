@@ -7,6 +7,7 @@
 - Introduced Git branching workflow: main / develop / feature branches
 - Direct commits to main are now prohibited
 - (2026-04-30) **Infrastructure (T-P2-003)**: hardened GitHub Actions CI gatekeeper — Python pinned to **3.10.12**, `ruff`/`black --check` now cover `app/` and `scripts/`, added Alembic migrations smoke-check and pytest run (no-tests exit is allowed) to prevent regressions before merge.
+- (2026-04-30) **Infrastructure (T-P2-004)**: migrated dependency management to **Poetry** — dependencies moved from `requirements.txt` into `pyproject.toml`, generated `poetry.lock` for reproducible installs, updated `Makefile` and CI to use `poetry install` / `poetry run`, removed `requirements.txt` as source of truth.
 
 ## v1.22.39 — 2026-04-27
 
