@@ -47,7 +47,9 @@ async def deploy(request: Request):
 
     script = "/root/scripts/deploy/update_timewoven.sh"
     try:
-        proc = subprocess.Popen([script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(
+            [script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
     except Exception:
         logger.exception("Deploy failed: could not start update script")
         raise HTTPException(status_code=503, detail="Deploy failed to start") from None
