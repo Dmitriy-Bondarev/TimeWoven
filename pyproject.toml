@@ -1,0 +1,13 @@
+[tool.ruff]
+target-version = "py311"
+exclude = [
+    "app",
+    "scripts",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+extend-exclude = '''
+^/(app|scripts)(/|$)
+'''
