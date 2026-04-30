@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from app.db.session import get_db
 
 router = APIRouter()
+
 
 @router.get("/family/tree", response_class=HTMLResponse)
 def family_tree(db: Session = Depends(get_db)):

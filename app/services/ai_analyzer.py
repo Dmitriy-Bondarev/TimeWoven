@@ -19,13 +19,15 @@ LOCAL_STUB_TIMEOUT_SECONDS = 15.0
 SYSTEM_PROMPT = (
     "Ты лингвистический анализатор семейных воспоминаний. "
     "Верни СТРОГО валидный JSON формата: "
-    "{\"summary\": \"\", \"dates\": [], \"persons\": [], \"locations\": []}. "
+    '{"summary": "", "dates": [], "persons": [], "locations": []}. '
     "summary: короткое резюме в 1-2 предложениях. "
     "Не пиши ничего, кроме JSON. Никаких markdown-бэктиков."
 )
 
 
-def _empty_analysis(status: str = "ok", raw_provider: Any = "disabled") -> dict[str, Any]:
+def _empty_analysis(
+    status: str = "ok", raw_provider: Any = "disabled"
+) -> dict[str, Any]:
     return {
         "summary": "",
         "persons": [],
@@ -61,7 +63,9 @@ class MockAnalyzerProvider(BaseAnalyzerProvider):
 
         # Lightweight deterministic extraction for local smoke tests.
         result["summary"] = normalized[:180]
-        date_candidates = re.findall(r"\b\d{4}\b|\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b", normalized)
+        date_candidates = re.findall(
+            r"\b\d{4}\b|\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b", normalized
+        )
         result["dates"] = sorted(set(date_candidates))[:10]
         capitalized_words = re.findall(r"\b[А-ЯЁ][а-яё]+\b", normalized)
         result["persons"] = sorted(set(capitalized_words))[:10]
@@ -74,7 +78,9 @@ class LocalStubAnalyzerProvider(BaseAnalyzerProvider):
     def __init__(self) -> None:
         self.url = os.getenv("AI_LOCAL_STUB_URL", "").strip()
 
-    def _error_result(self, error_message: str, status_code: int | None = None) -> dict[str, Any]:
+    def _error_result(
+        self, error_message: str, status_code: int | None = None
+    ) -> dict[str, Any]:
         raw_provider = {
             "provider": self.provider_name,
             "endpoint": self.url,
@@ -123,12 +129,18 @@ class LocalStubAnalyzerProvider(BaseAnalyzerProvider):
         try:
             payload = response.json()
         except ValueError as exc:
-            logger.warning("Local stub returned invalid JSON endpoint=%s: %s", self.url, exc)
-            return self._error_result("invalid JSON response", status_code=response.status_code)
+            logger.warning(
+                "Local stub returned invalid JSON endpoint=%s: %s", self.url, exc
+            )
+            return self._error_result(
+                "invalid JSON response", status_code=response.status_code
+            )
 
         if not isinstance(payload, dict):
             logger.warning("Local stub returned non-object JSON endpoint=%s", self.url)
-            return self._error_result("response JSON is not an object", status_code=response.status_code)
+            return self._error_result(
+                "response JSON is not an object", status_code=response.status_code
+            )
 
         return {
             "summary": str(payload.get("summary", "") or "").strip(),
@@ -160,7 +172,9 @@ class LlamaLocalAnalyzerProvider(BaseAnalyzerProvider):
     def __init__(self) -> None:
         self.url = os.getenv("AI_LLAMA_LOCAL_URL", "").strip()
 
-    def _error_result(self, error_message: str, status_code: int | None = None) -> dict[str, Any]:
+    def _error_result(
+        self, error_message: str, status_code: int | None = None
+    ) -> dict[str, Any]:
         raw_provider: dict[str, Any] = {
             "provider": self.provider_name,
             "endpoint": self.url,
@@ -208,12 +222,18 @@ class LlamaLocalAnalyzerProvider(BaseAnalyzerProvider):
         try:
             payload = response.json()
         except ValueError as exc:
-            logger.warning("llama_local returned invalid JSON endpoint=%s: %s", self.url, exc)
-            return self._error_result("invalid JSON response", status_code=response.status_code)
+            logger.warning(
+                "llama_local returned invalid JSON endpoint=%s: %s", self.url, exc
+            )
+            return self._error_result(
+                "invalid JSON response", status_code=response.status_code
+            )
 
         if not isinstance(payload, dict):
             logger.warning("llama_local returned non-object JSON endpoint=%s", self.url)
-            return self._error_result("response JSON is not an object", status_code=response.status_code)
+            return self._error_result(
+                "response JSON is not an object", status_code=response.status_code
+            )
 
         return {
             "summary": str(payload.get("summary", "") or "").strip(),
@@ -246,7 +266,9 @@ class LocalLLMAnalyzerProvider(BaseAnalyzerProvider):
     def __init__(self) -> None:
         self.url = os.getenv("AI_LOCAL_LLM_URL", "").strip()
 
-    def _error_result(self, error_message: str, status_code: int | None = None) -> dict[str, Any]:
+    def _error_result(
+        self, error_message: str, status_code: int | None = None
+    ) -> dict[str, Any]:
         raw_provider: dict[str, Any] = {
             "provider": self.provider_name,
             "endpoint": self.url,
@@ -303,12 +325,18 @@ class LocalLLMAnalyzerProvider(BaseAnalyzerProvider):
         try:
             payload = response.json()
         except ValueError as exc:
-            logger.warning("local_llm returned invalid JSON endpoint=%s: %s", self.url, exc)
-            return self._error_result("invalid JSON response", status_code=response.status_code)
+            logger.warning(
+                "local_llm returned invalid JSON endpoint=%s: %s", self.url, exc
+            )
+            return self._error_result(
+                "invalid JSON response", status_code=response.status_code
+            )
 
         if not isinstance(payload, dict):
             logger.warning("local_llm returned non-object JSON endpoint=%s", self.url)
-            return self._error_result("response JSON is not an object", status_code=response.status_code)
+            return self._error_result(
+                "response JSON is not an object", status_code=response.status_code
+            )
 
         status = str(payload.get("status", "") or "").strip().lower() or "ok"
         if status != "ok":
@@ -344,17 +372,27 @@ class AnthropicAnalyzerProvider(BaseAnalyzerProvider):
 
     def __init__(self) -> None:
         self.api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
-        self.primary_model = os.getenv("ANTHROPIC_PRIMARY_MODEL", "claude-3-5-sonnet-latest").strip()
-        self.fallback_model = os.getenv("ANTHROPIC_FALLBACK_MODEL", "claude-3-haiku-latest").strip()
+        self.primary_model = os.getenv(
+            "ANTHROPIC_PRIMARY_MODEL", "claude-3-5-sonnet-latest"
+        ).strip()
+        self.fallback_model = os.getenv(
+            "ANTHROPIC_FALLBACK_MODEL", "claude-3-haiku-latest"
+        ).strip()
         if anthropic is None:
             self.client = None
-            logger.warning("anthropic package is not installed; anthropic provider unavailable")
+            logger.warning(
+                "anthropic package is not installed; anthropic provider unavailable"
+            )
             return
 
-        self.client = anthropic.Anthropic(api_key=self.api_key) if self.api_key else None
+        self.client = (
+            anthropic.Anthropic(api_key=self.api_key) if self.api_key else None
+        )
 
         if not self.client:
-            logger.warning("ANTHROPIC_API_KEY is not set; anthropic provider unavailable")
+            logger.warning(
+                "ANTHROPIC_API_KEY is not set; anthropic provider unavailable"
+            )
 
     def _extract_text(self, response: Any) -> str:
         chunks: list[str] = []
@@ -378,7 +416,9 @@ class AnthropicAnalyzerProvider(BaseAnalyzerProvider):
 
     def _request_model(self, model_name: str, text: str) -> dict[str, Any]:
         if not self.client:
-            raise RuntimeError("ANTHROPIC_API_KEY is not set; cannot initialize anthropic client")
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY is not set; cannot initialize anthropic client"
+            )
 
         response = self.client.messages.create(
             model=model_name,
@@ -417,7 +457,11 @@ class ProviderAgnosticAnalyzer:
     def __init__(self, provider_name: str | None = None) -> None:
         env_provider = (os.getenv("AI_PROVIDER", "") or "").strip().lower()
         legacy_env_provider = (os.getenv("AIPROVIDER", "") or "").strip().lower()
-        self.provider_name = (provider_name or env_provider or legacy_env_provider or "disabled").strip().lower()
+        self.provider_name = (
+            (provider_name or env_provider or legacy_env_provider or "disabled")
+            .strip()
+            .lower()
+        )
         self.provider = self._build_provider(self.provider_name)
         logger.info("AI analyzer initialized with provider=%s", self.provider_name)
 
@@ -435,7 +479,9 @@ class ProviderAgnosticAnalyzer:
         if provider_name == "anthropic":
             return AnthropicAnalyzerProvider()
 
-        logger.warning("Unknown AI_PROVIDER=%s; falling back to disabled", provider_name)
+        logger.warning(
+            "Unknown AI_PROVIDER=%s; falling back to disabled", provider_name
+        )
         self.provider_name = "disabled"
         return DisabledAnalyzerProvider()
 
@@ -443,7 +489,9 @@ class ProviderAgnosticAnalyzer:
         try:
             return self.provider.analyze(text)
         except Exception as exc:
-            logger.error("AI analyzer provider failure (%s): %s", self.provider_name, exc)
+            logger.error(
+                "AI analyzer provider failure (%s): %s", self.provider_name, exc
+            )
             return _empty_analysis(status="error", raw_provider=self.provider_name)
 
 

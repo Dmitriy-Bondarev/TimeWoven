@@ -14,6 +14,8 @@
 
 Тестовый прогон Alembic‑миграций end‑to‑end: создание новой таблицы через SQLAlchemy model + Alembic revision, применение на dev (Mac) и на сервере.
 
+Важно: эта цепочка Alembic описывает **семейную БД** (`timewoven_<slug>`, в проде сейчас — `timewoven_bondarev`), а не registry‑БД `timewoven_core`.
+
 #### Изменения
 
 | Действие | Объект | Детали |

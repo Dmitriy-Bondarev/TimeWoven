@@ -30,7 +30,9 @@ def _is_hidden(item: Path) -> bool:
 def _build_tree(directory: Path, root: Path) -> list[dict[str, Any]]:
     nodes: list[dict[str, Any]] = []
 
-    for entry in sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
+    for entry in sorted(
+        directory.iterdir(), key=lambda p: (p.is_file(), p.name.lower())
+    ):
         if _is_hidden(entry):
             continue
 
@@ -97,7 +99,9 @@ async def explorer_login(
 
     # Cookie valid until midnight UTC today
     now = datetime.now(timezone.utc)
-    midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    midnight = (now + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     max_age = int((midnight - now).total_seconds())
 
     redirect_url = "/explorer/?from_admin=1" if from_admin else "/explorer/"
@@ -155,7 +159,9 @@ async def explorer_view(
         elif _is_hidden(candidate):
             context["preview_error"] = "Доступ к этому файлу запрещен."
         elif candidate.suffix.lower() not in PREVIEW_EXTENSIONS:
-            context["preview_error"] = "Предпросмотр доступен только для .py, .html, .md, .sql"
+            context["preview_error"] = (
+                "Предпросмотр доступен только для .py, .html, .md, .sql"
+            )
         else:
             content = candidate.read_text(encoding="utf-8", errors="replace")
             context["preview_path"] = str(candidate.relative_to(PROJECT_ROOT))

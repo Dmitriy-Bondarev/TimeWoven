@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint fmt run migrate migrate-check revision upgrade downgrade db-shell clean health snapshot
+.PHONY: help install dev test lint fmt run migrate migrate-check revision upgrade downgrade db-shell clean health snapshot cursorrules-sync
 
 
 # =========================
@@ -34,28 +34,27 @@ help:
 # INSTALL / DEV
 # =========================
 install:
-	pip install --upgrade pip
-	pip install -r requirements.txt
+	poetry install --no-interaction
 
 
 dev:
-	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 
 run:
-	uvicorn app.main:app --host 0.0.0.0 --port 8000
+	poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 
 test:
-	pytest -q
+	poetry run pytest -q
 
 
 lint:
-	ruff check .
+	poetry run ruff check app scripts
 
 
 fmt:
-	black .
+	poetry run black app scripts
 	# или, если перейдёшь на форматер ruff:
 	# ruff format .
 
@@ -67,15 +66,15 @@ migrate: upgrade
 
 
 migrate-check:
-	alembic upgrade head --sql
+	poetry run alembic upgrade head --sql
 
 
 upgrade:
-	alembic upgrade head
+	poetry run alembic upgrade head
 
 
 downgrade:
-	alembic downgrade -1
+	poetry run alembic downgrade -1
 
 
 revision:
@@ -83,7 +82,7 @@ revision:
 	  echo "ERROR: please provide msg, e.g. 'make revision msg=add_early_access'"; \
 	  exit 1; \
 	fi
-	alembic revision --autogenerate -m "$(msg)"
+	poetry run alembic revision --autogenerate -m "$(msg)"
 
 
 db-shell:
@@ -107,3 +106,7 @@ health:
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
+
+
+cursorrules-sync:
+	bash scripts/ops/sync_cursorrules_to_server.sh

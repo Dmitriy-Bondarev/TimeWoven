@@ -5,17 +5,15 @@ watcher.py — TimeWoven Audio Watcher (Mac)
 Запуск: python3 watcher.py
 """
 
-import os
-import time
 import hashlib
 import json
-from pathlib import Path
-from datetime import datetime
-from urllib.request import urlopen, Request
-from urllib.parse import urlencode
-from urllib.error import URLError, HTTPError
-import mimetypes
+import os
+import time
 import uuid
+from datetime import datetime
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 # ── Настройки ────────────────────────────────────────────────────────────────
 WATCH_DIR = Path.home() / "Desktop" / "timewoven_audio"
@@ -54,34 +52,39 @@ def log(msg: str):
 
 def build_multipart(path: Path, boundary: str) -> bytes:
     """Build multipart/form-data body using only stdlib."""
-    filename = path.name.encode('utf-8')
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         file_data = f.read()
     body = (
-        f'--{boundary}\r\n'
-        f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'
-        f'Content-Type: audio/mpeg\r\n'
-        f'\r\n'
-    ).encode('utf-8') + file_data + f'\r\n--{boundary}--\r\n'.encode('utf-8')
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'
+            f"Content-Type: audio/mpeg\r\n"
+            f"\r\n"
+        ).encode("utf-8")
+        + file_data
+        + f"\r\n--{boundary}--\r\n".encode("utf-8")
+    )
     return body
 
 
 def upload_file(path: Path) -> dict | None:
     boundary = uuid.uuid4().hex
     body = build_multipart(path, boundary)
-    token_ascii = ADMIN_TOKEN.encode('ascii', errors='ignore').decode('ascii')
+    token_ascii = ADMIN_TOKEN.encode("ascii", errors="ignore").decode("ascii")
     headers = {
-        'Authorization': f'Bearer {token_ascii}',
-        'Content-Type': f'multipart/form-data; boundary={boundary}',
-        'Content-Length': str(len(body)),
+        "Authorization": f"Bearer {token_ascii}",
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Content-Length": str(len(body)),
     }
     try:
-        req = Request(UPLOAD_ENDPOINT, data=body, headers=headers, method='POST')
+        req = Request(UPLOAD_ENDPOINT, data=body, headers=headers, method="POST")
         with urlopen(req, timeout=60) as resp:
-            resp_body = resp.read().decode('utf-8')
+            resp_body = resp.read().decode("utf-8")
             return json.loads(resp_body)
     except HTTPError as e:
-        log(f"  Ошибка HTTP {e.code}: {e.read().decode('utf-8', errors='replace')[:200]}")
+        log(
+            f"  Ошибка HTTP {e.code}: {e.read().decode('utf-8', errors='replace')[:200]}"
+        )
         return None
     except URLError as e:
         log(f"  Нет соединения: {e.reason}")
@@ -124,7 +127,7 @@ def run():
                         processed[fhash] = {
                             "filename": path.name,
                             "uploaded_at": datetime.now().isoformat(),
-                            "server_response": result
+                            "server_response": result,
                         }
                         save_log(processed)
                         log(f"  Успешно: {path.name}")

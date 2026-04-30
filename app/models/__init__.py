@@ -1,8 +1,20 @@
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Text, Float, DateTime, text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.db.base import Base
+
 
 class Person(Base):
     __tablename__ = "People"
@@ -26,10 +38,10 @@ class Person(Base):
     contact_email = Column(String, nullable=True)
     avatar_url = Column(String)
     pin = Column(String)
-    record_status = Column(String, nullable=False, default="active", server_default=text("'active'"))
-    public_uuid = Column(
-        UUID(as_uuid=True), nullable=False, unique=True, index=True
+    record_status = Column(
+        String, nullable=False, default="active", server_default=text("'active'")
     )
+    public_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
     family_access_enabled = Column(
         Boolean, nullable=False, server_default=text("false")
     )
@@ -46,8 +58,12 @@ class Person(Base):
         cascade="all, delete-orphan",
     )
     quotes = relationship("Quote", back_populates="author")
-    memories_authored = relationship("Memory", foreign_keys="Memory.author_id", back_populates="author")
-    memories_created = relationship("Memory", foreign_keys="Memory.created_by", back_populates="creator")
+    memories_authored = relationship(
+        "Memory", foreign_keys="Memory.author_id", back_populates="author"
+    )
+    memories_created = relationship(
+        "Memory", foreign_keys="Memory.created_by", back_populates="creator"
+    )
 
 
 class PersonAlias(Base):
@@ -56,16 +72,25 @@ class PersonAlias(Base):
     __tablename__ = "personaliases"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    person_id = Column(Integer, ForeignKey("People.person_id", ondelete="CASCADE"), nullable=False, index=True)
+    person_id = Column(
+        Integer,
+        ForeignKey("People.person_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     label = Column(String, nullable=False)
     alias_type = Column(String, nullable=False)
     used_by_generation = Column(String, nullable=True)
     note = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
-    spoken_by_person_id = Column(Integer, ForeignKey("People.person_id"), nullable=True, index=True)
+    spoken_by_person_id = Column(
+        Integer, ForeignKey("People.person_id"), nullable=True, index=True
+    )
     source = Column(String, nullable=False, server_default=text("'manual'"))
     status = Column(String, nullable=False, server_default=text("'active'"))
-    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
 
     person = relationship(
         "Person",
@@ -111,10 +136,16 @@ class Memory(Base):
     created_by = Column(Integer, ForeignKey("People.person_id"))
     source_type = Column(String)
     transcription_status = Column(String, default="pending")
-    is_archived = Column(Boolean, default=False, server_default=text("false"), nullable=False)
+    is_archived = Column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
 
-    author = relationship("Person", foreign_keys=[author_id], back_populates="memories_authored")
-    creator = relationship("Person", foreign_keys=[created_by], back_populates="memories_created")
+    author = relationship(
+        "Person", foreign_keys=[author_id], back_populates="memories_authored"
+    )
+    creator = relationship(
+        "Person", foreign_keys=[created_by], back_populates="memories_created"
+    )
     quotes = relationship("Quote", back_populates="memory")
 
 
@@ -160,6 +191,7 @@ class Event(Base):
 
 class Union(Base):
     """Союз/брак/партнёрство между людьми с общими детьми."""
+
     __tablename__ = "Unions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -179,6 +211,7 @@ class Union(Base):
 
 class UnionChild(Base):
     """Связь между Union и Person (ребёнок)."""
+
     __tablename__ = "UnionChildren"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -209,25 +242,30 @@ class MaxContactEvent(Base):
     contact_last_name = Column(String, nullable=True)
     raw_payload = Column(Text, nullable=False)
     matched_person_id = Column(Integer, ForeignKey("People.person_id"), nullable=True)
-    status = Column(String, nullable=False, default="new", server_default=text("'new'"), index=True)
+    status = Column(
+        String, nullable=False, default="new", server_default=text("'new'"), index=True
+    )
 
 
 class MaxChatSession(Base):
     """Session grouping incoming Max messages into a draft until the user sends a finalize command."""
+
     __tablename__ = "max_chat_sessions"
 
-    id              = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    max_user_id     = Column(String, nullable=False, index=True)
-    person_id       = Column(Integer, ForeignKey("People.person_id"), nullable=True)
-    status          = Column(String, nullable=False, default="open", server_default=text("'open'"))
-    created_at      = Column(String, nullable=False)
-    updated_at      = Column(String, nullable=False)
-    finalized_at    = Column(String, nullable=True)
-    draft_text      = Column(Text, nullable=True)   # concatenated text items
-    draft_items     = Column(Text, nullable=True)   # JSON array of {type, ...}
-    message_count   = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    audio_count     = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    memory_id       = Column(Integer, ForeignKey("Memories.id"), nullable=True)
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    max_user_id = Column(String, nullable=False, index=True)
+    person_id = Column(Integer, ForeignKey("People.person_id"), nullable=True)
+    status = Column(
+        String, nullable=False, default="open", server_default=text("'open'")
+    )
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+    finalized_at = Column(String, nullable=True)
+    draft_text = Column(Text, nullable=True)  # concatenated text items
+    draft_items = Column(Text, nullable=True)  # JSON array of {type, ...}
+    message_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    audio_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    memory_id = Column(Integer, ForeignKey("Memories.id"), nullable=True)
     analysis_status = Column(String, nullable=True)
 
     person = relationship("Person", foreign_keys=[person_id])
@@ -252,7 +290,9 @@ class FamilyAccessSession(Base):
     __tablename__ = "family_access_sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    person_id = Column(Integer, ForeignKey("People.person_id"), nullable=False, index=True)
+    person_id = Column(
+        Integer, ForeignKey("People.person_id"), nullable=False, index=True
+    )
     session_token_hash = Column(String, nullable=False, index=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
@@ -265,7 +305,9 @@ class PersonAccessBackupCode(Base):
     __tablename__ = "person_access_backup_codes"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    person_id = Column(Integer, ForeignKey("People.person_id"), nullable=False, index=True)
+    person_id = Column(
+        Integer, ForeignKey("People.person_id"), nullable=False, index=True
+    )
     code_hash = Column(String, nullable=False, index=True)
     used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)

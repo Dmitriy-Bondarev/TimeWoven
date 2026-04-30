@@ -6,6 +6,11 @@
 
 - Introduced Git branching workflow: main / develop / feature branches
 - Direct commits to main are now prohibited
+- (2026-04-30) **Infrastructure (T-P2-003)**: hardened GitHub Actions CI gatekeeper — Python pinned to **3.10.12**, `ruff`/`black --check` now cover `app/` and `scripts/`, added Alembic migrations smoke-check and pytest run (no-tests exit is allowed) to prevent regressions before merge.
+- (2026-04-30) **Infrastructure (T-P2-004)**: migrated dependency management to **Poetry** — dependencies moved from `requirements.txt` into `pyproject.toml`, generated `poetry.lock` for reproducible installs, updated `Makefile` and CI to use `poetry install` / `poetry run`, removed `requirements.txt` as source of truth.
+- (2026-04-30) **Infrastructure (T-P2-004)**: fixed pytest import path for Poetry/CI — set `pythonpath=["."]` in `pyproject.toml` to prevent `ModuleNotFoundError: app`.
+- (2026-04-30) **Infrastructure (T-P2-004)**: fixed CI bootstrapping — `setup-python` no longer uses `cache: poetry` (it required Poetry before install); CI now caches `pip` and installs Poetry explicitly.
+- (2026-04-30) **Operations**: added `scripts/ops/sync_cursorrules_to_server.sh` + `make cursorrules-sync` to sync `.cursorrules` into the server repo directory.
 
 ## v1.22.39 — 2026-04-27
 

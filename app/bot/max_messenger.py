@@ -15,7 +15,6 @@ from app.services.daily_impulses import get_random_impulse
 from app.services.memory_store import save_raw_memory
 from app.services.transcription import TranscriptionService
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -26,7 +25,9 @@ class MaxMessengerBot:
         self.bot_id = os.getenv("MAX_BOT_ID", "unknown")
         self.integration_status = os.getenv("MAX_BOT_STATUS", "planned")
         self.api_token = os.getenv("MAX_BOT_TOKEN", "").strip()
-        self.send_url = os.getenv("MAX_API_SEND_URL", "https://platform-api.max.ru/messages").strip()
+        self.send_url = os.getenv(
+            "MAX_API_SEND_URL", "https://platform-api.max.ru/messages"
+        ).strip()
         self.analyzer = MemoryAnalyzer()
         self.transcriber = TranscriptionService()
 
@@ -59,7 +60,9 @@ class MaxMessengerBot:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.post(send_url, json=payload, headers=headers)
-                logger.info("MAX API Response: %s %s", response.status_code, response.text)
+                logger.info(
+                    "MAX API Response: %s %s", response.status_code, response.text
+                )
                 if response.is_success:
                     try:
                         body = response.json()
@@ -90,7 +93,11 @@ class MaxMessengerBot:
         try:
             person = db.query(Person).filter(Person.person_id == person_id).first()
             if not person:
-                return {"sent": False, "reason": "Person not found", "person_id": person_id}
+                return {
+                    "sent": False,
+                    "reason": "Person not found",
+                    "person_id": person_id,
+                }
             if not person.messenger_max_id:
                 return {
                     "sent": False,
@@ -100,7 +107,9 @@ class MaxMessengerBot:
 
             impulse = get_random_impulse()
             message_text = f"Импульс дня:\n{impulse}"
-            delivery = await self.send_message(user_id=person.messenger_max_id, text=message_text)
+            delivery = await self.send_message(
+                user_id=person.messenger_max_id, text=message_text
+            )
 
             return {
                 "sent": bool(delivery.get("sent")),
@@ -119,7 +128,9 @@ class MaxMessengerBot:
         finally:
             db.close()
 
-    def _set_bot_session(self, user_id: str, current_step: str, data_json: str = "{}") -> None:
+    def _set_bot_session(
+        self, user_id: str, current_step: str, data_json: str = "{}"
+    ) -> None:
         db = SessionLocal()
         try:
             session = db.query(BotSession).filter(BotSession.user_id == user_id).first()
@@ -127,7 +138,9 @@ class MaxMessengerBot:
                 session.current_step = current_step
                 session.data_json = data_json
             else:
-                session = BotSession(user_id=user_id, current_step=current_step, data_json=data_json)
+                session = BotSession(
+                    user_id=user_id, current_step=current_step, data_json=data_json
+                )
                 db.add(session)
             db.commit()
         except Exception:
@@ -165,7 +178,14 @@ class MaxMessengerBot:
         patronymic = " ".join(fio_tokens[2:]) if len(fio_tokens) > 2 else None
         return first_name, last_name, patronymic, dob_part
 
-    def _create_person_profile(self, user_id: str, first_name: str, last_name: str, patronymic: str | None, birth_date: str) -> dict[str, Any]:
+    def _create_person_profile(
+        self,
+        user_id: str,
+        first_name: str,
+        last_name: str,
+        patronymic: str | None,
+        birth_date: str,
+    ) -> dict[str, Any]:
         db = SessionLocal()
         try:
             person = Person(
@@ -191,7 +211,9 @@ class MaxMessengerBot:
             return {
                 "person_id": person.person_id,
                 "first_name": first_name,
-                "full_name": " ".join([p for p in (first_name, last_name) if p]).strip(),
+                "full_name": " ".join(
+                    [p for p in (first_name, last_name) if p]
+                ).strip(),
             }
         except Exception:
             db.rollback()
@@ -199,7 +221,9 @@ class MaxMessengerBot:
         finally:
             db.close()
 
-    async def _handle_registration_step(self, user_id: str, user_text: str) -> dict[str, Any]:
+    async def _handle_registration_step(
+        self, user_id: str, user_text: str
+    ) -> dict[str, Any]:
         parsed = self._parse_fio_dob(user_text.strip())
         if not parsed:
             response_text = (
@@ -252,8 +276,21 @@ class MaxMessengerBot:
                 )
                 .first()
             )
-            first_name = i18n.first_name if i18n and i18n.first_name else f"Персона #{person.person_id}"
-            full_name = " ".join([p for p in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if p]).strip()
+            first_name = (
+                i18n.first_name
+                if i18n and i18n.first_name
+                else f"Персона #{person.person_id}"
+            )
+            full_name = " ".join(
+                [
+                    p
+                    for p in (
+                        i18n.first_name if i18n else None,
+                        i18n.last_name if i18n else None,
+                    )
+                    if p
+                ]
+            ).strip()
             if not full_name:
                 full_name = first_name
 
@@ -268,7 +305,12 @@ class MaxMessengerBot:
     def _get_unlinked_people(self) -> list[dict[str, Any]]:
         db = SessionLocal()
         try:
-            people = db.query(Person).filter(Person.messenger_max_id.is_(None)).order_by(Person.person_id).all()
+            people = (
+                db.query(Person)
+                .filter(Person.messenger_max_id.is_(None))
+                .order_by(Person.person_id)
+                .all()
+            )
             result: list[dict[str, Any]] = []
             for person in people:
                 i18n = (
@@ -280,20 +322,33 @@ class MaxMessengerBot:
                     .first()
                 )
                 full_name = " ".join(
-                    [p for p in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if p]
+                    [
+                        p
+                        for p in (
+                            i18n.first_name if i18n else None,
+                            i18n.last_name if i18n else None,
+                        )
+                        if p
+                    ]
                 ).strip()
                 if not full_name:
                     full_name = f"Персона #{person.person_id}"
-                result.append({
-                    "person_id": person.person_id,
-                    "full_name": full_name,
-                    "first_name": i18n.first_name if i18n and i18n.first_name else full_name,
-                })
+                result.append(
+                    {
+                        "person_id": person.person_id,
+                        "full_name": full_name,
+                        "first_name": (
+                            i18n.first_name if i18n and i18n.first_name else full_name
+                        ),
+                    }
+                )
             return result
         finally:
             db.close()
 
-    def _bind_user_to_person(self, user_id: str, person_id: int) -> dict[str, Any] | None:
+    def _bind_user_to_person(
+        self, user_id: str, person_id: int
+    ) -> dict[str, Any] | None:
         db = SessionLocal()
         try:
             person = (
@@ -321,8 +376,21 @@ class MaxMessengerBot:
                 )
                 .first()
             )
-            first_name = i18n.first_name if i18n and i18n.first_name else f"Персона #{person.person_id}"
-            full_name = " ".join([p for p in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if p]).strip()
+            first_name = (
+                i18n.first_name
+                if i18n and i18n.first_name
+                else f"Персона #{person.person_id}"
+            )
+            full_name = " ".join(
+                [
+                    p
+                    for p in (
+                        i18n.first_name if i18n else None,
+                        i18n.last_name if i18n else None,
+                    )
+                    if p
+                ]
+            ).strip()
             if not full_name:
                 full_name = first_name
             return {
@@ -336,12 +404,16 @@ class MaxMessengerBot:
         finally:
             db.close()
 
-    async def _run_identification_flow(self, user_id: str, user_text: str) -> dict[str, Any]:
+    async def _run_identification_flow(
+        self, user_id: str, user_text: str
+    ) -> dict[str, Any]:
         normalized = user_text.strip().lower()
         unlinked = self._get_unlinked_people()
 
         if normalized == "новый":
-            self._set_bot_session(user_id=user_id, current_step="AWAITING_FIO_DOB", data_json="{}")
+            self._set_bot_session(
+                user_id=user_id, current_step="AWAITING_FIO_DOB", data_json="{}"
+            )
             response_text = "Понял! Давайте создадим ваш профиль. Пожалуйста, напишите ваше полное ФИО и дату рождения (ГГГГ-ММ-ДД)."
             delivery = await self.send_message(user_id, response_text)
             return {
@@ -355,7 +427,9 @@ class MaxMessengerBot:
             idx = int(normalized)
             if 1 <= idx <= len(unlinked):
                 selected = unlinked[idx - 1]
-                bound = self._bind_user_to_person(user_id=user_id, person_id=selected["person_id"])
+                bound = self._bind_user_to_person(
+                    user_id=user_id, person_id=selected["person_id"]
+                )
                 if bound:
                     response_text = (
                         f"Приятно познакомиться, {bound['first_name']}! "
@@ -377,7 +451,10 @@ class MaxMessengerBot:
         await self.send_message(user_id, greeting)
 
         if unlinked:
-            lines = [f"{i}. {person['full_name']}" for i, person in enumerate(unlinked, start=1)]
+            lines = [
+                f"{i}. {person['full_name']}"
+                for i, person in enumerate(unlinked, start=1)
+            ]
             list_text = "\n".join(lines)
         else:
             list_text = "Список пока пуст."
@@ -393,11 +470,15 @@ class MaxMessengerBot:
             "candidates_count": len(unlinked),
         }
 
-    async def process_incoming_text(self, user_id: str, user_text: str, audio_url: str = None) -> dict[str, Any]:
+    async def process_incoming_text(
+        self, user_id: str, user_text: str, audio_url: str = None
+    ) -> dict[str, Any]:
         """Process incoming message text, then send response to MAX."""
         session = self._get_bot_session(user_id)
         if session and session.current_step == "AWAITING_FIO_DOB":
-            registration = await self._handle_registration_step(user_id=user_id, user_text=user_text)
+            registration = await self._handle_registration_step(
+                user_id=user_id, user_text=user_text
+            )
             return {
                 "bot_id": self.bot_id,
                 "status": self.integration_status,
@@ -409,7 +490,9 @@ class MaxMessengerBot:
 
         person = self._find_person_by_max_id(user_id)
         if not person:
-            identification = await self._run_identification_flow(user_id=user_id, user_text=user_text)
+            identification = await self._run_identification_flow(
+                user_id=user_id, user_text=user_text
+            )
             return {
                 "bot_id": self.bot_id,
                 "status": self.integration_status,
@@ -442,9 +525,13 @@ class MaxMessengerBot:
             "delivery": delivery,
         }
 
-    async def process_incoming_audio(self, user_id: str, audio_url: str) -> dict[str, Any]:
+    async def process_incoming_audio(
+        self, user_id: str, audio_url: str
+    ) -> dict[str, Any]:
         """Download incoming audio, transcribe it, then process as text."""
-        await self.send_message(user_id, "Получил ваше голосовое сообщение. Начинаю расшифровку... 🎙️")
+        await self.send_message(
+            user_id, "Получил ваше голосовое сообщение. Начинаю расшифровку... 🎙️"
+        )
 
         parsed = urlparse(audio_url)
         _, ext = os.path.splitext(parsed.path)
