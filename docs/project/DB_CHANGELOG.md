@@ -3,6 +3,51 @@
 > Журнал всех изменений схемы и данных базы данных.  
 > Каждая запись документирует **что** изменилось, **зачем** и **как откатить**.
 
+## [1.9] — 2026-04-30 — T-DB-DEMO-2026-04-30-01: demo_table (Alembic)
+
+**Тип:** Schema + Migration  
+**Автор:** project owner  
+**ADR:** —  
+**Обратимость:** Reversible (`DROP TABLE demo_table;`)
+
+#### Описание
+
+Тестовый прогон Alembic‑миграций end‑to‑end: создание новой таблицы через SQLAlchemy model + Alembic revision, применение на dev (Mac) и на сервере.
+
+#### Изменения
+
+| Действие | Объект | Детали |
+|----------|--------|--------|
+| CREATE TABLE | `demo_table` | `id` (PK), `name` (varchar(100), not null), `note` (varchar(255), null) |
+
+#### SQL
+
+```sql
+-- Forward (применение)
+CREATE TABLE demo_table (
+  id   INTEGER PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  note VARCHAR(255)
+);
+
+-- Rollback (откат)
+DROP TABLE demo_table;
+```
+
+#### Валидация
+
+```sql
+\d+ demo_table;
+INSERT INTO demo_table (name, note) VALUES ('test', 'from migration');
+SELECT * FROM demo_table;
+```
+
+#### Затронутый код
+- `alembic/versions/557fa6e449c1_t_db_demo_2026_04_30_01_create_demo_.py` — Alembic revision (create/drop `demo_table`).
+- `app/models/__init__.py` — модель `DemoTable`.
+
+---
+
 ## [1.8] — 2026-04-23 — T20: personaliases (разговорные имена и обращения)
 
 **Тип:** Schema + Migration  

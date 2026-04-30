@@ -2226,3 +2226,22 @@ Yes — введена модель веток разработки.
 * Repeatable schema evolution path
 * Better production diagnostics
 * Reduced manual deployment risk
+
+---
+
+## 2026-04-30 — T-DB-DEMO-2026-04-30-01
+
+### Alembic migration smoke: demo_table (Mac → server)
+
+**Structural change:** No  
+**Schema change:** Yes — new table `demo_table` via Alembic
+
+### Changes
+
+- Добавлена тестовая модель `DemoTable` и Alembic‑ревизия `557fa6e449c1` (create/drop `demo_table`).
+- Выполнен прогон миграции на dev‑БД (Mac) и на серверной БД (под safety_snapshot).
+
+### Validation / Proof
+
+- `alembic upgrade head` выполнен успешно на обоих окружениях.
+- `psql ... \d+ demo_table` на сервере показывает таблицу `public.demo_table` с колонками `id/name/note`.
