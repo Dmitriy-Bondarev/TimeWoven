@@ -19,8 +19,8 @@ def health():
         db_status = "error"
 
     try:
-    result = resolve_family(None)
-    resolver_status = result.get("status", "ok") if isinstance(result, dict) else "ok"
+        result = resolve_family(None)
+        resolver_status = result.get("status", "ok") if isinstance(result, dict) else "ok"
     except Exception:
     resolver_status = "error"
 
