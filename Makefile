@@ -76,10 +76,6 @@ upgrade:
 downgrade:
 	poetry run alembic downgrade -1
 
-
-downgrade:
-	poetry run alembic downgrade -1
-
 revision:
 	@if [ -z "$(msg)" ]; then \
 	  echo "ERROR: please provide msg, e.g. 'make revision msg=add_early_access'"; \
