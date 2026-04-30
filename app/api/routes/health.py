@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 from sqlalchemy import text
-from app.db.session import SessionLocal
+
 from app.core.family_resolver import resolve_family
+from app.db.session import SessionLocal
 
 router = APIRouter()
 @router.get("/health")

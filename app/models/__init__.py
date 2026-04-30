@@ -15,6 +15,7 @@ from sqlalchemy.sql import func
 
 from app.db.base import Base
 
+
 class Person(Base):
     __tablename__ = "People"
 
