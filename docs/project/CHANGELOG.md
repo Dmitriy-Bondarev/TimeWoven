@@ -7,6 +7,7 @@
 - Introduced Git branching workflow: main / develop / feature branches
 - Direct commits to main are now prohibited
 - (2026-04-30) **Docs**: resolved merge-conflict markers in `docs/core/Rules_of_work.md`.
+- (2026-04-30) **Operations (T-P2-007)**: repaired `/deploy` control-plane endpoint — removed silent 500s on missing `GITHUB_WEBHOOK_SECRET` (now explicit 503 + server-side exception logging), and made server toolchain deterministic via systemd `PATH` + `python -m uvicorn` (added `/etc/profile.d/timewoven.sh` for interactive shell).
 - (2026-04-30) **Infrastructure (T-P2-003)**: hardened GitHub Actions CI gatekeeper — Python pinned to **3.10.12**, `ruff`/`black --check` now cover `app/` and `scripts/`, added Alembic migrations smoke-check and pytest run (no-tests exit is allowed) to prevent regressions before merge.
 - (2026-04-30) **Infrastructure (T-P2-004)**: migrated dependency management to **Poetry** — dependencies moved from `requirements.txt` into `pyproject.toml`, generated `poetry.lock` for reproducible installs, updated `Makefile` and CI to use `poetry install` / `poetry run`, removed `requirements.txt` as source of truth.
 - (2026-04-30) **Infrastructure (T-P2-004)**: fixed pytest import path for Poetry/CI — set `pythonpath=["."]` in `pyproject.toml` to prevent `ModuleNotFoundError: app`.
