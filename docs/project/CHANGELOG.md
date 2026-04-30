@@ -521,7 +521,7 @@
 
 ### Bugfix | QA
 
-- **Bugfix (Template Render)**: `app/web/templates/family_tree.html` — удалены дублирующиеся `{% extends %}` / `{% block content %}`, которые вызывали `500` (`TemplateSyntaxError: Unexpected end of template`) на `/family/tree` после авторизации.
+- **Bugfix (Template Render)**: `app/web/templates/family_tree.html` — удалены дублирующиеся `{% raw %}{% extends %}{% endraw %}` / `{% raw %}{% block content %}{% endraw %}`, которые вызывали `500` (`TemplateSyntaxError: Unexpected end of template`) на `/family/tree` после авторизации.
 - **Bugfix (Frontend Asset Integrity)**: `app/web/static/js/family_graph.js` — устранено повреждение файла (смешение v1/v2 кода, `Unexpected end of input` в браузере). Файл принудительно переписан в единый валидный Graph v2 скрипт.
 - **QA (Smoke Test)**: Выполнен browser-level smoke-test (Playwright, headless Chromium) с cookie-авторизацией: render=true, click_focus=true, tooltip=true, union_click_no_focus_change=true, filters=true, depth=true, history=true, page_errors=[].
 - **Known non-blocking**: В console фиксируется внешний SRI warning для Font Awesome CSS (из базового шаблона), не влияет на рендер/работу семейного графа.
