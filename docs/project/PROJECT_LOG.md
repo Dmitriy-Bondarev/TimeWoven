@@ -1780,7 +1780,7 @@ Schema change: No.
 
 Changes:
 - В ops/whisper_small/ добавлен FastAPI-сервис service.py с эндпоинтами GET /health и POST /transcribe, использующий модель WhisperModel("small", device="cpu", compute_type="int8") с параметрами beam_size=2 и temperature=0.0.
-- Подготовлен Dockerfile на базе python:3.11-slim с установкой faster-whisper и ffmpeg, а также docker-compose.yml для сервиса timewoven-whisper-small, слушающего только 127.0.0.1:9100.
+- Подготовлен Dockerfile на базе python:3.10.12-slim с установкой faster-whisper и ffmpeg, а также docker-compose.yml для сервиса timewoven-whisper-small, слушающего только 127.0.0.1:9100.
 - Добавлен systemd-юнит timewoven-whisper.service, запускающий docker compose up -d --build и обеспечивающий автозапуск Whisper-сервиса после перезагрузки VPS.
 - В .env настроены переменные WHISPER_PROVIDER=local_small и WHISPER_LOCAL_URL=http://127.0.0.1:9100/transcribe для дальнейшей интеграции в TranscriptionService.
 

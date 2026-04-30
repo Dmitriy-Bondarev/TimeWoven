@@ -36,3 +36,9 @@ starlette-session==0.4.3
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.39.0
+
+# CI / quality gate
+alembic
+black
+pytest
+ruff

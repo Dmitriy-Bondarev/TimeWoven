@@ -51,11 +51,11 @@ test:
 
 
 lint:
-	ruff check .
+	ruff check app scripts
 
 
 fmt:
-	black .
+	black app scripts
 	# или, если перейдёшь на форматер ruff:
 	# ruff format .
 
