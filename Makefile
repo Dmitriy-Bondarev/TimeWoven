@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint fmt run migrate migrate-check revision upgrade downgrade db-shell clean health snapshot
+.PHONY: help install dev test lint fmt run migrate migrate-check revision upgrade downgrade db-shell clean health snapshot cursorrules-sync
 
 
 # =========================
@@ -107,3 +107,7 @@ health:
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
+
+
+cursorrules-sync:
+	bash scripts/ops/sync_cursorrules_to_server.sh

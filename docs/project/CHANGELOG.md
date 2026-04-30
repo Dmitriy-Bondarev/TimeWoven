@@ -6,6 +6,7 @@
 
 - Introduced Git branching workflow: main / develop / feature branches
 - Direct commits to main are now prohibited
+- (2026-04-30) **Operations**: added `scripts/ops/sync_cursorrules_to_server.sh` + `make cursorrules-sync` to sync `.cursorrules` into the server repo directory.
 
 ## v1.22.39 — 2026-04-27
 
