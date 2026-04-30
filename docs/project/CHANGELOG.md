@@ -12,6 +12,7 @@
 - (2026-04-30) **Infrastructure (T-P2-004)**: fixed CI bootstrapping — `setup-python` no longer uses `cache: poetry` (it required Poetry before install); CI now caches `pip` and installs Poetry explicitly.
 - (2026-04-30) **Operations**: added `scripts/ops/sync_cursorrules_to_server.sh` + `make cursorrules-sync` to sync `.cursorrules` into the server repo directory.
 - (2026-04-30) **Cursor / AI rules (T-Update_CursorRules)**: переработан корневой `.cursorrules` — роль implementation-агента, обязательные ссылки на `PROJECT_OPS_PROTOCOL.md`, `Rules_of_work.md`, `AI_INIT.md`; секции Git Flow/Ops, CHANGELOG, ФЗ-152 и имплементации без расширения scope.
+- (2026-04-30) **Infrastructure (CI)**: применён `black` к `app/api/routes/health.py` и `app/main.py` (фикс падения `black --check` на ветке `develop`).
 
 ## v1.22.39 — 2026-04-27
 

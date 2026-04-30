@@ -5,6 +5,8 @@ from app.core.family_resolver import resolve_family
 from app.db.session import SessionLocal
 
 router = APIRouter()
+
+
 @router.get("/health")
 def health():
     db_status = "ok"
