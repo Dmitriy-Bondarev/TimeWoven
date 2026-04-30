@@ -11,7 +11,6 @@ from typing import Iterator
 
 from dotenv import load_dotenv
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -19,7 +18,6 @@ if str(PROJECT_ROOT) not in sys.path:
 load_dotenv(PROJECT_ROOT / ".env", override=True)
 
 from app.services.ai_analyzer import analyze_memory_text
-
 
 TEST_TEXT = "В 1976 году бабушка Анна переехала в Томск."
 
@@ -113,7 +111,9 @@ def test_local_stub_missing_url() -> None:
 
 
 def test_local_stub_broken_url() -> None:
-    with temporary_env(AI_PROVIDER="local_stub", AI_LOCAL_STUB_URL="http://127.0.0.1:1/analyze"):
+    with temporary_env(
+        AI_PROVIDER="local_stub", AI_LOCAL_STUB_URL="http://127.0.0.1:1/analyze"
+    ):
         result = analyze_memory_text(TEST_TEXT)
     assert result["status"] == "error", result
     assert result["raw_provider"]["provider"] == "local_stub", result

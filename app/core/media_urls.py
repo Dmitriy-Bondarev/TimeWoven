@@ -57,4 +57,3 @@ def normalize_media_url(url: str | None, slug: str) -> str | None:
 def family_data_path_for_slug(slug: str) -> str:
     family = resolve_family((slug or "").strip() or default_family_slug())
     return str(family["data_path"])
-

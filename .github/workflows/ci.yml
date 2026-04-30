@@ -2,16 +2,14 @@ name: TimeWoven CI
 
 on:
   push:
-    branches:
-      - develop
-      - main
+    branches: ["**"]
   pull_request:
     branches:
       - develop
       - main
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,10 +19,41 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.10.12"
+          cache: "pip"
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry
+          poetry --version
+          poetry config virtualenvs.in-project true
 
-      - name: Smoke check
-        run: echo "CI OK"
+      - name: Install dependencies (Poetry)
+        run: |
+          poetry install --no-interaction
+
+      - name: Code quality (ruff, black)
+        run: |
+          poetry run ruff check app scripts
+          poetry run black --check app scripts
+
+      - name: Migrations check (alembic offline + single head)
+        env:
+          # Offline mode doesn't connect; URL is used for dialect rendering/import safety.
+          DATABASE_URL: postgresql+psycopg2://ci:ci@localhost:5432/timewoven_ci
+        run: |
+          poetry run alembic heads
+          poetry run alembic upgrade head --sql > /dev/null
+
+      - name: Tests (pytest; allow empty suite)
+        shell: bash
+        run: |
+          set -euo pipefail
+          poetry run pytest -q || rc=$?
+          if [[ "${rc:-0}" -eq 0 ]]; then exit 0; fi
+          if [[ "$rc" -eq 5 ]]; then
+            echo "pytest: no tests collected (allowed)"
+            exit 0
+          fi
+          exit "$rc"

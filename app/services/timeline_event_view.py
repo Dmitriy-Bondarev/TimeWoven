@@ -2,6 +2,7 @@
 View-layer «события» таймлайна поверх family-visible memories (без БД, без миграций).
 TW-2026-04-26-B3
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -35,7 +36,9 @@ def _memory_title_and_preview(m: Memory) -> tuple[str, str]:
     first_line = text.split("\n", 1)[0].strip()
     title_src = tr._own_story_line_title_src(first_line)
     display_title = (
-        tr._text_excerpt(title_src, tr._OWN_STORY_TITLE_MAX).strip() if title_src else ""
+        tr._text_excerpt(title_src, tr._OWN_STORY_TITLE_MAX).strip()
+        if title_src
+        else ""
     )
     if not display_title or not display_title.replace("…", "").strip():
         display_title = "Без заголовка"
@@ -69,13 +72,19 @@ def memory_to_timeline_event_view(
         return None
     meaning = _meaning_layer_for_family(m, title, preview)
     ev_raw = m.created_at
-    event_date = (ev_raw or "") if isinstance(ev_raw, str) else (str(ev_raw) if ev_raw is not None else "")
+    event_date = (
+        (ev_raw or "")
+        if isinstance(ev_raw, str)
+        else (str(ev_raw) if ev_raw is not None else "")
+    )
     raw_author = (author_display_name or "").strip()
     if not raw_author and m.author_id is not None:
         raw_author = f"Персона #{m.author_id}"
     if not raw_author:
         raw_author = "Неизвестный автор"
-    author_person_href = f"/family/person/{m.author_id}" if m.author_id is not None else ""
+    author_person_href = (
+        f"/family/person/{m.author_id}" if m.author_id is not None else ""
+    )
     return TimelineEventView(
         source_memory_id=m.id,
         person_id=m.author_id,

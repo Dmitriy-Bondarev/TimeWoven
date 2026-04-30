@@ -3,23 +3,34 @@ import re
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 from urllib.parse import quote, unquote, urlparse
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Form, Query, HTTPException, Request, File, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import and_, or_, func, false
+from sqlalchemy import and_, false, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.i18n import install_jinja_i18n
-from app.core.media_urls import default_family_slug, family_data_path_for_slug, normalize_media_url
+from app.core.media_urls import (
+    default_family_slug,
+    family_data_path_for_slug,
+    normalize_media_url,
+)
 from app.core.whoami_experiment import is_whoami_experiment_enabled
 from app.db.session import get_db
 from app.models import Memory, Person, PersonI18n, Quote
 from app.schemas.family_graph import FamilyGraph
-from app.services.family_graph import build_family_graph
-from app.services.timeline_event_view import memory_to_timeline_event_view, TimelineEventView
 from app.services.family_access_service import (
     DEFAULT_SESSION_TTL,
     check_rate_limit,
@@ -32,6 +43,11 @@ from app.services.family_access_service import (
     set_totp_last_used,
     use_one_backup_code,
     verify_totp_code,
+)
+from app.services.family_graph import build_family_graph
+from app.services.timeline_event_view import (
+    TimelineEventView,
+    memory_to_timeline_event_view,
 )
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -80,7 +96,9 @@ def _role_caption_friendly(role: str | None) -> str:
 
 
 def _memory_display_text(m: Memory) -> str:
-    return (m.transcript_readable or m.transcript_verbatim or m.content_text or "").strip()
+    return (
+        m.transcript_readable or m.transcript_verbatim or m.content_text or ""
+    ).strip()
 
 
 def _text_excerpt(text: str, max_len: int = 220) -> str:
@@ -143,7 +161,9 @@ def _hero_date_humane_for_display(s: str) -> str | None:
         y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
         if 1 <= mo <= 12 and 1 <= d <= 31:
             return f"{d:02d}.{mo:02d}.{y}"
-        return str(y)  # сырой ISO с нелегальным днём/месяцем — не показывать D.M, только год
+        return str(
+            y
+        )  # сырой ISO с нелегальным днём/месяцем — не показывать D.M, только год
     m = re.match(r"^(\d{1,2})\.(\d{1,2})\.(\d{4})$", t0)
     if m:
         d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
@@ -176,7 +196,9 @@ def _hero_lifespan_caption(
     return f"Дата смерти: {ddv}" if ddv else None
 
 
-def _family_hero_subtitle_one_line(person: Person, person_i18n: PersonI18n | None) -> str | None:
+def _family_hero_subtitle_one_line(
+    person: Person, person_i18n: PersonI18n | None
+) -> str | None:
     """
     One human line under the name for /family/person: dates (not ISO), maiden, short bio.
     Patronymic is not used here (only with first+last in the title line, see family_person).
@@ -188,9 +210,11 @@ def _family_hero_subtitle_one_line(person: Person, person_i18n: PersonI18n | Non
         line = _hero_lifespan_caption(bd, dd)
         if line:
             parts.append(line)
-    last_for_maiden = _nonempty_display_str(
-        person_i18n.last_name if person_i18n else None
-    ) if person_i18n else None
+    last_for_maiden = (
+        _nonempty_display_str(person_i18n.last_name if person_i18n else None)
+        if person_i18n
+        else None
+    )
     maiden = _nonempty_display_str(getattr(person, "maiden_name", None) or None)
     if maiden and maiden != (last_for_maiden or ""):
         parts.append(f"урожд. {maiden}")
@@ -287,7 +311,12 @@ def _ru_first_name_genitive_for_photo(first: str | None) -> str | None:
             g = t0[:-2] + "ия"
         elif len(tlow) >= 2 and tlow.endswith("ей"):
             g = t0[:-2] + "ея"
-        elif len(tlow) >= 1 and tlow.endswith("й") and not tlow.endswith("ий") and not tlow.endswith("ей"):
+        elif (
+            len(tlow) >= 1
+            and tlow.endswith("й")
+            and not tlow.endswith("ий")
+            and not tlow.endswith("ей")
+        ):
             g = t0[:-1] + "я"
         elif tlow.endswith("ь"):
             g = t0[:-1] + "я"
@@ -295,7 +324,12 @@ def _ru_first_name_genitive_for_photo(first: str | None) -> str | None:
             g = t0 + "а"
         elif tlow.endswith("а") and len(tlow) >= 2:
             g = t0[:-1] + "ы"
-        elif tlow.endswith("я") and len(tlow) >= 2 and not tlow.endswith("ия") and not tlow.endswith("ья"):
+        elif (
+            tlow.endswith("я")
+            and len(tlow) >= 2
+            and not tlow.endswith("ия")
+            and not tlow.endswith("ья")
+        ):
             g = t0[:-1] + "и"
         elif tlow.endswith("о") and len(tlow) >= 2:
             g = t0[:-1] + "а"
@@ -309,7 +343,10 @@ def _ru_first_name_genitive_for_photo(first: str | None) -> str | None:
 def _name_tokens_for_search(person_i18n: PersonI18n | None) -> list[str]:
     """Short tokens (first/last name) for memory text search, min length 2."""
     toks: list[str] = []
-    for raw in (person_i18n.first_name if person_i18n else None, person_i18n.last_name if person_i18n else None):
+    for raw in (
+        person_i18n.first_name if person_i18n else None,
+        person_i18n.last_name if person_i18n else None,
+    ):
         t = _nonempty_display_str(raw)
         if t and len(t) >= 2:
             toks.append(t)
@@ -328,7 +365,14 @@ def _author_display_name(session: Session, author_id: int | None) -> str:
         .first()
     )
     n = " ".join(
-        [p for p in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if p]
+        [
+            p
+            for p in (
+                i18n.first_name if i18n else None,
+                i18n.last_name if i18n else None,
+            )
+            if p
+        ]
     ).strip()
     return n or f"Персона #{author_id}"
 
@@ -408,7 +452,7 @@ _RE_OWN_STORY_SERVICE_LABEL = re.compile(
     r"^(?P<tp>тест_)?\s*"
     r"(?P<lab>(?:(?:очень\s+)?короткая|средняя|длинная)\s+история)\s*:\s*"
     r"(?P<rest>.*)$",
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 
 
@@ -471,7 +515,11 @@ def _own_memory_body_preview_for_card(full: str) -> str:
 
 def _own_memory_date_display(created: object) -> str:
     """DD.MM.YYYY, как в подзаголовке /family/person; без сырого ISO в карточке при нормальной дате."""
-    raw = (created or "") if isinstance(created, str) else (str(created) if created is not None else "")
+    raw = (
+        (created or "")
+        if isinstance(created, str)
+        else (str(created) if created is not None else "")
+    )
     raw = (raw or "").strip()
     if not raw:
         return "—"
@@ -510,7 +558,11 @@ def _own_memory_date_line_for_card(created: object) -> str:
     """
     Одна строка для мини‑таймлайна: «24 апр 2026»; год — если только год; иначе как _own_memory_date_display.
     """
-    raw = (created or "") if isinstance(created, str) else (str(created) if created is not None else "")
+    raw = (
+        (created or "")
+        if isinstance(created, str)
+        else (str(created) if created is not None else "")
+    )
     raw = (raw or "").strip()
     if not raw:
         return "—"
@@ -521,7 +573,9 @@ def _own_memory_date_line_for_card(created: object) -> str:
             y, mo, d = int(m0.group(1)), int(m0.group(2)), int(m0.group(3))
             if 1 <= mo <= 12 and 1 <= d <= 31:
                 return f"{d} {_RU_MONTHS_SHORT_3[mo - 1]} {y}"
-    m1 = re.match(r"^(\d{1,2})\.(\d{1,2})\.(\d{4})$", raw[:10] if len(raw) >= 10 else raw)
+    m1 = re.match(
+        r"^(\d{1,2})\.(\d{1,2})\.(\d{4})$", raw[:10] if len(raw) >= 10 else raw
+    )
     if m1:
         d, mo, y = int(m1.group(1)), int(m1.group(2)), int(m1.group(3))
         if 1 <= mo <= 12 and 1 <= d <= 31:
@@ -538,7 +592,9 @@ def _family_own_memory_card(session: Session, m: Memory) -> dict:
         return {}
     first_line = text.split("\n", 1)[0].strip()
     title_src = _own_story_line_title_src(first_line)
-    display_title = _text_excerpt(title_src, _OWN_STORY_TITLE_MAX).strip() if title_src else ""
+    display_title = (
+        _text_excerpt(title_src, _OWN_STORY_TITLE_MAX).strip() if title_src else ""
+    )
     if not display_title or not display_title.replace("…", "").strip():
         display_title = "Без заголовка"
     preview = _own_memory_body_preview_for_card(text)
@@ -580,7 +636,9 @@ def _get_family_member_id(request: Request) -> int | None:
     return int(raw)
 
 
-def _require_family_session(request: Request, db: Session | None = None) -> RedirectResponse | None:
+def _require_family_session(
+    request: Request, db: Session | None = None
+) -> RedirectResponse | None:
     if db is not None and resolve_viewer(request, db) is not None:
         return None
     if _get_family_member_id(request) is not None:
@@ -610,7 +668,9 @@ def _redirect_if_whoami_disabled(*, next_url: str | None) -> RedirectResponse | 
 @router.get("/f/{slug}" + FAMILY_NEED_ACCESS_PATH, response_class=HTMLResponse)
 async def family_need_access(
     request: Request,
-    next: str = Query("/family/welcome", description="Куда вернуться после входа по семейной ссылке"),
+    next: str = Query(
+        "/family/welcome", description="Куда вернуться после входа по семейной ссылке"
+    ),
 ):
     return templates.TemplateResponse(
         "family/need_family_access.html",
@@ -776,17 +836,21 @@ async def family_leave_session() -> RedirectResponse:
 
 
 @router.get("/family/tree", response_class=HTMLResponse, name="family_tree_page")
-@router.get("/f/{slug}/family/tree", response_class=HTMLResponse, name="family_tree_page_slug")
+@router.get(
+    "/f/{slug}/family/tree", response_class=HTMLResponse, name="family_tree_page_slug"
+)
 async def family_tree_page(
     request: Request,
     root_person_id: int = Query(1, description="ID персоны для корня графа"),
     depth: int = Query(2, ge=1, le=10, description="Глубина поиска (1-10)"),
-    year: int | None = Query(None, ge=1000, le=2100, description="Год для temporal-режима"),
+    year: int | None = Query(
+        None, ge=1000, le=2100, description="Год для temporal-режима"
+    ),
     db: Session = Depends(get_db),
 ):
     """
     Страница визуализации семейного графа.
-    
+
     :param root_person_id: ID персоны для корня графа
     :param depth: Глубина BFS (кол-во уровней Person <-> Union переходов)
     """
@@ -794,7 +858,9 @@ async def family_tree_page(
     if redirect:
         return redirect
 
-    logger.info(f"Family tree page requested: root={root_person_id}, depth={depth}, year={year}")
+    logger.info(
+        f"Family tree page requested: root={root_person_id}, depth={depth}, year={year}"
+    )
     return templates.TemplateResponse(
         "family_tree.html",
         {
@@ -811,28 +877,32 @@ async def family_tree_page(
 async def family_tree_json(
     root_person_id: int = Query(..., description="ID персоны для корня графа"),
     depth: int = Query(2, ge=1, le=10, description="Глубина поиска (1-10)"),
-    year: int | None = Query(None, ge=1000, le=2100, description="Год для temporal-режима"),
+    year: int | None = Query(
+        None, ge=1000, le=2100, description="Год для temporal-режима"
+    ),
     session: Session = Depends(get_db),
 ):
     """
     API эндпоинт для получения семейного графа в формате JSON.
-    
+
     Возвращает структуру:
     {
       "nodes": [...],
       "edges": [...]
     }
-    
+
     Узлы могут быть типов "person" или "union".
     Рёбра типов "partner" (Person <-> Union) или "child" (Union <-> Person).
-    
+
     :param root_person_id: ID персоны для корня графа
     :param depth: Глубина BFS (1-10)
     :param session: Database session
     :return: FamilyGraph с nodes и edges
     """
-    logger.info(f"Family tree JSON API: root={root_person_id}, depth={depth}, year={year}")
-    
+    logger.info(
+        f"Family tree JSON API: root={root_person_id}, depth={depth}, year={year}"
+    )
+
     try:
         graph = build_family_graph(
             root_person_id=root_person_id,
@@ -883,7 +953,11 @@ async def family_person(
 
     first_n = _nonempty_display_str(person_i18n.first_name if person_i18n else None)
     last_n = _nonempty_display_str(person_i18n.last_name if person_i18n else None)
-    pat_n = _nonempty_display_str(person_i18n.patronymic if person_i18n else None) if person_i18n else None
+    pat_n = (
+        _nonempty_display_str(person_i18n.patronymic if person_i18n else None)
+        if person_i18n
+        else None
+    )
     if first_n:
         name_segs: list[str] = [first_n] + ([pat_n] if pat_n else [])
         if last_n:
@@ -909,10 +983,14 @@ async def family_person(
     )
     quotes_count = session.query(Quote).filter(Quote.author_id == person_id).count()
 
-    hero_subtitle = _nonempty_display_str(_family_hero_subtitle_one_line(person, person_i18n))
+    hero_subtitle = _nonempty_display_str(
+        _family_hero_subtitle_one_line(person, person_i18n)
+    )
 
     profile_is_living = (getattr(person, "is_alive", 0) or 0) == 1
-    photo_possessive_name = None if profile_is_living else _ru_first_name_genitive_for_photo(first_n)
+    photo_possessive_name = (
+        None if profile_is_living else _ru_first_name_genitive_for_photo(first_n)
+    )
 
     tokens = _name_tokens_for_search(person_i18n)
     mention_memories: list[dict] = []
@@ -921,7 +999,11 @@ async def family_person(
         like_conds = []
         for tok in tokens:
             pat = f"%{tok}%"
-            for col in (Memory.transcript_readable, Memory.transcript_verbatim, Memory.content_text):
+            for col in (
+                Memory.transcript_readable,
+                Memory.transcript_verbatim,
+                Memory.content_text,
+            ):
                 like_conds.append(col.ilike(pat))
         mention_base = (
             session.query(Memory)
@@ -1033,6 +1115,7 @@ async def family_timeline(
         return redirect
 
     from app.models import Union, UnionChild
+
     slug = request.path_params.get("slug") or default_family_slug()
 
     items = []
@@ -1055,7 +1138,9 @@ async def family_timeline(
                 related_person_ids.add(related_union.partner2_id)
             child_ids = [
                 row.child_id
-                for row in db.query(UnionChild).filter(UnionChild.union_id == related_union.id).all()
+                for row in db.query(UnionChild)
+                .filter(UnionChild.union_id == related_union.id)
+                .all()
                 if row.child_id is not None and row.child_id in visible_person_ids
             ]
             related_person_ids.update(child_ids)
@@ -1074,7 +1159,14 @@ async def family_timeline(
             .first()
         )
         name = " ".join(
-            [p for p in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if p]
+            [
+                p
+                for p in (
+                    i18n.first_name if i18n else None,
+                    i18n.last_name if i18n else None,
+                )
+                if p
+            ]
         ).strip()
         if not name:
             name = f"Персона #{person.person_id}"
@@ -1108,11 +1200,20 @@ async def family_timeline(
             )
 
     for union in db.query(Union).all():
-        if union.partner1_id is not None and union.partner1_id not in visible_person_ids:
+        if (
+            union.partner1_id is not None
+            and union.partner1_id not in visible_person_ids
+        ):
             continue
-        if union.partner2_id is not None and union.partner2_id not in visible_person_ids:
+        if (
+            union.partner2_id is not None
+            and union.partner2_id not in visible_person_ids
+        ):
             continue
-        if person_id is not None and person_id not in (union.partner1_id, union.partner2_id):
+        if person_id is not None and person_id not in (
+            union.partner1_id,
+            union.partner2_id,
+        ):
             continue
         if union_id is not None and union.id != union_id:
             continue
@@ -1122,20 +1223,32 @@ async def family_timeline(
             p2_name = "Персона"
 
             if union.partner1_id:
-                i1 = db.query(PersonI18n).filter(
-                    PersonI18n.person_id == union.partner1_id,
-                    PersonI18n.lang_code == "ru",
-                ).first()
+                i1 = (
+                    db.query(PersonI18n)
+                    .filter(
+                        PersonI18n.person_id == union.partner1_id,
+                        PersonI18n.lang_code == "ru",
+                    )
+                    .first()
+                )
                 if i1:
-                    p1_name = " ".join([p for p in (i1.first_name, i1.last_name) if p]).strip()
+                    p1_name = " ".join(
+                        [p for p in (i1.first_name, i1.last_name) if p]
+                    ).strip()
 
             if union.partner2_id:
-                i2 = db.query(PersonI18n).filter(
-                    PersonI18n.person_id == union.partner2_id,
-                    PersonI18n.lang_code == "ru",
-                ).first()
+                i2 = (
+                    db.query(PersonI18n)
+                    .filter(
+                        PersonI18n.person_id == union.partner2_id,
+                        PersonI18n.lang_code == "ru",
+                    )
+                    .first()
+                )
                 if i2:
-                    p2_name = " ".join([p for p in (i2.first_name, i2.last_name) if p]).strip()
+                    p2_name = " ".join(
+                        [p for p in (i2.first_name, i2.last_name) if p]
+                    ).strip()
 
             items.append(
                 {
@@ -1186,7 +1299,9 @@ async def family_timeline(
         memories_query = memories_query.filter(Memory.author_id == person_id)
     if union_id is not None:
         if related_person_ids:
-            memories_query = memories_query.filter(Memory.author_id.in_(list(related_person_ids)))
+            memories_query = memories_query.filter(
+                Memory.author_id.in_(list(related_person_ids))
+            )
         else:
             memories_query = memories_query.filter(false())
 
@@ -1202,9 +1317,20 @@ async def family_timeline(
             )
             .first()
         )
-        author_name = " ".join(
-            [p for p in (author_i18n.first_name if author_i18n else None, author_i18n.last_name if author_i18n else None) if p]
-        ).strip() if author_i18n else None
+        author_name = (
+            " ".join(
+                [
+                    p
+                    for p in (
+                        author_i18n.first_name if author_i18n else None,
+                        author_i18n.last_name if author_i18n else None,
+                    )
+                    if p
+                ]
+            ).strip()
+            if author_i18n
+            else None
+        )
         if not author_name:
             author_name = f"Персона #{memory.author_id}"
 
@@ -1258,7 +1384,9 @@ async def family_timeline(
 
 @router.get("/family/welcome", response_class=HTMLResponse)
 @router.get("/f/{slug}/family/welcome", response_class=HTMLResponse)
-async def family_welcome(request: Request, person_id: int = Query(None), db: Session = Depends(get_db)):
+async def family_welcome(
+    request: Request, person_id: int = Query(None), db: Session = Depends(get_db)
+):
     redirect = _require_family_session(request, db)
     if redirect:
         return redirect
@@ -1315,9 +1443,13 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
                 .first()
             )
             if i18n:
-                author_name = " ".join([p for p in (i18n.first_name, i18n.last_name) if p]).strip()
+                author_name = " ".join(
+                    [p for p in (i18n.first_name, i18n.last_name) if p]
+                ).strip()
 
-            person = db.query(Person).filter(Person.person_id == memory.author_id).first()
+            person = (
+                db.query(Person).filter(Person.person_id == memory.author_id).first()
+            )
             if person and person.avatar_url:
                 author_avatar = normalize_media_url(person.avatar_url, slug) or ""
 
@@ -1331,7 +1463,9 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
 
     memory_audio_url = ""
     if memory and (memory.audio_url or "").strip():
-        memory_audio_url = normalize_media_url((memory.audio_url or "").strip(), slug) or ""
+        memory_audio_url = (
+            normalize_media_url((memory.audio_url or "").strip(), slug) or ""
+        )
 
     return templates.TemplateResponse(
         "family/welcome.html",
@@ -1350,7 +1484,9 @@ async def family_welcome(request: Request, person_id: int = Query(None), db: Ses
 
 @router.get("/who-am-i", response_class=HTMLResponse)
 @router.get("/f/{slug}/who-am-i", response_class=HTMLResponse)
-async def who_am_i(request: Request, next: str = "/family/welcome", db: Session = Depends(get_db)):
+async def who_am_i(
+    request: Request, next: str = "/family/welcome", db: Session = Depends(get_db)
+):
     r = _redirect_if_whoami_disabled(next_url=next)
     if r is not None:
         return r
@@ -1377,7 +1513,14 @@ async def who_am_i(request: Request, next: str = "/family/welcome", db: Session 
             .first()
         )
         name = " ".join(
-            [p for p in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if p]
+            [
+                p
+                for p in (
+                    i18n.first_name if i18n else None,
+                    i18n.last_name if i18n else None,
+                )
+                if p
+            ]
         ).strip()
         if not name:
             name = f"Персона #{person.person_id}"
@@ -1456,7 +1599,14 @@ async def who_am_i_pin(
         .first()
     )
     name = " ".join(
-        [p for p in (i18n.first_name if i18n else None, i18n.last_name if i18n else None) if p]
+        [
+            p
+            for p in (
+                i18n.first_name if i18n else None,
+                i18n.last_name if i18n else None,
+            )
+            if p
+        ]
     ).strip()
     if not name:
         name = f"Персона #{person_id}"
@@ -1505,7 +1655,15 @@ async def who_am_i_pin_submit(
         )
 
     # Защита от open redirect: принимаем только внутренние пути
-    safe_next = decoded_next if (decoded_next and decoded_next.startswith("/") and not decoded_next.startswith("//")) else "/family/welcome"
+    safe_next = (
+        decoded_next
+        if (
+            decoded_next
+            and decoded_next.startswith("/")
+            and not decoded_next.startswith("//")
+        )
+        else "/family/welcome"
+    )
     response = RedirectResponse(url=safe_next, status_code=303)
     response.set_cookie(
         key=FAMILY_COOKIE_NAME,
@@ -1533,12 +1691,18 @@ async def family_reply(
 
     author_name = "Неизвестный"
     if memory.author_id:
-        i18n = db.query(PersonI18n).filter(
-            PersonI18n.person_id == memory.author_id,
-            PersonI18n.lang_code == "ru",
-        ).first()
+        i18n = (
+            db.query(PersonI18n)
+            .filter(
+                PersonI18n.person_id == memory.author_id,
+                PersonI18n.lang_code == "ru",
+            )
+            .first()
+        )
         if i18n:
-            author_name = " ".join([p for p in (i18n.first_name, i18n.last_name) if p]).strip()
+            author_name = " ".join(
+                [p for p in (i18n.first_name, i18n.last_name) if p]
+            ).strip()
 
     memory_text = (
         memory.transcript_readable
@@ -1555,32 +1719,45 @@ async def family_reply(
         .order_by(Quote.created_at.desc())
         .all()
     )
-    
-    for quote in quotes:
+
+    for quote_row in quotes:
         resp_author_name = "Неизвестный"
         resp_avatar_url = None
-        if quote.author_id:
-            author = db.query(Person).filter(Person.person_id == quote.author_id).first()
+        if quote_row.author_id:
+            author = (
+                db.query(Person).filter(Person.person_id == quote_row.author_id).first()
+            )
             if author:
                 resp_avatar_url = normalize_media_url(author.avatar_url, slug)
-                i18n = db.query(PersonI18n).filter(
-                    PersonI18n.person_id == quote.author_id,
-                    PersonI18n.lang_code == "ru",
-                ).first()
+                i18n = (
+                    db.query(PersonI18n)
+                    .filter(
+                        PersonI18n.person_id == quote_row.author_id,
+                        PersonI18n.lang_code == "ru",
+                    )
+                    .first()
+                )
                 if i18n:
-                    resp_author_name = " ".join([p for p in (i18n.first_name, i18n.last_name) if p]).strip()
-        
-        responses.append({
-            "text": quote.content_text,
-            "author_name": resp_author_name,
-            "author_id": quote.author_id,
-            "avatar_url": resp_avatar_url,
-            "created_at": quote.created_at,
-        })
-    
+                    resp_author_name = " ".join(
+                        [p for p in (i18n.first_name, i18n.last_name) if p]
+                    ).strip()
+
+        responses.append(
+            {
+                "text": quote_row.content_text,
+                "author_name": resp_author_name,
+                "author_id": quote_row.author_id,
+                "avatar_url": resp_avatar_url,
+                "created_at": quote_row.created_at,
+            }
+        )
+
     message = "Ответ сохранён" if saved else None
 
-    original_audio_url = normalize_media_url((memory.audio_url or "").strip() if memory else "", slug) or ""
+    original_audio_url = (
+        normalize_media_url((memory.audio_url or "").strip() if memory else "", slug)
+        or ""
+    )
 
     return templates.TemplateResponse(
         "family/reply.html",
@@ -1612,6 +1789,7 @@ async def family_reply_submit(
 
     if text and text.strip() and person_id:
         from datetime import datetime
+
         quote = Quote(
             author_id=person_id,
             content_text=text,
@@ -1809,4 +1987,3 @@ async def profile_avatar_upload(
     db.commit()
 
     return RedirectResponse(url=f"/family/person/{resolved_person_id}", status_code=303)
-

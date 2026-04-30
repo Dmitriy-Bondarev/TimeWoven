@@ -1,12 +1,11 @@
 from collections import deque
-from typing import Dict, Tuple, Set, Literal, Optional
+from typing import Dict, Literal, Optional, Set, Tuple
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import Person, PersonI18n, Union, UnionChild
-from app.schemas.family_graph import FamilyGraph, GraphNode, GraphEdge
-
+from app.schemas.family_graph import FamilyGraph, GraphEdge, GraphNode
 
 NodeKey = Tuple[str, int]  # ("person" | "union", id)
 
@@ -123,42 +122,52 @@ def get_person(session: Session, person_id: int) -> Optional[Person]:
 def get_person_i18n(
     session: Session, person_id: int, lang_code: str = "ru"
 ) -> Optional[PersonI18n]:
-    return session.query(PersonI18n).filter(
-        PersonI18n.person_id == person_id,
-        PersonI18n.lang_code == lang_code,
-    ).first()
+    return (
+        session.query(PersonI18n)
+        .filter(
+            PersonI18n.person_id == person_id,
+            PersonI18n.lang_code == lang_code,
+        )
+        .first()
+    )
 
 
 def get_unions_for_partner(session: Session, person_id: int) -> list[Union]:
-    return session.query(Union).filter(
-        or_(Union.partner1_id == person_id, Union.partner2_id == person_id)
-    ).all()
+    return (
+        session.query(Union)
+        .filter(or_(Union.partner1_id == person_id, Union.partner2_id == person_id))
+        .all()
+    )
 
 
 def get_unions_for_child(session: Session, person_id: int) -> list[Union]:
-    return session.query(Union).join(
-        UnionChild, UnionChild.union_id == Union.id
-    ).filter(
-        UnionChild.child_id == person_id
-    ).all()
+    return (
+        session.query(Union)
+        .join(UnionChild, UnionChild.union_id == Union.id)
+        .filter(UnionChild.child_id == person_id)
+        .all()
+    )
 
 
 def get_union_partners(session: Session, union_id: int) -> list[Person]:
     union = session.query(Union).filter(Union.id == union_id).first()
     if not union:
         return []
-    partner_ids = [pid for pid in (union.partner1_id, union.partner2_id) if pid is not None]
+    partner_ids = [
+        pid for pid in (union.partner1_id, union.partner2_id) if pid is not None
+    ]
     if not partner_ids:
         return []
     return session.query(Person).filter(Person.person_id.in_(partner_ids)).all()
 
 
 def get_union_children(session: Session, union_id: int) -> list[Person]:
-    return session.query(Person).join(
-        UnionChild, UnionChild.child_id == Person.person_id
-    ).filter(
-        UnionChild.union_id == union_id
-    ).all()
+    return (
+        session.query(Person)
+        .join(UnionChild, UnionChild.child_id == Person.person_id)
+        .filter(UnionChild.union_id == union_id)
+        .all()
+    )
 
 
 def build_person_name(person: Person, i18n: Optional[PersonI18n]) -> str:

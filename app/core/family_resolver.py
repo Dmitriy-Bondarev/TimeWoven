@@ -25,13 +25,11 @@ core_engine = create_engine(
 def resolve_family(slug: str) -> dict:
     with core_engine.connect() as conn:
         result = conn.execute(
-            text(
-                """
+            text("""
                 SELECT db_name, data_path
                 FROM families
                 WHERE slug = :slug
-                """
-            ),
+                """),
             {"slug": slug},
         ).fetchone()
 

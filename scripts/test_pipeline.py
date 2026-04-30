@@ -1,8 +1,7 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -13,7 +12,6 @@ load_dotenv(PROJECT_ROOT / ".env", override=True)
 from app.db.session import SessionLocal
 from app.models import Person, PersonI18n
 from app.services.ai_analyzer import MemoryAnalyzer
-
 
 TEST_TEXT = "В августе 1998 года мы с тетей Леной переехали жить в Москву"
 
