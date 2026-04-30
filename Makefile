@@ -78,8 +78,7 @@ downgrade:
 
 
 downgrade:
-	alembic downgrade -1
-
+	poetry run alembic downgrade -1
 
 revision:
 	@if [ -z "$(msg)" ]; then \
