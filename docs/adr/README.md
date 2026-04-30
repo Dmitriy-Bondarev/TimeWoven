@@ -15,4 +15,4 @@
 | 009   | User Ownership and GDPR Compliance Foundation | Proposed | 2026-04-29 |  |
 | 010   | User Layer Foundation | Proposed | 2026-04-29 |  |
 | 011   | User Layer v1 and Membership Model | Proposed | 2026-04-29 |  |
-
+| 012 | Engineering Maturity Layer | Accepted | 2026-04-29 | |

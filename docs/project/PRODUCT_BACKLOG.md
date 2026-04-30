@@ -1,5 +1,10 @@
-# PRODUCT BACKLOG — TimeWoven
+# PROJECT LOG — TimeWoven
 
+
+
+2026-04-29: Production branch model migrated to main successfully.
+
+## INCIDENT 2026-04-26 — потеря исходников family access слоя (post-mortem)
 
 > Живой реестр продуктовых задач и решений проекта.
 > Этот файл фиксирует:

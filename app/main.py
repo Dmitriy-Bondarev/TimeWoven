@@ -11,6 +11,7 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from app.api.routes.health import router as health_router
 
 from app.api.routes.bot_webhooks import router as bot_webhooks_router
 from app.api.routes.tree import router as tree_router
@@ -45,9 +46,7 @@ async def family_root(slug: str, request: Request):
     return RedirectResponse(url=f"/f/{slug}/family/need-access", status_code=303)
 
 
-@app.get("/health")
-async def health():
-    return JSONResponse({"status": "ok"})
+
 
 
 try:
@@ -66,8 +65,8 @@ app.include_router(explorer_router)
 app.include_router(timeline_router)
 app.include_router(admin_router)
 app.include_router(media_router)
+app.include_router(health_router)
 app.include_router(deploy_router)
-
 
 logger = logging.getLogger(__name__)
 
