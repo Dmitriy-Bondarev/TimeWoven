@@ -38,6 +38,7 @@ FINALIZE_COMMANDS: frozenset[str] = frozenset(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _normalize_finalize_text(text: str) -> str:
     """Normalize user text for robust finalize-command matching.
 
@@ -88,6 +89,7 @@ def _rebuild_draft_text(items: list[dict]) -> str | None:
 # Session CRUD
 # ---------------------------------------------------------------------------
 
+
 def get_open_session(db, max_user_id: str) -> MaxChatSession | None:
     """Return the most-recent open session for *max_user_id*, or None."""
     return (
@@ -118,7 +120,9 @@ def create_session(db, max_user_id: str, person_id: int | None) -> MaxChatSessio
     db.add(session)
     db.commit()
     db.refresh(session)
-    logger.info("Created max_chat_session id=%s for max_user_id=%s", session.id, max_user_id)
+    logger.info(
+        "Created max_chat_session id=%s for max_user_id=%s", session.id, max_user_id
+    )
     return session
 
 
@@ -143,6 +147,7 @@ def get_or_create_open_session(
 # ---------------------------------------------------------------------------
 # Draft item writers
 # ---------------------------------------------------------------------------
+
 
 def add_text_item(db, session: MaxChatSession, text: str, raw_payload: dict) -> None:
     """Append a text message to the session draft."""
@@ -220,6 +225,7 @@ def add_audio_item(
 # ---------------------------------------------------------------------------
 # Finalize
 # ---------------------------------------------------------------------------
+
 
 def finalize_session(db, session: MaxChatSession) -> Memory | None:
     """Finalize an open session: create a draft Memory, run AI analysis, return Memory.

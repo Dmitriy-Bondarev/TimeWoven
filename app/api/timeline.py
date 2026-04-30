@@ -2,13 +2,12 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.api.routes.tree import _family_timeline_date_display
 from app.db.session import get_db
-from app.services.timeline_service import get_timeline, create_event
+from app.services.timeline_service import create_event, get_timeline
 
 router = APIRouter(prefix="/timeline", tags=["timeline"])
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -36,7 +35,11 @@ def read_timeline(request: Request, family_id: int, db: Session = Depends(get_db
     items = []
     for event in events or []:
         raw_date = getattr(event, "date", None)
-        date_sort = raw_date.isoformat() if hasattr(raw_date, "isoformat") else str(raw_date or "")
+        date_sort = (
+            raw_date.isoformat()
+            if hasattr(raw_date, "isoformat")
+            else str(raw_date or "")
+        )
         date_display = _family_timeline_date_display(raw_date)
         items.append(
             {
@@ -78,4 +81,3 @@ def read_timeline(request: Request, family_id: int, db: Session = Depends(get_db
 @router.post("/")
 def add_event(data: dict, db: Session = Depends(get_db)):
     return create_event(db, data)
-    

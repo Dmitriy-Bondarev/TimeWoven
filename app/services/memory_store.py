@@ -1,5 +1,5 @@
-from datetime import datetime
 import json
+from datetime import datetime
 
 from sqlalchemy import or_
 
@@ -25,7 +25,9 @@ def _resolve_person_id_by_messenger(db, user_id: str) -> int | None:
     return person.person_id if person else None
 
 
-def create_memory_from_max(user_id: str, text: str, raw_payload: dict | None = None) -> dict:
+def create_memory_from_max(
+    user_id: str, text: str, raw_payload: dict | None = None
+) -> dict:
     """Save one incoming MAX text message as a Memory row.
 
     This is a minimal transport+persistence function for webhook ingestion.
@@ -47,7 +49,9 @@ def create_memory_from_max(user_id: str, text: str, raw_payload: dict | None = N
             if isinstance(message, dict):
                 message_id = message.get("id") or message.get("message_id")
 
-        external_id = str(message_id).strip() if message_id is not None else normalized_user_id
+        external_id = (
+            str(message_id).strip() if message_id is not None else normalized_user_id
+        )
         metadata = {
             "transport": "max_messenger",
             "external_id": external_id,
@@ -56,7 +60,9 @@ def create_memory_from_max(user_id: str, text: str, raw_payload: dict | None = N
         }
         memory_json = json.dumps(metadata, ensure_ascii=False)
 
-        memory_source_type = "max_contact_test_marker" if is_contact_marker else "max_messenger"
+        memory_source_type = (
+            "max_contact_test_marker" if is_contact_marker else "max_messenger"
+        )
         memory_status = "archived" if is_contact_marker else "published"
 
         memory = Memory(
@@ -113,7 +119,9 @@ def attach_analysis_to_memory(memory_id: int, analysis_result: dict | None) -> d
             except json.JSONDecodeError:
                 metadata = {"raw_transcript_verbatim": memory.transcript_verbatim}
 
-        metadata["analysis"] = analysis_result if isinstance(analysis_result, dict) else {}
+        metadata["analysis"] = (
+            analysis_result if isinstance(analysis_result, dict) else {}
+        )
         memory.transcript_verbatim = json.dumps(metadata, ensure_ascii=False)
         db.commit()
 
@@ -125,7 +133,9 @@ def attach_analysis_to_memory(memory_id: int, analysis_result: dict | None) -> d
         db.close()
 
 
-async def save_raw_memory(user_id: str, text: str, audio_url: str = None, person_id: int | None = None) -> dict:
+async def save_raw_memory(
+    user_id: str, text: str, audio_url: str = None, person_id: int | None = None
+) -> dict:
     """Persist incoming memory text (and optional audio url) into Memories."""
     db = SessionLocal()
     try:

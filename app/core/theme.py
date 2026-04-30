@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from app.models import BotSession
 
-
 THEME_PRESETS: tuple[str, ...] = ("current_dark", "voice_premium")
 DEFAULT_THEME_PRESET = "current_dark"
 
@@ -22,11 +21,7 @@ def normalize_theme_preset(value: object) -> str:
 
 
 def get_active_theme_preset(db: Session) -> str:
-    row = (
-        db.query(BotSession)
-        .filter(BotSession.user_id == _SETTINGS_ROW_ID)
-        .first()
-    )
+    row = db.query(BotSession).filter(BotSession.user_id == _SETTINGS_ROW_ID).first()
     if not row or not (row.data_json or "").strip():
         return DEFAULT_THEME_PRESET
     try:
@@ -40,11 +35,7 @@ def get_active_theme_preset(db: Session) -> str:
 
 def set_active_theme_preset(db: Session, preset: str) -> str:
     normalized = normalize_theme_preset(preset)
-    row = (
-        db.query(BotSession)
-        .filter(BotSession.user_id == _SETTINGS_ROW_ID)
-        .first()
-    )
+    row = db.query(BotSession).filter(BotSession.user_id == _SETTINGS_ROW_ID).first()
     payload: dict = {}
     if row and (row.data_json or "").strip():
         try:

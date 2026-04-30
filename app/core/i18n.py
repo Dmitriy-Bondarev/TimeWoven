@@ -1,16 +1,17 @@
 """
 Minimal YAML-based i18n for TimeWoven (T33 I18N-1).
 """
+
 from __future__ import annotations
 
 import re
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import quote as _urlquote
 
 import yaml
 from jinja2 import pass_context
-from urllib.parse import quote as _urlquote
 
 # Request-scoped language for Jinja and sync call sites
 _current_lang: ContextVar[str] = ContextVar("tw_i18n_lang", default="ru")
